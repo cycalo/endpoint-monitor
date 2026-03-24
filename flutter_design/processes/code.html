@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "secondary-container": "#2f3f92",
+              "tertiary-container": "#006657",
+              "on-primary-fixed-variant": "#293ca0",
+              "secondary-fixed-dim": "#bac3ff",
+              "secondary-fixed": "#dee0ff",
+              "on-primary": "#08218a",
+              "inverse-surface": "#e5e2e1",
+              "on-secondary-container": "#a3b0ff",
+              "primary": "#bac3ff",
+              "on-tertiary-container": "#53e8cd",
+              "error": "#ffb4ab",
+              "tertiary-fixed": "#68fadd",
+              "surface": "#131313",
+              "surface-variant": "#353534",
+              "surface-container-high": "#2a2a2a",
+              "on-primary-container": "#cacfff",
+              "on-tertiary-fixed": "#00201a",
+              "primary-fixed-dim": "#bac3ff",
+              "surface-container": "#201f1f",
+              "primary-container": "#3f51b5",
+              "background": "#131313",
+              "on-tertiary": "#00382f",
+              "surface-container-lowest": "#0e0e0e",
+              "on-surface": "#e5e2e1",
+              "on-tertiary-fixed-variant": "#005145",
+              "on-secondary-fixed-variant": "#2f3f92",
+              "outline": "#8f909e",
+              "on-surface-variant": "#c5c5d4",
+              "outline-variant": "#454652",
+              "tertiary-fixed-dim": "#44ddc1",
+              "inverse-primary": "#4355b9",
+              "surface-tint": "#bac3ff",
+              "on-primary-fixed": "#00105c",
+              "on-error-container": "#ffdad6",
+              "surface-container-highest": "#353534",
+              "error-container": "#93000a",
+              "on-error": "#690005",
+              "inverse-on-surface": "#313030",
+              "surface-dim": "#131313",
+              "primary-fixed": "#dee0ff",
+              "on-secondary": "#15267b",
+              "on-background": "#e5e2e1",
+              "tertiary": "#44ddc1",
+              "secondary": "#bac3ff",
+              "surface-bright": "#393939",
+              "on-secondary-fixed": "#00105b",
+              "surface-container-low": "#1c1b1b"
+            },
+            fontFamily: {
+              "headline": ["Space Grotesk"],
+              "body": ["Inter"],
+              "label": ["Inter"],
+              "mono": ["ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "Liberation Mono", "Courier New", "monospace"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3 { font-family: 'Space Grotesk', sans-serif; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface min-h-screen pb-24">
+<!-- TopAppBar -->
+<nav class="flex justify-between items-center w-full px-6 h-16 bg-[#131313] dark:bg-[#131313] fixed top-0 z-50">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#BAC3FF]" style="font-size: 24px;">terminal</span>
+<span class="font-['Space_Grotesk'] font-bold tracking-tight uppercase text-lg text-[#BAC3FF] tracking-widest">ENDPOINT MONITOR</span>
+</div>
+<button class="bg-primary-container text-on-primary-container px-4 py-1.5 rounded-lg font-['Space_Grotesk'] font-bold tracking-tight uppercase text-sm hover:bg-[#2A2A2A] transition-colors active:scale-95 duration-150">
+            CONNECT
+        </button>
+</nav>
+<!-- Main Content -->
+<main class="pt-20 px-4 md:px-8 max-w-7xl mx-auto">
+<!-- Header & Search -->
+<header class="mb-8 mt-4">
+<h1 class="text-4xl font-bold tracking-tighter mb-6">SYSTEM PROCESSES</h1>
+<div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+<div class="md:col-span-8 relative">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="w-full bg-surface-container-lowest border-none focus:ring-1 focus:ring-primary rounded-lg pl-12 py-3 font-mono text-sm" placeholder="Search by name, PID, or user..." type="text"/>
+</div>
+<div class="md:col-span-4 flex gap-2">
+<div class="flex-1 bg-surface-container-low rounded-lg p-1 flex">
+<button class="flex-1 text-[10px] font-bold uppercase tracking-wider py-2 bg-surface-container-high text-primary rounded-sm transition-all">CPU</button>
+<button class="flex-1 text-[10px] font-bold uppercase tracking-wider py-2 text-outline hover:text-on-surface transition-all">RAM</button>
+<button class="flex-1 text-[10px] font-bold uppercase tracking-wider py-2 text-outline hover:text-on-surface transition-all">NAME</button>
+</div>
+<button class="bg-surface-container-low px-4 rounded-lg flex items-center justify-center hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-outline">filter_list</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Process Table Header -->
+<div class="grid grid-cols-12 px-6 py-3 bg-surface-container-lowest text-[10px] font-extrabold uppercase tracking-widest text-outline-variant mb-2">
+<div class="col-span-5 md:col-span-4">Process Name</div>
+<div class="col-span-2 md:col-span-2">PID</div>
+<div class="hidden md:block md:col-span-2 text-right">CPU Usage</div>
+<div class="hidden md:block md:col-span-2 text-right">Memory</div>
+<div class="col-span-5 md:col-span-2 text-right">Status</div>
+</div>
+<!-- List Items -->
+<div class="space-y-1">
+<!-- Process Item (Normal) -->
+<div class="group bg-surface-container-low hover:bg-surface-container-high transition-colors">
+<div class="grid grid-cols-12 items-center px-6 py-4 cursor-pointer">
+<div class="col-span-5 md:col-span-4 flex items-center gap-3">
+<div class="w-2 h-2 rounded-full bg-tertiary"></div>
+<span class="font-medium text-sm truncate">svchost.exe</span>
+</div>
+<div class="col-span-2 md:col-span-2 font-mono text-xs text-outline">1024</div>
+<div class="hidden md:block md:col-span-2 text-right font-mono text-xs">0.4%</div>
+<div class="hidden md:block md:col-span-2 text-right font-mono text-xs">42.1 MB</div>
+<div class="col-span-5 md:col-span-2 flex justify-end">
+<span class="material-symbols-outlined text-tertiary text-lg">check_circle</span>
+</div>
+</div>
+</div>
+<!-- Process Item (High Usage Warning) -->
+<div class="group bg-surface-container-low border-l-2 border-primary-container hover:bg-surface-container-high transition-colors">
+<div class="grid grid-cols-12 items-center px-6 py-4 cursor-pointer">
+<div class="col-span-5 md:col-span-4 flex items-center gap-3">
+<div class="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+<span class="font-medium text-sm truncate text-primary">chrome.exe</span>
+</div>
+<div class="col-span-2 md:col-span-2 font-mono text-xs text-primary">8842</div>
+<div class="hidden md:block md:col-span-2 text-right font-mono text-xs text-primary">12.8%</div>
+<div class="hidden md:block md:col-span-2 text-right font-mono text-xs text-primary">1,402 MB</div>
+<div class="col-span-5 md:col-span-2 flex justify-end">
+<span class="material-symbols-outlined text-primary text-lg" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+</div>
+</div>
+<!-- Expanded Process Item -->
+<div class="bg-surface-container-highest ring-1 ring-outline-variant/20 shadow-xl overflow-hidden">
+<div class="grid grid-cols-12 items-center px-6 py-4 border-b border-outline-variant/10">
+<div class="col-span-5 md:col-span-4 flex items-center gap-3">
+<div class="w-2 h-2 rounded-full bg-tertiary"></div>
+<span class="font-bold text-sm truncate">winlogon.exe</span>
+</div>
+<div class="col-span-2 md:col-span-2 font-mono text-xs text-outline">620</div>
+<div class="hidden md:block md:col-span-2 text-right font-mono text-xs">0.0%</div>
+<div class="hidden md:block md:col-span-2 text-right font-mono text-xs">8.4 MB</div>
+<div class="col-span-5 md:col-span-2 flex justify-end gap-2">
+<span class="material-symbols-outlined text-outline text-lg">shield</span>
+</div>
+</div>
+<!-- Expanded Detail Section -->
+<div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-8 bg-surface-container-highest">
+<div class="space-y-4">
+<div>
+<p class="text-[10px] font-bold uppercase tracking-wider text-outline mb-1">Executable Path</p>
+<p class="font-mono text-xs text-on-surface-variant break-all">C:\Windows\System32\winlogon.exe</p>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div>
+<p class="text-[10px] font-bold uppercase tracking-wider text-outline mb-1">Parent PID</p>
+<p class="font-mono text-sm">544</p>
+</div>
+<div>
+<p class="text-[10px] font-bold uppercase tracking-wider text-outline mb-1">User</p>
+<p class="font-mono text-sm">SYSTEM</p>
+</div>
+</div>
+</div>
+<div class="flex flex-col justify-end gap-3">
+<div class="flex gap-2">
+<button class="flex-1 flex items-center justify-center gap-2 bg-surface-container-low hover:bg-primary-container/20 border border-outline-variant/30 py-3 rounded-lg text-primary transition-all active:scale-95">
+<span class="material-symbols-outlined text-lg">flag</span>
+<span class="text-xs font-bold uppercase tracking-tighter">Flag Thread</span>
+</button>
+<button class="flex-1 flex items-center justify-center gap-2 bg-surface-container-low hover:bg-orange-500/20 border border-outline-variant/30 py-3 rounded-lg text-orange-400 transition-all active:scale-95">
+<span class="material-symbols-outlined text-lg">pause</span>
+<span class="text-xs font-bold uppercase tracking-tighter">Suspend</span>
+</button>
+</div>
+<button class="w-full flex items-center justify-center gap-2 bg-error-container text-on-error-container py-3 rounded-lg hover:brightness-110 transition-all active:scale-[0.98]">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">dangerous</span>
+<span class="text-xs font-bold uppercase tracking-wider">Terminate Process (Kill)</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Process Item (Suspended) -->
+<div class="group bg-surface-container-low hover:bg-surface-container-high transition-colors opacity-75">
+<div class="grid grid-cols-12 items-center px-6 py-4 cursor-pointer">
+<div class="col-span-5 md:col-span-4 flex items-center gap-3">
+<div class="w-2 h-2 rounded-full bg-outline"></div>
+<span class="font-medium text-sm truncate italic text-outline">searchindexer.exe</span>
+</div>
+<div class="col-span-2 md:col-span-2 font-mono text-xs text-outline">2140</div>
+<div class="hidden md:block md:col-span-2 text-right font-mono text-xs">0.0%</div>
+<div class="hidden md:block md:col-span-2 text-right font-mono text-xs">0.0 MB</div>
+<div class="col-span-5 md:col-span-2 flex justify-end">
+<span class="material-symbols-outlined text-orange-400 text-lg">pause_circle</span>
+</div>
+</div>
+</div>
+<!-- More List Items for scroll effect -->
+<div class="group bg-surface-container-low hover:bg-surface-container-high transition-colors">
+<div class="grid grid-cols-12 items-center px-6 py-4 cursor-pointer">
+<div class="col-span-5 md:col-span-4 flex items-center gap-3">
+<div class="w-2 h-2 rounded-full bg-tertiary"></div>
+<span class="font-medium text-sm truncate">lsass.exe</span>
+</div>
+<div class="col-span-2 md:col-span-2 font-mono text-xs text-outline">744</div>
+<div class="hidden md:block md:col-span-2 text-right font-mono text-xs">0.1%</div>
+<div class="hidden md:block md:col-span-2 text-right font-mono text-xs">15.9 MB</div>
+<div class="col-span-5 md:col-span-2 flex justify-end">
+<span class="material-symbols-outlined text-tertiary text-lg">check_circle</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-4 pt-2 bg-[#131313] border-t border-[#454652]/15 shadow-[0_-4px_24px_rgba(63,81,181,0.06)]">
+<a class="flex flex-col items-center justify-center text-[#454652] px-5 py-1.5 hover:text-[#BAC3FF] transition-all active:translate-y-0.5 duration-200" href="#">
+<span class="material-symbols-outlined mb-1">dashboard</span>
+<span class="font-['Inter'] text-[11px] font-semibold uppercase tracking-tighter">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-[#3F51B5] text-[#FFFFFF] rounded-xl px-5 py-1.5 hover:text-[#BAC3FF] transition-all active:translate-y-0.5 duration-200" href="#">
+<span class="material-symbols-outlined mb-1">memory</span>
+<span class="font-['Inter'] text-[11px] font-semibold uppercase tracking-tighter">Processes</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#454652] px-5 py-1.5 hover:text-[#BAC3FF] transition-all active:translate-y-0.5 duration-200" href="#">
+<span class="material-symbols-outlined mb-1">lan</span>
+<span class="font-['Inter'] text-[11px] font-semibold uppercase tracking-tighter">Network</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#454652] px-5 py-1.5 hover:text-[#BAC3FF] transition-all active:translate-y-0.5 duration-200" href="#">
+<span class="material-symbols-outlined mb-1">event_note</span>
+<span class="font-['Inter'] text-[11px] font-semibold uppercase tracking-tighter">Events</span>
+</a>
+</nav>
+</body></html>

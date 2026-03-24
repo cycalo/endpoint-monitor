@@ -1,0 +1,8 @@
+windows_service/appsettings.json
+**/bin/
+**/obj/
+**/.dart_tool/
+**/build/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/pubspec.lock

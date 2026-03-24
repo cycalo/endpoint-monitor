@@ -1,0 +1,7 @@
+Endpoint Monitor Windows service
+
+1. Copy appsettings.example.json to appsettings.json and set Auth:Token and Auth:JwtSigningKey (32+ chars).
+2. Run as Administrator (required for WMI, Sysmon, firewall, process actions).
+3. From this folder: dotnet run
+4. Listen port: Server:Port in appsettings (default 5000).
+5. WebSocket: ws://<host>:<port>/ws with header Authorization: Bearer <token>
