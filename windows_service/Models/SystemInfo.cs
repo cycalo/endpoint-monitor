@@ -22,6 +22,18 @@ public sealed class SystemInfo
     /// <summary>Active Directory DNS domain, or workgroup name on workgroup PCs.</summary>
     public string Domain { get; set; } = "";
 
+    /// <summary>First IPv4-enabled adapter description (e.g. Intel Wi-Fi).</summary>
+    public string PrimaryNetworkDescription { get; set; } = "";
+
+    /// <summary>IPv4 on that adapter (not loopback).</summary>
+    public string PrimaryNetworkIpv4 { get; set; } = "";
+
+    /// <summary>Endpoint Monitor Windows service build (informational or assembly version).</summary>
+    public string AgentVersion { get; set; } = "";
+
+    /// <summary>Sysmon driver/service: Not installed | Stopped | Running.</summary>
+    public string SysmonStatus { get; set; } = "";
+
     /// <summary>Last boot time in local time, yyyy-MM-dd HH:mm:ss.</summary>
     public string LastBootTime { get; set; } = "";
     public List<string> LoggedInUsers { get; set; } = [];

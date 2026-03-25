@@ -127,6 +127,10 @@ class SystemInfo {
     required this.processCount,
     required this.networkConnectionCount,
     required this.eventsTodayCount,
+    this.primaryNetworkDescription = '',
+    this.primaryNetworkIpv4 = '',
+    this.agentVersion = '',
+    this.sysmonStatus = '',
   });
 
   /// Windows computer / device name (from agent).
@@ -154,6 +158,18 @@ class SystemInfo {
   final int networkConnectionCount;
   final int eventsTodayCount;
 
+  /// First IPv4-enabled adapter label from the agent (WMI).
+  final String primaryNetworkDescription;
+
+  /// Local IPv4 on that adapter.
+  final String primaryNetworkIpv4;
+
+  /// Windows service / assembly version string.
+  final String agentVersion;
+
+  /// Sysmon driver state: Running | Stopped | Not installed.
+  final String sysmonStatus;
+
   /// Display string for OS row: caption when present, else version.
   String get osDisplayLine {
     final c = osCaption.trim();
@@ -179,6 +195,10 @@ class SystemInfo {
         processCount: (j['processCount'] as num?)?.toInt() ?? 0,
         networkConnectionCount: (j['networkConnectionCount'] as num?)?.toInt() ?? 0,
         eventsTodayCount: (j['eventsTodayCount'] as num?)?.toInt() ?? 0,
+        primaryNetworkDescription: j['primaryNetworkDescription'] as String? ?? '',
+        primaryNetworkIpv4: j['primaryNetworkIpv4'] as String? ?? '',
+        agentVersion: j['agentVersion'] as String? ?? '',
+        sysmonStatus: j['sysmonStatus'] as String? ?? '',
       );
 }
 

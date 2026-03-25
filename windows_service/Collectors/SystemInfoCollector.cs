@@ -1,5 +1,8 @@
 using System.Diagnostics;
 using System.Management;
+using System.Net;
+using System.Net.Sockets;
+using System.Reflection;
 using EndpointMonitorService.Models;
 using Microsoft.Win32;
 using static System.Management.ManagementDateTimeConverter;
@@ -124,8 +127,100 @@ public sealed class SystemInfoCollector(ILogger<SystemInfoCollector> logger)
         info.OsVersion = Environment.OSVersion.VersionString;
         info.PatchLevel = ReadPatchLevel();
         info.LoggedInUsers = CollectLoggedOnUsers();
+        info.AgentVersion = CollectAgentVersion();
+        info.SysmonStatus = CollectSysmonStatus();
+        var (netDesc, netIp) = CollectPrimaryNetwork();
+        info.PrimaryNetworkDescription = netDesc;
+        info.PrimaryNetworkIpv4 = netIp;
 
         return info;
+    }
+
+    private static string CollectAgentVersion()
+    {
+        try
+        {
+            var a = typeof(SystemInfoCollector).Assembly;
+            var info = a.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+            if (!string.IsNullOrWhiteSpace(info))
+            {
+                var plus = info.IndexOf('+', StringComparison.Ordinal);
+                return plus > 0 ? info[..plus] : info;
+            }
+
+            var v = a.GetName().Version;
+            return v?.ToString() ?? "";
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
+    private static string CollectSysmonStatus()
+    {
+        try
+        {
+            using var s = new ManagementObjectSearcher(
+                "SELECT State FROM Win32_Service WHERE Name='Sysmon64' OR Name='Sysmon'");
+            foreach (ManagementObject mo in s.Get())
+            {
+                var state = mo["State"]?.ToString() ?? "";
+                if (string.Equals(state, "Running", StringComparison.OrdinalIgnoreCase))
+                    return "Running";
+                if (string.Equals(state, "Stopped", StringComparison.OrdinalIgnoreCase))
+                    return "Stopped";
+            }
+        }
+        catch
+        {
+            // ignore
+        }
+
+        return "Not installed";
+    }
+
+    private static (string Description, string Ipv4) CollectPrimaryNetwork()
+    {
+        try
+        {
+            using var searcher = new ManagementObjectSearcher(
+                "SELECT Description, IPAddress FROM Win32_NetworkAdapterConfiguration WHERE IPEnabled=True");
+            foreach (ManagementObject mo in searcher.Get())
+            {
+                var desc = mo["Description"]?.ToString()?.Trim() ?? "";
+                if (mo["IPAddress"] is not string[] ips) continue;
+                foreach (var ip in ips)
+                {
+                    if (string.IsNullOrWhiteSpace(ip)) continue;
+                    if (!IPAddress.TryParse(ip, out var addr)) continue;
+                    if (addr.AddressFamily != AddressFamily.InterNetwork) continue;
+                    if (IPAddress.IsLoopback(addr)) continue;
+                    if (ip.StartsWith("169.254.", StringComparison.Ordinal)) continue;
+                    return (desc, ip);
+                }
+            }
+
+            foreach (ManagementObject mo in searcher.Get())
+            {
+                var desc = mo["Description"]?.ToString()?.Trim() ?? "";
+                if (mo["IPAddress"] is not string[] ips2) continue;
+                foreach (var ip in ips2)
+                {
+                    if (string.IsNullOrWhiteSpace(ip)) continue;
+                    if (!IPAddress.TryParse(ip, out var addr)) continue;
+                    if (addr.AddressFamily != AddressFamily.InterNetwork) continue;
+                    if (IPAddress.IsLoopback(addr)) continue;
+                    return (desc, ip);
+                }
+            }
+        }
+        catch
+        {
+            // ignore
+        }
+
+        return ("", "");
     }
 
     private static string ReadPatchLevel()
@@ -146,30 +241,19 @@ public sealed class SystemInfoCollector(ILogger<SystemInfoCollector> logger)
         return "";
     }
 
+    /// <summary>
+    /// Uses Win32_ComputerSystem.UserName for the logged-on user; falls back to Environment.UserName when null/empty.
+    /// </summary>
     private static List<string> CollectLoggedOnUsers()
     {
-        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        string? user = null;
         try
         {
-            using var searcher = new ManagementObjectSearcher(
-                "SELECT Antecedent FROM Win32_LoggedOnUser");
+            using var searcher = new ManagementObjectSearcher("SELECT UserName FROM Win32_ComputerSystem");
             foreach (ManagementObject mo in searcher.Get())
             {
-                try
-                {
-                    var ant = mo["Antecedent"]?.ToString() ?? "";
-                    var idx = ant.IndexOf("Name=\"", StringComparison.Ordinal);
-                    if (idx >= 0)
-                    {
-                        var end = ant.IndexOf('"', idx + 6);
-                        if (end > idx)
-                            set.Add(ant[(idx + 6)..end]);
-                    }
-                }
-                catch
-                {
-                    // ignore
-                }
+                user = mo["UserName"]?.ToString()?.Trim();
+                break;
             }
         }
         catch
@@ -177,6 +261,13 @@ public sealed class SystemInfoCollector(ILogger<SystemInfoCollector> logger)
             // ignore
         }
 
-        return set.ToList();
+        if (string.IsNullOrWhiteSpace(user))
+            user = Environment.UserName;
+
+        user = user?.Trim();
+        if (string.IsNullOrEmpty(user))
+            return [];
+
+        return [user];
     }
 }

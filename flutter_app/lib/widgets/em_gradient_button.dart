@@ -46,17 +46,17 @@ class EmGradientButton extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           );
-    const labelColor = Color(0xFFFFFFFF);
+    final labelColor = scheme.onPrimary;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
         child: Ink(
           decoration: BoxDecoration(
             gradient: gradient,
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(8),
             boxShadow: disabled
                 ? null
                 : [
@@ -79,10 +79,10 @@ class EmGradientButton extends StatelessWidget {
                 ],
                 Text(
                   label.toUpperCase(),
-                  style: GoogleFonts.spaceGrotesk(
+                  style: GoogleFonts.manrope(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: 2,
+                    letterSpacing: 1.2,
                     color: labelColor,
                   ),
                 ),

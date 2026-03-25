@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../bloc/network_bloc.dart';
 import '../models/ws_models.dart';
+import '../theme/em_design_system.dart';
 import '../widgets/em_brand_app_bar.dart';
 
 class NetworkScreen extends StatefulWidget {
@@ -26,22 +27,24 @@ class _NetworkScreenState extends State<NetworkScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final mono = GoogleFonts.jetBrainsMono(fontSize: 12, color: scheme.onSurfaceVariant);
 
     return Scaffold(
       backgroundColor: scheme.surface,
       appBar: const EmBrandAppBar(),
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Text(
-              'NETWORK CONNECTIONS',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
-                  ),
+              'Network monitor',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
+              ),
             ),
           ),
           Padding(
@@ -79,23 +82,34 @@ class _NetworkScreenState extends State<NetworkScreen> {
           ),
           Padding(
             padding: const EdgeInsets.all(12),
-            child: TextField(
-              controller: _search,
-              style: mono,
-              onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                prefixIcon: Icon(Icons.search_rounded, color: scheme.outline),
-                hintText: 'Search IP or process',
-                suffixIcon: _search.text.isEmpty
-                    ? null
-                    : IconButton(
-                        tooltip: 'Clear',
-                        onPressed: () {
-                          _search.clear();
-                          setState(() {});
-                        },
-                        icon: Icon(Icons.clear_rounded, color: scheme.outline, size: 22),
-                      ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+                border: EmDesign.ghostBorder(scheme),
+              ),
+              child: TextField(
+                controller: _search,
+                style: mono,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.transparent,
+                  border: InputBorder.none,
+                  prefixIcon: Icon(Icons.search_rounded, color: scheme.outline),
+                  hintText: 'Search IP or process',
+                  suffixIcon: _search.text.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'Clear',
+                          onPressed: () {
+                            _search.clear();
+                            setState(() {});
+                          },
+                          icon: Icon(Icons.clear_rounded, color: scheme.outline, size: 22),
+                        ),
+                ),
               ),
             ),
           ),
@@ -108,54 +122,137 @@ class _NetworkScreenState extends State<NetworkScreen> {
                 final q = _search.text.trim().toLowerCase();
                 final list = state.items.where((n) {
                   if (_protocol != 'all' && n.protocol != _protocol) return false;
-                  if (_state != 'all' && n.state != _state && n.protocol == 'TCP') return false;
+                  if (_state != 'all' && n.state != _state && n.protocol == 'TCP') {
+                    return false;
+                  }
                   if (q.isEmpty) return true;
-                  return n.remoteAddress.toLowerCase().contains(q) || n.processName.toLowerCase().contains(q);
+                  return n.remoteAddress.toLowerCase().contains(q) ||
+                      n.processName.toLowerCase().contains(q);
                 }).toList();
-                return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 96),
-                  itemCount: list.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 4),
-                  itemBuilder: (context, i) {
-                    final n = list[i];
-                    return Material(
-                      color: scheme.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(4),
-                      child: ExpansionTile(
-                        tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                        title: Text(
-                          '${n.processName} (${n.pid})',
-                          style: Theme.of(context).textTheme.titleSmall,
-                        ),
-                        subtitle: Text(
-                          '${n.localAddress}:${n.localPort} → ${n.remoteAddress}:${n.remotePort} · ${n.protocol} ${n.state}',
-                          style: mono.copyWith(fontSize: 11),
-                        ),
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                            child: Row(
-                              children: [
-                                TextButton(
-                                  onPressed: n.remoteAddress.isEmpty ? null : () => _block(context, n),
-                                  child: const Text('Block IP'),
-                                ),
-                                TextButton(
-                                  onPressed: n.remoteAddress.isEmpty
-                                      ? null
-                                      : () => context.read<NetworkBloc>().sendCommand({
-                                            'type': 'unblock_ip',
-                                            'ip': n.remoteAddress,
-                                          }),
-                                  child: const Text('Unblock'),
-                                ),
-                              ],
+                          Text(
+                            'Active connections',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: scheme.tertiary.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              '${list.length} active',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: scheme.tertiary,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                    );
-                  },
+                    ),
+                    Expanded(
+                      child: list.isEmpty
+                          ? Center(
+                              child: Text(
+                                'No matching connections',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
+                            )
+                          : ListView.separated(
+                              padding: const EdgeInsets.fromLTRB(12, 0, 12, 96),
+                              itemCount: list.length,
+                              separatorBuilder: (_, __) => const SizedBox(height: 8),
+                              itemBuilder: (context, i) {
+                                final n = list[i];
+                                return Material(
+                                  color: scheme.surfaceContainer,
+                                  borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+                                      border: EmDesign.ghostBorder(scheme),
+                                    ),
+                                    child: ExpansionTile(
+                                      tilePadding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 8,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+                                      ),
+                                      collapsedShape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+                                      ),
+                                      leading: Container(
+                                        width: 44,
+                                        height: 44,
+                                        decoration: BoxDecoration(
+                                          color: scheme.surfaceContainerLow,
+                                          borderRadius: BorderRadius.circular(EmDesign.radiusSm),
+                                        ),
+                                        child: Icon(
+                                          Icons.public_rounded,
+                                          color: scheme.primary,
+                                        ),
+                                      ),
+                                      title: Text(
+                                        '${n.processName} (${n.pid})',
+                                        style: theme.textTheme.titleSmall?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      subtitle: Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Text(
+                                          '${n.localAddress}:${n.localPort} → ${n.remoteAddress}:${n.remotePort} · ${n.protocol} ${n.state}',
+                                          style: mono.copyWith(fontSize: 11),
+                                        ),
+                                      ),
+                                      children: [
+                                        Padding(
+                                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                                          child: Row(
+                                            children: [
+                                              TextButton(
+                                                onPressed: n.remoteAddress.isEmpty
+                                                    ? null
+                                                    : () => _block(context, n),
+                                                child: const Text('Block IP'),
+                                              ),
+                                              TextButton(
+                                                onPressed: n.remoteAddress.isEmpty
+                                                    ? null
+                                                    : () => context.read<NetworkBloc>().sendCommand({
+                                                          'type': 'unblock_ip',
+                                                          'ip': n.remoteAddress,
+                                                        }),
+                                                child: const Text('Unblock'),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -178,7 +275,11 @@ class _NetworkScreenState extends State<NetworkScreen> {
       ),
     );
     if (ok == true && context.mounted) {
-      context.read<NetworkBloc>().sendCommand({'type': 'block_ip', 'ip': n.remoteAddress, 'direction': 'outbound'});
+      context.read<NetworkBloc>().sendCommand({
+        'type': 'block_ip',
+        'ip': n.remoteAddress,
+        'direction': 'outbound',
+      });
     }
   }
 }

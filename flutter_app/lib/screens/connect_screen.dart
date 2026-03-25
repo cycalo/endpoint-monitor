@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../bloc/connection_bloc.dart';
+import '../theme/em_design_system.dart';
 import '../widgets/em_brand_app_bar.dart';
 import '../widgets/em_gradient_button.dart';
 import '../widgets/em_technical_grid.dart';
@@ -89,290 +90,348 @@ class _ConnectScreenState extends State<ConnectScreen> {
     return Scaffold(
       backgroundColor: scheme.surface,
       appBar: const EmBrandAppBar(),
-      body: EmTechnicalGrid(
-        child: SafeArea(
-          child: BlocConsumer<ConnectionBloc, EmConnectionState>(
-            listener: (context, state) {
-              if (state.status == ConnectionStatus.connected) {
-                context.goNamed('dashboard');
-              }
-            },
-            builder: (context, state) {
-              return LayoutBuilder(
-                builder: (context, constraints) {
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(0, -0.35),
+                  radius: 1.15,
+                  colors: [
+                    scheme.surfaceContainer.withValues(alpha: 0.65),
+                    scheme.surface,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          EmTechnicalGrid(
+            child: SafeArea(
+              child: BlocConsumer<ConnectionBloc, EmConnectionState>(
+                listener: (context, state) {
+                  if (state.status == ConnectionStatus.connected) {
+                    context.goNamed('dashboard');
+                  }
+                },
+                builder: (context, state) {
                   return SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(minHeight: constraints.maxHeight - 24),
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 440),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              const SizedBox(height: 8),
-                              Column(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(18),
-                                    decoration: BoxDecoration(
-                                      color: scheme.surfaceContainerHigh,
-                                      borderRadius: BorderRadius.circular(12),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: scheme.shadow,
-                                          blurRadius: 24,
-                                          offset: const Offset(0, 12),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Icon(
-                                      Icons.terminal_rounded,
-                                      size: 48,
-                                      color: theme.colorScheme.primary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  Text(
-                                    'Connect to Endpoint',
-                                    textAlign: TextAlign.center,
-                                    style: theme.textTheme.headlineMedium?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Enter the host address and your bearer token to securely monitor this device.',
-                                    textAlign: TextAlign.center,
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: scheme.onSurfaceVariant,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 28),
-                              DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: scheme.surfaceContainerLow,
-                                  borderRadius: BorderRadius.circular(8),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: scheme.shadow,
-                                      blurRadius: 32,
-                                      offset: const Offset(0, 16),
-                                    ),
-                                  ],
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(24),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 440),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                                  Column(
                                     children: [
-                                      if (_recent.isNotEmpty) ...[
-                                        Text(
-                                          'RECENT ENDPOINTS',
-                                          style: theme.textTheme.labelSmall,
-                                        ),
-                                        const SizedBox(height: 10),
-                                        Wrap(
-                                          spacing: 8,
-                                          runSpacing: 8,
-                                          children: _recent.map((h) {
-                                            return Material(
-                                              color: scheme.surfaceContainerHigh,
-                                              borderRadius: BorderRadius.circular(6),
-                                              child: InkWell(
-                                                onTap: () {
-                                                  _host.text = h
-                                                      .replaceFirst(RegExp(r'^https?://'), '')
-                                                      .replaceFirst(RegExp(r'^ws://'), '');
-                                                },
-                                                borderRadius: BorderRadius.circular(6),
-                                                child: Padding(
-                                                  padding: const EdgeInsets.symmetric(
-                                                    horizontal: 12,
-                                                    vertical: 8,
-                                                  ),
-                                                  child: Text(
-                                                    h,
-                                                    style: mono.copyWith(fontSize: 11),
-                                                  ),
-                                                ),
-                                              ),
-                                            );
-                                          }).toList(),
-                                        ),
-                                        const SizedBox(height: 22),
-                                      ],
-                                      _LabeledField(
-                                        label: 'Host Address',
-                                        child: TextField(
-                                          controller: _host,
-                                          style: mono,
-                                          decoration: InputDecoration(
-                                            hintText: '192.168.1.100 or endpoint-monitor.local',
-                                            hintStyle: mono.copyWith(
-                                              color: scheme.outline.withValues(alpha: 0.45),
+                                      Container(
+                                        width: 52,
+                                        height: 52,
+                                        decoration: BoxDecoration(
+                                          color: scheme.surfaceContainer,
+                                          borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+                                          border: EmDesign.ghostBorder(scheme),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: scheme.primary.withValues(alpha: 0.08),
+                                              blurRadius: 24,
+                                              offset: const Offset(0, 8),
                                             ),
-                                            prefixIcon: Icon(
-                                              Icons.link_rounded,
-                                              color: scheme.outline,
-                                              size: 20,
-                                            ),
-                                          ),
+                                          ],
+                                        ),
+                                        child: Icon(
+                                          Icons.monitor_heart_rounded,
+                                          size: 30,
+                                          color: scheme.primary,
                                         ),
                                       ),
-                                      const SizedBox(height: 18),
-                                      _LabeledField(
-                                        label: 'Bearer Token',
-                                        child: TextField(
-                                          controller: _token,
-                                          obscureText: _hideToken,
-                                          style: mono,
-                                          decoration: InputDecoration(
-                                            hintText: 'Enter authentication token',
-                                            hintStyle: mono.copyWith(
-                                              color: scheme.outline.withValues(alpha: 0.45),
-                                            ),
-                                            prefixIcon: Icon(
-                                              Icons.key_rounded,
-                                              color: scheme.outline,
-                                              size: 20,
-                                            ),
-                                            suffixIcon: IconButton(
-                                              onPressed: () =>
-                                                  setState(() => _hideToken = !_hideToken),
-                                              icon: Icon(
-                                                _hideToken
-                                                    ? Icons.visibility_outlined
-                                                    : Icons.visibility_off_outlined,
-                                                color: scheme.outline,
-                                              ),
-                                            ),
-                                          ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        'ENDPOINT MONITOR',
+                                        style: GoogleFonts.manrope(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 3,
+                                          color: scheme.primary,
                                         ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      CheckboxListTile(
-                                        contentPadding: EdgeInsets.zero,
-                                        controlAffinity: ListTileControlAffinity.leading,
-                                        value: _rememberDetails,
-                                        onChanged: (v) async {
-                                          final next = v ?? false;
-                                          setState(() => _rememberDetails = next);
-                                          if (!next) {
-                                            await _persistRememberPreference();
-                                          }
-                                        },
-                                        title: Text(
-                                          'Remember host and token on this device',
-                                          style: theme.textTheme.bodySmall?.copyWith(
-                                            color: scheme.onSurfaceVariant,
-                                            height: 1.35,
-                                          ),
-                                        ),
-                                      ),
-                                      if (state.message != null) ...[
-                                        const SizedBox(height: 16),
-                                        Container(
-                                          padding: const EdgeInsets.all(12),
-                                          decoration: BoxDecoration(
-                                            color: scheme.errorContainer.withValues(alpha: 0.2),
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(
-                                              color: scheme.error.withValues(alpha: 0.1),
-                                            ),
-                                          ),
-                                          child: Row(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Icon(
-                                                Icons.error_outline_rounded,
-                                                color: scheme.error,
-                                                size: 20,
-                                              ),
-                                              const SizedBox(width: 10),
-                                              Expanded(
-                                                child: Text(
-                                                  state.message!,
-                                                  style: theme.textTheme.bodySmall?.copyWith(
-                                                    color: scheme.onErrorContainer,
-                                                    height: 1.35,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                      const SizedBox(height: 22),
-                                      EmGradientButton(
-                                        label: switch (state.status) {
-                                          ConnectionStatus.connecting => 'Connecting…',
-                                          _ => 'Connect',
-                                        },
-                                        onPressed: state.status == ConnectionStatus.connecting
-                                            ? null
-                                            : () async {
-                                                await _persistRememberPreference();
-                                                if (!context.mounted) return;
-                                                context.read<ConnectionBloc>().add(
-                                                      ConnectionConnectRequested(
-                                                        host: _host.text.trim(),
-                                                        token: _token.text.trim(),
-                                                      ),
-                                                    );
-                                              },
                                       ),
                                     ],
                                   ),
-                                ),
-                              ),
-                              const SizedBox(height: 22),
-                              Divider(
-                                height: 1,
-                                thickness: 1,
-                                color: scheme.outlineVariant.withValues(alpha: 0.1),
-                              ),
-                              const SizedBox(height: 16),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _MetaCell(
-                                      label: 'Protocol',
-                                      value: 'WSS/TLS 1.3',
-                                      mono: mono,
+                                  const SizedBox(height: 24),
+                                  Container(
+                                    padding: const EdgeInsets.all(24),
+                                    decoration: EmDesign.cardShell(
+                                      scheme,
+                                      color: scheme.surfaceContainerLow,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                                      children: [
+                                        Text(
+                                          'Establish connection',
+                                          style: theme.textTheme.headlineSmall?.copyWith(
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          'Initialize telemetry for a remote Windows host.',
+                                          style: theme.textTheme.bodySmall?.copyWith(
+                                            color: scheme.onSurfaceVariant,
+                                            height: 1.4,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 22),
+                                        if (_recent.isNotEmpty) ...[
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                'RECENT ENDPOINTS',
+                                                style: EmDesign.labelCaps(context, scheme),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 10),
+                                          Wrap(
+                                            spacing: 8,
+                                            runSpacing: 8,
+                                            children: _recent.map((h) {
+                                              return Material(
+                                                color: scheme.surfaceContainerHigh,
+                                                borderRadius: BorderRadius.circular(999),
+                                                child: InkWell(
+                                                  onTap: () {
+                                                    _host.text = h
+                                                        .replaceFirst(RegExp(r'^https?://'), '')
+                                                        .replaceFirst(RegExp(r'^wss?://'), '');
+                                                    setState(() {});
+                                                  },
+                                                  borderRadius: BorderRadius.circular(999),
+                                                  child: Container(
+                                                    padding: const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 8,
+                                                    ),
+                                                    decoration: BoxDecoration(
+                                                      borderRadius: BorderRadius.circular(999),
+                                                      border: EmDesign.ghostBorder(scheme),
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Container(
+                                                          width: 6,
+                                                          height: 6,
+                                                          decoration: BoxDecoration(
+                                                            shape: BoxShape.circle,
+                                                            color: scheme.tertiary,
+                                                            boxShadow: [
+                                                              BoxShadow(
+                                                                color: scheme.tertiary.withValues(alpha: 0.4),
+                                                                blurRadius: 6,
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                        const SizedBox(width: 8),
+                                                        Text(
+                                                          h,
+                                                          style: GoogleFonts.inter(
+                                                            fontSize: 12,
+                                                            color: scheme.onSurface,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              );
+                                            }).toList(),
+                                          ),
+                                          const SizedBox(height: 22),
+                                        ],
+                                        _LabeledField(
+                                          label: 'Remote host address',
+                                          child: TextField(
+                                            controller: _host,
+                                            style: mono,
+                                            decoration: InputDecoration(
+                                              hintText: '192.168.1.100',
+                                              hintStyle: mono.copyWith(
+                                                color: scheme.outline.withValues(alpha: 0.45),
+                                              ),
+                                              prefixIcon: Icon(
+                                                Icons.lan_rounded,
+                                                color: scheme.outline,
+                                                size: 20,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 18),
+                                        _LabeledField(
+                                          label: 'Authentication token',
+                                          child: TextField(
+                                            controller: _token,
+                                            obscureText: _hideToken,
+                                            style: mono,
+                                            decoration: InputDecoration(
+                                              hintText: '••••••••',
+                                              hintStyle: mono.copyWith(
+                                                color: scheme.outline.withValues(alpha: 0.45),
+                                              ),
+                                              prefixIcon: Icon(
+                                                Icons.key_rounded,
+                                                color: scheme.outline,
+                                                size: 20,
+                                              ),
+                                              suffixIcon: IconButton(
+                                                onPressed: () =>
+                                                    setState(() => _hideToken = !_hideToken),
+                                                icon: Icon(
+                                                  _hideToken
+                                                      ? Icons.visibility_outlined
+                                                      : Icons.visibility_off_outlined,
+                                                  color: scheme.outline,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        CheckboxListTile(
+                                          contentPadding: EdgeInsets.zero,
+                                          controlAffinity: ListTileControlAffinity.leading,
+                                          value: _rememberDetails,
+                                          onChanged: (v) async {
+                                            final next = v ?? false;
+                                            setState(() => _rememberDetails = next);
+                                            if (!next) {
+                                              await _persistRememberPreference();
+                                            }
+                                          },
+                                          title: Text(
+                                            'Remember host and token on this device',
+                                            style: theme.textTheme.bodySmall?.copyWith(
+                                              color: scheme.onSurfaceVariant,
+                                              height: 1.35,
+                                            ),
+                                          ),
+                                        ),
+                                        if (state.message != null) ...[
+                                          const SizedBox(height: 16),
+                                          Container(
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color: scheme.errorContainer.withValues(alpha: 0.2),
+                                              borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+                                              border: Border.all(
+                                                color: scheme.error.withValues(alpha: 0.15),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Icon(
+                                                  Icons.error_outline_rounded,
+                                                  color: scheme.error,
+                                                  size: 20,
+                                                ),
+                                                const SizedBox(width: 10),
+                                                Expanded(
+                                                  child: Text(
+                                                    state.message!,
+                                                    style: theme.textTheme.bodySmall?.copyWith(
+                                                      color: scheme.onErrorContainer,
+                                                      height: 1.35,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                        const SizedBox(height: 22),
+                                        EmGradientButton(
+                                          label: switch (state.status) {
+                                            ConnectionStatus.connecting => 'Connecting…',
+                                            _ => 'Connect to endpoint',
+                                          },
+                                          icon: Icons.bolt_rounded,
+                                          onPressed: state.status == ConnectionStatus.connecting
+                                              ? null
+                                              : () async {
+                                                  await _persistRememberPreference();
+                                                  if (!context.mounted) return;
+                                                  context.read<ConnectionBloc>().add(
+                                                        ConnectionConnectRequested(
+                                                          host: _host.text.trim(),
+                                                          token: _token.text.trim(),
+                                                        ),
+                                                      );
+                                                },
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  Expanded(
-                                    child: _MetaCell(
-                                      label: 'Encryption',
-                                      value: 'AES-256-GCM',
-                                      mono: mono,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _MetaCell(
-                                      label: 'Region',
-                                      value: 'Global',
-                                      mono: mono,
-                                    ),
+                                  const SizedBox(height: 28),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      _MetaPill(scheme: scheme, label: 'WSS / TLS 1.3'),
+                                      const SizedBox(width: 20),
+                                      _MetaPill(scheme: scheme, label: 'Encrypted channel'),
+                                    ],
                                   ),
                                 ],
                               ),
-                            ],
+                            ),
                           ),
-                        ),
-                      ),
-                    ),
                   );
                 },
-              );
-            },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MetaPill extends StatelessWidget {
+  const _MetaPill({required this.scheme, required this.label});
+
+  final ColorScheme scheme;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: scheme.tertiary,
           ),
         ),
-      ),
+        const SizedBox(width: 8),
+        Text(
+          label.toUpperCase(),
+          style: GoogleFonts.inter(
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.6,
+            color: scheme.onSurfaceVariant,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -388,54 +447,21 @@ class _LabeledField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(
-            label.toUpperCase(),
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  letterSpacing: 1.4,
-                ),
-          ),
-        ),
-        child,
-      ],
-    );
-  }
-}
-
-class _MetaCell extends StatelessWidget {
-  const _MetaCell({
-    required this.label,
-    required this.value,
-    required this.mono,
-  });
-
-  final String label;
-  final String value;
-  final TextStyle mono;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Column(
-      children: [
         Text(
           label.toUpperCase(),
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                fontSize: 9,
-                letterSpacing: 0.5,
-                color: scheme.outline,
-              ),
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1,
+            color: scheme.onSurfaceVariant,
+          ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          textAlign: TextAlign.center,
-          style: mono.copyWith(fontSize: 11, color: scheme.onSurfaceVariant),
-        ),
+        const SizedBox(height: 8),
+        child,
       ],
     );
   }

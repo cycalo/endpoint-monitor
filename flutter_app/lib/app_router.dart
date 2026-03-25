@@ -144,15 +144,15 @@ class ScaffoldWithNavBar extends StatelessWidget {
       body: shell,
       bottomNavigationBar: DecoratedBox(
         decoration: BoxDecoration(
-          color: scheme.surface,
+          color: scheme.surfaceContainerHighest,
           border: Border(
-            top: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.12)),
+            top: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.15)),
           ),
           boxShadow: [
             BoxShadow(
-              color: scheme.primary.withValues(alpha: 0.06),
-              blurRadius: 24,
-              offset: const Offset(0, -6),
+              color: scheme.onSurface.withValues(alpha: 0.06),
+              blurRadius: 12,
+              offset: const Offset(0, -4),
             ),
           ],
         ),

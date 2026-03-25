@@ -1,59 +1,59 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Cyber blue + slate — inspired by flutter_design gradients, no purple / no green primaries.
-const ColorScheme _endpointMonitorDarkScheme = ColorScheme(
+import 'em_design_system.dart';
+
+/// Cyber Slate — tokens from [flutter_design] HTML + DESIGN.md (Deep Slate + Cyber Blue).
+const ColorScheme _orchestratorDarkScheme = ColorScheme(
   brightness: Brightness.dark,
-  // Brighter, more chromatic blues (still readable on dark slate).
-  primary: Color(0xFF6BA3FF),
-  onPrimary: Color(0xFF061225),
-  primaryContainer: Color(0xFF1538A8),
-  onPrimaryContainer: Color(0xFFE8F4FF),
-  secondary: Color(0xFF94A3B8),
-  onSecondary: Color(0xFF0F172A),
-  secondaryContainer: Color(0xFF334155),
-  onSecondaryContainer: Color(0xFFE2E8F0),
-  // Accent: sky cyan (status / highlights) — stays in the blue family, not mint green.
-  tertiary: Color(0xFF22D3FF),
-  onTertiary: Color(0xFF001018),
-  tertiaryContainer: Color(0xFF005F99),
-  onTertiaryContainer: Color(0xFFD6F3FF),
+  primary: Color(0xFF98CBFF),
+  onPrimary: Color(0xFF003354),
+  primaryContainer: Color(0xFF0097EC),
+  onPrimaryContainer: Color(0xFF002C4A),
+  secondary: Color(0xFFB9C7DF),
+  onSecondary: Color(0xFF233144),
+  secondaryContainer: Color(0xFF3C4A5E),
+  onSecondaryContainer: Color(0xFFABB9D1),
+  tertiary: Color(0xFF2FD9F4),
+  onTertiary: Color(0xFF00363E),
+  tertiaryContainer: Color(0xFF009FB4),
+  onTertiaryContainer: Color(0xFF002F36),
   error: Color(0xFFFFB4AB),
   onError: Color(0xFF690005),
   errorContainer: Color(0xFF93000A),
   onErrorContainer: Color(0xFFFFDAD6),
-  surface: Color(0xFF0F1218),
-  onSurface: Color(0xFFE2E8F0),
-  surfaceContainerHighest: Color(0xFF2A3140),
-  surfaceContainerHigh: Color(0xFF222936),
-  surfaceContainer: Color(0xFF1A2030),
-  surfaceContainerLow: Color(0xFF151A26),
-  surfaceContainerLowest: Color(0xFF0C0F16),
-  onSurfaceVariant: Color(0xFF94A3B8),
-  outline: Color(0xFF64748B),
-  outlineVariant: Color(0xFF3D4A5C),
+  surface: Color(0xFF0B1326),
+  onSurface: Color(0xFFDAE2FD),
+  surfaceContainerHighest: Color(0xFF2D3449),
+  surfaceContainerHigh: Color(0xFF222A3D),
+  surfaceContainer: Color(0xFF171F33),
+  surfaceContainerLow: Color(0xFF131B2E),
+  surfaceContainerLowest: Color(0xFF060E20),
+  onSurfaceVariant: Color(0xFFC1C6D7),
+  outline: Color(0xFF8B90A0),
+  outlineVariant: Color(0xFF414754),
   shadow: Color(0x66000000),
   scrim: Color(0x99000000),
-  inverseSurface: Color(0xFFE2E8F0),
-  onInverseSurface: Color(0xFF1E293B),
-  inversePrimary: Color(0xFF1D5CFF),
-  surfaceTint: Color(0xFF4B8FFF),
+  inverseSurface: Color(0xFFDAE2FD),
+  onInverseSurface: Color(0xFF283044),
+  inversePrimary: Color(0xFF00629D),
+  surfaceTint: Color(0xFF98CBFF),
 );
 
-const ColorScheme _endpointMonitorLightScheme = ColorScheme(
+const ColorScheme _orchestratorLightScheme = ColorScheme(
   brightness: Brightness.light,
-  primary: Color(0xFF1D56F0),
+  primary: Color(0xFF00629D),
   onPrimary: Color(0xFFFFFFFF),
-  primaryContainer: Color(0xFFC8E0FF),
-  onPrimaryContainer: Color(0xFF142E7A),
+  primaryContainer: Color(0xFFCFE5FF),
+  onPrimaryContainer: Color(0xFF001D33),
   secondary: Color(0xFF475569),
   onSecondary: Color(0xFFFFFFFF),
   secondaryContainer: Color(0xFFE2E8F0),
   onSecondaryContainer: Color(0xFF1E293B),
-  tertiary: Color(0xFF0077C8),
+  tertiary: Color(0xFF007896),
   onTertiary: Color(0xFFFFFFFF),
-  tertiaryContainer: Color(0xFFCCEAFF),
-  onTertiaryContainer: Color(0xFF003A5C),
+  tertiaryContainer: Color(0xFFCCEFFF),
+  onTertiaryContainer: Color(0xFF001F25),
   error: Color(0xFFBA1A1A),
   onError: Color(0xFFFFFFFF),
   errorContainer: Color(0xFFFFDAD6),
@@ -72,17 +72,16 @@ const ColorScheme _endpointMonitorLightScheme = ColorScheme(
   scrim: Color(0x66000000),
   inverseSurface: Color(0xFF1E293B),
   onInverseSurface: Color(0xFFF1F5F9),
-  inversePrimary: Color(0xFF6BA3FF),
-  surfaceTint: Color(0xFF1D56F0),
+  inversePrimary: Color(0xFF98CBFF),
+  surfaceTint: Color(0xFF00629D),
 );
 
 ThemeData buildEndpointMonitorDarkTheme() =>
-    _buildEndpointMonitorTheme(_endpointMonitorDarkScheme);
+    _buildEndpointMonitorTheme(_orchestratorDarkScheme);
 
 ThemeData buildEndpointMonitorLightTheme() =>
-    _buildEndpointMonitorTheme(_endpointMonitorLightScheme);
+    _buildEndpointMonitorTheme(_orchestratorLightScheme);
 
-/// Dialog / overlay surface (slightly distinct from cards).
 Color _dialogSurface(ColorScheme scheme) {
   return Color.alphaBlend(
     scheme.surfaceContainerHigh
@@ -103,65 +102,66 @@ ThemeData _buildEndpointMonitorTheme(ColorScheme scheme) {
     highlightColor: scheme.primary.withValues(alpha: 0.06),
   );
 
-  final inter = GoogleFonts.interTextTheme(base.textTheme);
-  final space = GoogleFonts.spaceGroteskTextTheme(base.textTheme);
+  final interBase = GoogleFonts.interTextTheme(base.textTheme);
+  final manrope = GoogleFonts.manropeTextTheme(base.textTheme);
 
-  final textTheme = inter.copyWith(
-    displayLarge: space.displayLarge?.copyWith(
-      fontWeight: FontWeight.w700,
+  final textTheme = interBase.copyWith(
+    displayLarge: manrope.displayLarge?.copyWith(
+      fontWeight: FontWeight.w800,
       letterSpacing: -0.5,
       color: scheme.onSurface,
     ),
-    displayMedium: space.displayMedium?.copyWith(
-      fontWeight: FontWeight.w700,
+    displayMedium: manrope.displayMedium?.copyWith(
+      fontWeight: FontWeight.w800,
       letterSpacing: -0.5,
       color: scheme.onSurface,
     ),
-    displaySmall: space.displaySmall?.copyWith(
+    displaySmall: manrope.displaySmall?.copyWith(
       fontWeight: FontWeight.w700,
       color: scheme.onSurface,
     ),
-    headlineLarge: space.headlineLarge?.copyWith(
+    headlineLarge: manrope.headlineLarge?.copyWith(
+      fontWeight: FontWeight.w800,
+      letterSpacing: -0.35,
+      color: scheme.onSurface,
+    ),
+    headlineMedium: manrope.headlineMedium?.copyWith(
       fontWeight: FontWeight.w700,
       letterSpacing: -0.25,
       color: scheme.onSurface,
     ),
-    headlineMedium: space.headlineMedium?.copyWith(
+    headlineSmall: manrope.headlineSmall?.copyWith(
       fontWeight: FontWeight.w700,
       color: scheme.onSurface,
     ),
-    headlineSmall: space.headlineSmall?.copyWith(
-      fontWeight: FontWeight.w600,
-      color: scheme.onSurface,
-    ),
-    titleLarge: space.titleLarge?.copyWith(
+    titleLarge: manrope.titleLarge?.copyWith(
       fontWeight: FontWeight.w700,
       color: scheme.onSurface,
     ),
-    titleMedium: inter.titleMedium?.copyWith(
+    titleMedium: interBase.titleMedium?.copyWith(
       fontWeight: FontWeight.w600,
       color: scheme.onSurface,
     ),
-    titleSmall: inter.titleSmall?.copyWith(
+    titleSmall: interBase.titleSmall?.copyWith(
       fontWeight: FontWeight.w600,
+      color: scheme.onSurface,
+    ),
+    bodyLarge: interBase.bodyLarge?.copyWith(color: scheme.onSurface),
+    bodyMedium: interBase.bodyMedium?.copyWith(color: scheme.onSurface),
+    bodySmall: interBase.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+    labelLarge: interBase.labelLarge?.copyWith(
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.5,
       color: scheme.onSurfaceVariant,
     ),
-    bodyLarge: inter.bodyLarge?.copyWith(color: scheme.onSurface),
-    bodyMedium: inter.bodyMedium?.copyWith(color: scheme.onSurface),
-    bodySmall: inter.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-    labelLarge: inter.labelLarge?.copyWith(
+    labelMedium: interBase.labelMedium?.copyWith(
       fontWeight: FontWeight.w600,
-      letterSpacing: 0.8,
+      letterSpacing: 0.4,
       color: scheme.onSurfaceVariant,
     ),
-    labelMedium: inter.labelMedium?.copyWith(
+    labelSmall: interBase.labelSmall?.copyWith(
       fontWeight: FontWeight.w600,
-      letterSpacing: 0.6,
-      color: scheme.onSurfaceVariant,
-    ),
-    labelSmall: inter.labelSmall?.copyWith(
-      fontWeight: FontWeight.w600,
-      letterSpacing: 0.9,
+      letterSpacing: 1.0,
       color: scheme.outline,
     ),
   );
@@ -174,36 +174,40 @@ ThemeData _buildEndpointMonitorTheme(ColorScheme scheme) {
       centerTitle: false,
       backgroundColor: scheme.surface,
       foregroundColor: scheme.primary,
-      titleTextStyle: GoogleFonts.spaceGrotesk(
+      titleTextStyle: GoogleFonts.manrope(
         fontSize: 18,
         fontWeight: FontWeight.w700,
-        letterSpacing: 2,
-        color: scheme.primary,
+        letterSpacing: -0.2,
+        color: scheme.onSurface,
       ),
       iconTheme: IconThemeData(color: scheme.primary, size: 24),
     ),
     cardTheme: CardThemeData(
       color: scheme.surfaceContainer,
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(EmDesign.radiusLg),
+        side: BorderSide(color: EmDesign.ghostLine(scheme), width: 1),
+      ),
       margin: EdgeInsets.zero,
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: _dialogSurface(scheme),
       elevation: 8,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(EmDesign.radiusLg),
+      ),
     ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: scheme.surfaceContainerHigh,
-      contentTextStyle: inter.bodyMedium?.copyWith(color: scheme.onSurface),
+      contentTextStyle: interBase.bodyMedium?.copyWith(color: scheme.onSurface),
       behavior: SnackBarBehavior.floating,
     ),
     navigationBarTheme: NavigationBarThemeData(
       height: 72,
-      backgroundColor: scheme.surface,
+      backgroundColor: scheme.surfaceContainerHighest,
       elevation: 0,
-      shadowColor: scheme.primary.withValues(alpha: 0.06),
-      indicatorColor: scheme.primaryContainer,
+      indicatorColor: scheme.primary.withValues(alpha: 0.18),
       surfaceTintColor: Colors.transparent,
       labelTextStyle: WidgetStateProperty.resolveWith((states) {
         final selected = states.contains(WidgetState.selected);
@@ -211,13 +215,13 @@ ThemeData _buildEndpointMonitorTheme(ColorScheme scheme) {
           fontSize: 11,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.2,
-          color: selected ? scheme.onPrimaryContainer : scheme.outlineVariant,
+          color: selected ? scheme.primary : scheme.onSurfaceVariant,
         );
       }),
       iconTheme: WidgetStateProperty.resolveWith((states) {
         final selected = states.contains(WidgetState.selected);
         return IconThemeData(
-          color: selected ? scheme.onPrimaryContainer : scheme.outlineVariant,
+          color: selected ? scheme.primary : scheme.onSurfaceVariant,
           size: 22,
         );
       }),
@@ -225,35 +229,35 @@ ThemeData _buildEndpointMonitorTheme(ColorScheme scheme) {
     listTileTheme: ListTileThemeData(
       iconColor: scheme.onSurfaceVariant,
       textColor: scheme.onSurface,
-      titleTextStyle: inter.titleMedium,
+      titleTextStyle: interBase.titleMedium,
       subtitleTextStyle:
-          inter.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+          interBase.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: scheme.surfaceContainerLowest,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(6),
-        borderSide: BorderSide.none,
+        borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+        borderSide: BorderSide(color: EmDesign.ghostLine(scheme), width: 1),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(6),
-        borderSide: BorderSide.none,
+        borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+        borderSide: BorderSide(color: EmDesign.ghostLine(scheme), width: 1),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(EmDesign.radiusMd),
         borderSide: BorderSide(color: scheme.primary, width: 1),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(EmDesign.radiusMd),
         borderSide: BorderSide(color: scheme.error.withValues(alpha: 0.5)),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      hintStyle: TextStyle(color: scheme.outline.withValues(alpha: 0.5)),
+      hintStyle: TextStyle(color: scheme.outline.withValues(alpha: 0.45)),
       labelStyle: GoogleFonts.inter(
         fontSize: 11,
         fontWeight: FontWeight.w600,
-        letterSpacing: 1.2,
+        letterSpacing: 1.0,
         color: scheme.onSurfaceVariant,
       ),
     ),
@@ -273,16 +277,19 @@ ThemeData _buildEndpointMonitorTheme(ColorScheme scheme) {
         }),
         side: WidgetStateProperty.all(BorderSide.none),
         shape: WidgetStateProperty.all(
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(EmDesign.radiusSm),
+          ),
         ),
         padding: WidgetStateProperty.all(
-            const EdgeInsets.symmetric(horizontal: 8, vertical: 10)),
+          const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        ),
       ),
     ),
     popupMenuTheme: PopupMenuThemeData(
       color: scheme.surfaceContainerHigh,
       surfaceTintColor: Colors.transparent,
-      textStyle: inter.bodyMedium?.copyWith(color: scheme.onSurface),
+      textStyle: interBase.bodyMedium?.copyWith(color: scheme.onSurface),
     ),
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: scheme.surfaceContainerLow,

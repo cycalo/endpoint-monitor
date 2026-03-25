@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../bloc/events_bloc.dart';
 import '../models/ws_models.dart';
+import '../theme/em_design_system.dart';
 import '../widgets/em_brand_app_bar.dart';
 
 class EventsScreen extends StatefulWidget {
@@ -39,6 +40,7 @@ class _EventsScreenState extends State<EventsScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
     return Scaffold(
       backgroundColor: scheme.surface,
       appBar: EmBrandAppBar(
@@ -76,19 +78,23 @@ class _EventsScreenState extends State<EventsScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
               }
             },
-            icon: const Icon(Icons.download_outlined),
+            icon: const Icon(Icons.ios_share_rounded),
           ),
           const SizedBox(width: 4),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(96),
-          child: Padding(
+          preferredSize: const Size.fromHeight(108),
+          child: Container(
+            color: scheme.surfaceContainerLow,
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
             child: Column(
               children: [
                 DropdownButtonFormField<String>(
                   initialValue: _type,
-                  decoration: const InputDecoration(labelText: 'Type'),
+                  decoration: const InputDecoration(
+                    labelText: 'Event type',
+                    isDense: true,
+                  ),
                   items: const [
                     DropdownMenuItem(value: 'all', child: Text('All')),
                     DropdownMenuItem(value: 'ProcessCreate', child: Text('Process')),
@@ -98,11 +104,23 @@ class _EventsScreenState extends State<EventsScreen> {
                   ],
                   onChanged: (v) => setState(() => _type = v ?? 'all'),
                 ),
+                const SizedBox(height: 8),
                 TextField(
                   controller: _search,
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.search_rounded),
-                    hintText: 'Search',
+                  style: theme.textTheme.bodyMedium,
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: scheme.surfaceContainerLowest,
+                    hintText: 'Search events…',
+                    prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+                      borderSide: BorderSide(color: EmDesign.ghostLine(scheme), width: 1),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+                      borderSide: BorderSide(color: EmDesign.ghostLine(scheme), width: 1),
+                    ),
                   ),
                   onChanged: (_) => setState(() {}),
                 ),
@@ -113,7 +131,6 @@ class _EventsScreenState extends State<EventsScreen> {
       ),
       body: BlocBuilder<EventsBloc, EventsState>(
         builder: (context, state) {
-          final theme = Theme.of(context);
           final q = _search.text.trim().toLowerCase();
           final list = state.items.where((e) {
             if (_type != 'all' && e.type != _type) return false;
@@ -134,18 +151,17 @@ class _EventsScreenState extends State<EventsScreen> {
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
             itemCount: list.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 4),
+            separatorBuilder: (_, __) => const SizedBox(height: 6),
             itemBuilder: (context, i) {
               final e = list[i];
               final ts = DateTime.tryParse(e.timestamp);
               final tsText = ts != null ? DateFormat('yyyy-MM-dd HH:mm:ss').format(ts.toLocal()) : e.timestamp;
+              final accent = _colorFor(e, scheme);
               return Material(
-                color: scheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(4),
-                child: ListTile(
-                  leading: Icon(Icons.circle, size: 12, color: _colorFor(e, scheme)),
-                  title: Text('${e.type} · ${e.processName}'),
-                  subtitle: Text(tsText, style: theme.textTheme.bodySmall),
+                color: scheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(EmDesign.radiusMd),
                   onTap: () {
                     showModalBottomSheet<void>(
                       context: context,
@@ -162,6 +178,52 @@ class _EventsScreenState extends State<EventsScreen> {
                       ),
                     );
                   },
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+                      border: Border(
+                        left: BorderSide(color: accent.withValues(alpha: 0.75), width: 3),
+                        top: BorderSide(color: EmDesign.ghostLine(scheme), width: 1),
+                        right: BorderSide(color: EmDesign.ghostLine(scheme), width: 1),
+                        bottom: BorderSide(color: EmDesign.ghostLine(scheme), width: 1),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${e.type} · ${e.processName}',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              tsText,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          e.rawXml.length > 160 ? '${e.rawXml.substring(0, 160)}…' : e.rawXml,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: scheme.onSecondaryContainer,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               );
             },

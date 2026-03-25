@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../bloc/alerts_bloc.dart';
+import '../theme/em_design_system.dart';
 import '../widgets/em_brand_app_bar.dart';
 
 class AlertsScreen extends StatelessWidget {
@@ -39,8 +40,12 @@ class AlertsScreen extends StatelessWidget {
               final a = state.items[i];
               final acked = state.acked.contains(a.id);
               return Material(
-                color: scheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(4),
+                color: scheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+                  side: BorderSide(color: EmDesign.ghostLine(scheme), width: 1),
+                ),
                 child: ListTile(
                   leading: Icon(Icons.warning_amber_rounded, color: _sev(a.severity, scheme)),
                   title: Text(a.message),

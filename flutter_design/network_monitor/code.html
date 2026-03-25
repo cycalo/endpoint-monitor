@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Network Monitor - The Orchestrator</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "inverse-surface": "#dae2fd",
+                        "on-surface": "#dae2fd",
+                        "on-background": "#dae2fd",
+                        "on-secondary-fixed-variant": "#3a485b",
+                        "inverse-primary": "#00629d",
+                        "surface-variant": "#2d3449",
+                        "surface-tint": "#98cbff",
+                        "secondary-fixed": "#d5e3fc",
+                        "surface-container-low": "#131b2e",
+                        "on-error-container": "#ffdad6",
+                        "surface": "#0b1326",
+                        "on-tertiary-fixed": "#001f25",
+                        "tertiary-container": "#009fb4",
+                        "on-surface-variant": "#c1c6d7",
+                        "outline": "#8b90a0",
+                        "primary": "#98cbff",
+                        "primary-fixed": "#cfe5ff",
+                        "inverse-on-surface": "#283044",
+                        "on-tertiary": "#00363e",
+                        "surface-container-lowest": "#060e20",
+                        "surface-container": "#171f33",
+                        "surface-container-high": "#222a3d",
+                        "on-primary-fixed-variant": "#004a77",
+                        "surface-dim": "#0b1326",
+                        "surface-container-highest": "#2d3449",
+                        "tertiary-fixed": "#a2eeff",
+                        "primary-container": "#0097ec",
+                        "surface-bright": "#31394d",
+                        "on-secondary-container": "#abb9d1",
+                        "on-tertiary-container": "#002f36",
+                        "on-primary-fixed": "#001d33",
+                        "on-tertiary-fixed-variant": "#004e5a",
+                        "outline-variant": "#414754",
+                        "error-container": "#93000a",
+                        "secondary-fixed-dim": "#b9c7df",
+                        "error": "#ffb4ab",
+                        "tertiary-fixed-dim": "#2fd9f4",
+                        "primary-fixed-dim": "#98cbff",
+                        "secondary": "#b9c7df",
+                        "secondary-container": "#3c4a5e",
+                        "on-secondary-fixed": "#0d1c2e",
+                        "on-primary": "#003354",
+                        "on-secondary": "#233144",
+                        "on-error": "#690005",
+                        "on-primary-container": "#002c4a",
+                        "tertiary": "#2fd9f4",
+                        "background": "#0b1326"
+                    },
+                    fontFamily: {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .bg-gradient-cyber {
+            background: linear-gradient(135deg, #98cbff 0%, #0097ec 100%);
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface font-body text-on-surface min-h-screen flex flex-col">
+<!-- Top AppBar -->
+<header class="flex items-center bg-surface p-4 pb-2 justify-between sticky top-0 z-20">
+<div class="text-primary flex size-12 shrink-0 items-center" data-icon="monitor" data-size="24px">
+<span class="material-symbols-outlined text-2xl">monitor</span>
+</div>
+<h2 class="text-on-surface font-headline text-lg font-bold leading-tight tracking-[-0.015em] flex-1">Network Monitor</h2>
+<div class="flex items-center justify-end">
+<button class="text-primary font-headline text-base font-bold leading-normal tracking-[0.015em] px-4 py-2 hover:bg-surface-container-high rounded transition-colors">
+                Disconnect
+            </button>
+</div>
+</header>
+<!-- Content Area -->
+<main class="flex-1 flex flex-col px-4 gap-6 pb-24 overflow-y-auto no-scrollbar">
+<!-- Search and Filters Section -->
+<section class="space-y-4">
+<div class="py-1">
+<label class="flex flex-col w-full">
+<div class="flex w-full items-stretch rounded h-12 bg-surface-container">
+<div class="text-on-surface-variant flex items-center justify-center pl-4 rounded-l border-r-0" data-icon="search" data-size="24px">
+<span class="material-symbols-outlined">search</span>
+</div>
+<input class="form-input flex w-full min-w-0 flex-1 border-none bg-transparent focus:ring-0 text-on-surface placeholder:text-on-surface-variant px-4 text-base font-normal" placeholder="Search process names or IP addresses" value=""/>
+</div>
+</label>
+</div>
+<div class="flex flex-wrap gap-4">
+<div class="flex-1 min-w-[140px]">
+<p class="text-on-surface-variant text-xs font-medium uppercase tracking-wider pb-2 px-1">Protocol</p>
+<div class="relative">
+<select class="form-select w-full h-12 bg-surface-container border-none rounded text-on-surface px-4 appearance-none focus:ring-1 focus:ring-primary-container">
+<option>All Protocols</option>
+<option>TCP</option>
+<option>UDP</option>
+</select>
+<div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">
+<span class="material-symbols-outlined">expand_more</span>
+</div>
+</div>
+</div>
+<div class="flex-1 min-w-[140px]">
+<p class="text-on-surface-variant text-xs font-medium uppercase tracking-wider pb-2 px-1">State</p>
+<div class="relative">
+<select class="form-select w-full h-12 bg-surface-container border-none rounded text-on-surface px-4 appearance-none focus:ring-1 focus:ring-primary-container">
+<option>All States</option>
+<option>Established</option>
+<option>Listening</option>
+<option>Time Wait</option>
+</select>
+<div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">
+<span class="material-symbols-outlined">expand_more</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Active Connections List -->
+<section class="flex flex-col gap-1">
+<div class="flex items-center justify-between pb-2 border-b border-outline-variant/15">
+<h3 class="font-headline text-base font-bold text-on-surface">Active Connections</h3>
+<span class="text-tertiary text-xs font-medium bg-tertiary/10 px-2 py-1 rounded">24 Active</span>
+</div>
+<!-- List Item: Chrome -->
+<div class="flex flex-col gap-4 bg-surface-container p-4 rounded-lg hover:bg-surface-container-high transition-colors group relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary scale-y-0 group-hover:scale-y-100 transition-transform origin-top"></div>
+<div class="flex gap-4 justify-between">
+<div class="flex items-start gap-4">
+<div class="flex items-center justify-center rounded bg-surface-container-low text-primary size-12 shrink-0">
+<span class="material-symbols-outlined" data-icon="globe">public</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<p class="text-on-surface font-headline font-bold">chrome.exe</p>
+<span class="text-on-surface-variant text-[10px] bg-surface-container-highest px-1.5 py-0.5 rounded">PID: 14208</span>
+</div>
+<p class="text-on-surface-variant text-xs font-medium leading-normal mt-1">
+                                Local: <span class="text-on-surface">192.168.1.15:54322</span>
+</p>
+<p class="text-on-surface-variant text-xs font-medium leading-normal">
+                                Remote: <span class="text-tertiary">142.250.190.46:443</span>
+</p>
+</div>
+</div>
+<div class="flex flex-col items-end justify-between">
+<span class="text-primary font-headline font-bold text-sm">42.8 Mbps</span>
+<div class="flex items-center gap-1">
+<span class="size-2 rounded-full bg-tertiary shadow-[0_0_8px_rgba(47,217,244,0.5)]"></span>
+<span class="text-on-surface-variant text-[10px] font-bold uppercase tracking-tighter">TCP | Established</span>
+</div>
+</div>
+</div>
+<div class="flex gap-2 pt-2">
+<button class="flex-1 bg-surface-container-highest text-on-surface text-sm font-semibold py-2 rounded hover:bg-outline-variant/30 transition-colors">Details</button>
+<button class="flex-1 bg-error-container text-error text-sm font-semibold py-2 rounded hover:brightness-125 transition-colors">Block Connection</button>
+</div>
+</div>
+<!-- List Item: Spotify -->
+<div class="flex flex-col gap-4 bg-surface-container-low p-4 rounded-lg hover:bg-surface-container-high transition-colors group relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary scale-y-0 group-hover:scale-y-100 transition-transform origin-top"></div>
+<div class="flex gap-4 justify-between">
+<div class="flex items-start gap-4">
+<div class="flex items-center justify-center rounded bg-surface-container text-primary size-12 shrink-0">
+<span class="material-symbols-outlined" data-icon="music">music_note</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<p class="text-on-surface font-headline font-bold">spotify.exe</p>
+<span class="text-on-surface-variant text-[10px] bg-surface-container-highest px-1.5 py-0.5 rounded">PID: 8940</span>
+</div>
+<p class="text-on-surface-variant text-xs font-medium leading-normal mt-1">
+                                Local: <span class="text-on-surface">192.168.1.15:58441</span>
+</p>
+<p class="text-on-surface-variant text-xs font-medium leading-normal">
+                                Remote: <span class="text-tertiary">35.186.224.25:443</span>
+</p>
+</div>
+</div>
+<div class="flex flex-col items-end justify-between">
+<span class="text-primary font-headline font-bold text-sm">1.2 Mbps</span>
+<div class="flex items-center gap-1">
+<span class="size-2 rounded-full bg-tertiary"></span>
+<span class="text-on-surface-variant text-[10px] font-bold uppercase tracking-tighter">TCP | Established</span>
+</div>
+</div>
+</div>
+<div class="flex gap-2 pt-2">
+<button class="flex-1 bg-surface-container-highest text-on-surface text-sm font-semibold py-2 rounded hover:bg-outline-variant/30 transition-colors">Details</button>
+<button class="flex-1 bg-error-container text-error text-sm font-semibold py-2 rounded hover:brightness-125 transition-colors">Block Connection</button>
+</div>
+</div>
+<!-- List Item: System (UDP) -->
+<div class="flex flex-col gap-4 bg-surface-container p-4 rounded-lg hover:bg-surface-container-high transition-colors group relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary scale-y-0 group-hover:scale-y-100 transition-transform origin-top"></div>
+<div class="flex gap-4 justify-between">
+<div class="flex items-start gap-4">
+<div class="flex items-center justify-center rounded bg-surface-container-low text-primary size-12 shrink-0">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<p class="text-on-surface font-headline font-bold">System</p>
+<span class="text-on-surface-variant text-[10px] bg-surface-container-highest px-1.5 py-0.5 rounded">PID: 4</span>
+</div>
+<p class="text-on-surface-variant text-xs font-medium leading-normal mt-1">
+                                Local: <span class="text-on-surface">0.0.0.0:135</span>
+</p>
+<p class="text-on-surface-variant text-xs font-medium leading-normal">
+                                Remote: <span class="text-on-surface-variant">0.0.0.0:*</span>
+</p>
+</div>
+</div>
+<div class="flex flex-col items-end justify-between">
+<span class="text-on-surface-variant font-headline font-bold text-sm">0.0 Kbps</span>
+<div class="flex items-center gap-1">
+<span class="size-2 rounded-full bg-outline-variant"></span>
+<span class="text-on-surface-variant text-[10px] font-bold uppercase tracking-tighter">UDP | Listening</span>
+</div>
+</div>
+</div>
+<div class="flex gap-2 pt-2">
+<button class="flex-1 bg-surface-container-highest text-on-surface text-sm font-semibold py-2 rounded hover:bg-outline-variant/30 transition-colors">Details</button>
+<button class="flex-1 bg-error-container text-error text-sm font-semibold py-2 rounded hover:brightness-125 transition-colors">Block Connection</button>
+</div>
+</div>
+<!-- List Item: Discord -->
+<div class="flex flex-col gap-4 bg-surface-container-low p-4 rounded-lg hover:bg-surface-container-high transition-colors group relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary scale-y-0 group-hover:scale-y-100 transition-transform origin-top"></div>
+<div class="flex gap-4 justify-between">
+<div class="flex items-start gap-4">
+<div class="flex items-center justify-center rounded bg-surface-container text-primary size-12 shrink-0">
+<span class="material-symbols-outlined" data-icon="forum">forum</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<p class="text-on-surface font-headline font-bold">discord.exe</p>
+<span class="text-on-surface-variant text-[10px] bg-surface-container-highest px-1.5 py-0.5 rounded">PID: 15622</span>
+</div>
+<p class="text-on-surface-variant text-xs font-medium leading-normal mt-1">
+                                Local: <span class="text-on-surface">192.168.1.15:61204</span>
+</p>
+<p class="text-on-surface-variant text-xs font-medium leading-normal">
+                                Remote: <span class="text-tertiary">162.159.135.233:443</span>
+</p>
+</div>
+</div>
+<div class="flex flex-col items-end justify-between">
+<span class="text-primary font-headline font-bold text-sm">3.4 Mbps</span>
+<div class="flex items-center gap-1">
+<span class="size-2 rounded-full bg-tertiary"></span>
+<span class="text-on-surface-variant text-[10px] font-bold uppercase tracking-tighter">TCP | Established</span>
+</div>
+</div>
+</div>
+<div class="flex gap-2 pt-2">
+<button class="flex-1 bg-surface-container-highest text-on-surface text-sm font-semibold py-2 rounded hover:bg-outline-variant/30 transition-colors">Details</button>
+<button class="flex-1 bg-error-container text-error text-sm font-semibold py-2 rounded hover:brightness-125 transition-colors">Block Connection</button>
+</div>
+</div>
+</section>
+</main>
+<!-- Shared BottomNavBar -->
+<div class="fixed bottom-0 left-0 right-0 flex h-auto w-full flex-col bg-[#0f1924] dark group/design-root z-30" style='font-family: Manrope, "Noto Sans", sans-serif;'>
+<div class="flex gap-2 border-t border-[#20354b] bg-[#172636] px-4 pb-3 pt-2">
+<a class="just flex flex-1 flex-col items-center justify-end gap-1 text-[#8dacce]" href="#">
+<div class="text-[#8dacce] flex h-8 items-center justify-center" data-icon="Gauge" data-size="24px" data-weight="regular">
+<svg fill="currentColor" height="24px" viewbox="0 0 256 256" width="24px" xmlns="http://www.w3.org/2000/svg">
+<path d="M207.06,80.67A111.24,111.24,0,0,0,128,48h-.4C66.07,48.21,16,99,16,161.13V184a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V160A111.25,111.25,0,0,0,207.06,80.67ZM224,184H119.71l54.76-75.3a8,8,0,0,0-12.94-9.42L99.92,184H32V161.13c0-3.08.15-6.12.43-9.13H56a8,8,0,0,0,0-16H35.27c10.32-38.86,44-68.24,84.73-71.66V88a8,8,0,0,0,16,0V64.33A96.14,96.14,0,0,1,221,136H200a8,8,0,0,0,0,16h23.67c.21,2.65.33,5.31.33,8Z"></path>
+</svg>
+</div>
+<p class="text-[#8dacce] text-xs font-medium leading-normal tracking-[0.015em]">Overview</p>
+</a>
+<a class="just flex flex-1 flex-col items-center justify-end gap-1 rounded-full text-white" href="#">
+<div class="text-white flex h-8 items-center justify-center" data-icon="Graph" data-size="24px" data-weight="fill">
+<svg fill="currentColor" height="24px" viewbox="0 0 256 256" width="24px" xmlns="http://www.w3.org/2000/svg">
+<path d="M200,152a31.84,31.84,0,0,0-19.53,6.68l-23.11-18A31.65,31.65,0,0,0,160,128c0-.74,0-1.48-.08-2.21l13.23-4.41A32,32,0,1,0,168,104c0,.74,0,1.48.08,2.21l-13.23,4.41A32,32,0,0,0,128,96a32.59,32.59,0,0,0-5.27.44L115.89,81A32,32,0,1,0,96,88a32.59,32.59,0,0,0,5.27-.44l6.84,15.4a31.92,31.92,0,0,0-8.57,39.64L73.83,165.44a32.06,32.06,0,1,0,10.63,12l25.71-22.84a31.91,31.91,0,0,0,37.36-1.24l23.11,18A31.65,31.65,0,0,0,168,184a32,32,0,1,0,32-32Zm0-64a16,16,0,1,1-16,16A16,16,0,0,1,200,88ZM80,56A16,16,0,1,1,96,72,16,16,0,0,1,80,56ZM56,208a16,16,0,1,1,16-16A16,16,0,0,1,56,208Zm144-8a16,16,0,1,1,16-16A16,16,0,0,1,200,200Z"></path>
+</svg>
+</div>
+<p class="text-white text-xs font-medium leading-normal tracking-[0.015em]">Network</p>
+</a>
+<a class="just flex flex-1 flex-col items-center justify-end gap-1 text-[#8dacce]" href="#">
+<div class="text-[#8dacce] flex h-8 items-center justify-center" data-icon="Shield" data-size="24px" data-weight="regular">
+<svg fill="currentColor" height="24px" viewbox="0 0 256 256" width="24px" xmlns="http://www.w3.org/2000/svg">
+<path d="M208,40H48A16,16,0,0,0,32,56v58.77c0,89.61,75.82,119.34,91,124.39a15.53,15.53,0,0,0,10,0c15.2-5.05,91-34.78,91-124.39V56A16,16,0,0,0,208,40Zm0,74.79c0,78.42-66.35,104.62-80,109.18-13.53-4.51-80-30.69-80-109.18V56l160,0Z"></path>
+</svg>
+</div>
+<p class="text-[#8dacce] text-xs font-medium leading-normal tracking-[0.015em]">Firewall</p>
+</a>
+<a class="just flex flex-1 flex-col items-center justify-end gap-1 text-[#8dacce]" href="#">
+<div class="text-[#8dacce] flex h-8 items-center justify-center" data-icon="Gear" data-size="24px" data-weight="regular">
+<svg fill="currentColor" height="24px" viewbox="0 0 256 256" width="24px" xmlns="http://www.w3.org/2000/svg">
+<path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm88-29.84q.06-2.16,0-4.32l14.92-18.64a8,8,0,0,0,1.48-7.06,107.21,107.21,0,0,0-10.88-26.25,8,8,0,0,0-6-3.93l-23.72-2.64q-1.48-1.56-3-3L186,40.54a8,8,0,0,0-3.94-6,107.71,107.71,0,0,0-26.25-10.87,8,8,0,0,0-7.06,1.49L130.16,40Q128,40,125.84,40L107.2,25.11a8,8,0,0,0-7.06-1.48A107.6,107.6,0,0,0,73.89,34.51a8,8,0,0,0-3.93,6L67.32,64.27q-1.56,1.49-3,3L40.54,70a8,8,0,0,0-6,3.94,107.71,107.71,0,0,0-10.87,26.25,8,8,0,0,0,1.49,7.06L40,125.84Q40,128,40,130.16L25.11,148.8a8,8,0,0,0-1.48,7.06,107.21,107.21,0,0,0,10.88,26.25,8,8,0,0,0,6,3.93l23.72,2.64q1.49,1.56,3,3L70,215.46a8,8,0,0,0,3.94,6,107.71,107.71,0,0,0,26.25,10.87,8,8,0,0,0,7.06-1.49L125.84,216q2.16.06,4.32,0l18.64,14.92a8,8,0,0,0,7.06,1.48,107.21,107.21,0,0,0,26.25-10.88,8,8,0,0,0,3.93-6l2.64-23.72q1.56-1.48,3-3L215.46,186a8,8,0,0,0,6-3.94,107.71,107.71,0,0,0,10.87-26.25,8,8,0,0,0-1.49-7.06Zm-16.1-6.5a73.93,73.93,0,0,1,0,8.68,8,8,0,0,0,1.74,5.48l14.19,17.73a91.57,91.57,0,0,1-6.23,15L187,173.11a8,8,0,0,0-5.1,2.64,74.11,74.11,0,0,1-6.14,6.14,8,8,0,0,0-2.64,5.1l-2.51,22.58a91.32,91.32,0,0,1-15,6.23l-17.74-14.19a8,8,0,0,0-5-1.75h-.48a73.93,73.93,0,0,1-8.68,0,8,8,0,0,0-5.48,1.74L100.45,215.8a91.57,91.57,0,0,1-15-6.23L82.89,187a8,8,0,0,0-2.64-5.1,74.11,74.11,0,0,1-6.14-6.14,8,8,0,0,0-5.1-2.64L46.43,170.6a91.32,91.32,0,0,1-6.23-15l14.19-17.74a8,8,0,0,0,1.74-5.48,73.93,73.93,0,0,1,0-8.68,8,8,0,0,0-1.74-5.48L40.2,100.45a91.57,91.57,0,0,1,6.23-15L69,82.89a8,8,0,0,0,5.1-2.64,74.11,74.11,0,0,1,6.14-6.14A8,8,0,0,0,82.89,69L85.4,46.43a91.32,91.32,0,0,1,15-6.23l17.74,14.19a8,8,0,0,0,5.48,1.74,73.93,73.93,0,0,1,8.68,0,8,8,0,0,0,5.48-1.74L155.55,40.2a91.57,91.57,0,0,1,15,6.23L173.11,69a8,8,0,0,0,2.64,5.1,74.11,74.11,0,0,1,6.14,6.14,8,8,0,0,0,5.1,2.64l22.58,2.51a91.32,91.32,0,0,1,6.23,15l-14.19,17.74A8,8,0,0,0,199.87,123.66Z"></path>
+</svg>
+</div>
+<p class="text-[#8dacce] text-xs font-medium leading-normal tracking-[0.015em]">Settings</p>
+</a>
+</div>
+</div>
+</body></html>

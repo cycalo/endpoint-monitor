@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Endpoint Monitor - Events</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "secondary-container": "#3c4a5e",
+              "on-secondary-container": "#abb9d1",
+              "primary": "#98cbff",
+              "tertiary-fixed": "#a2eeff",
+              "on-primary": "#003354",
+              "background": "#0b1326",
+              "on-tertiary-container": "#002f36",
+              "primary-fixed": "#cfe5ff",
+              "on-secondary": "#233144",
+              "tertiary-container": "#009fb4",
+              "inverse-primary": "#00629d",
+              "surface-container-lowest": "#060e20",
+              "on-tertiary-fixed-variant": "#004e5a",
+              "inverse-surface": "#dae2fd",
+              "secondary-fixed-dim": "#b9c7df",
+              "error": "#ffb4ab",
+              "tertiary": "#2fd9f4",
+              "outline-variant": "#414754",
+              "secondary": "#b9c7df",
+              "surface-container-highest": "#2d3449",
+              "surface-container-high": "#222a3d",
+              "secondary-fixed": "#d5e3fc",
+              "error-container": "#93000a",
+              "surface-container": "#171f33",
+              "surface": "#0b1326",
+              "surface-tint": "#98cbff",
+              "on-error": "#690005",
+              "on-primary-fixed-variant": "#004a77",
+              "on-primary-container": "#002c4a",
+              "on-error-container": "#ffdad6",
+              "primary-fixed-dim": "#98cbff",
+              "on-secondary-fixed-variant": "#3a485b",
+              "inverse-on-surface": "#283044",
+              "on-surface": "#dae2fd",
+              "on-tertiary": "#00363e",
+              "surface-bright": "#31394d",
+              "tertiary-fixed-dim": "#2fd9f4",
+              "surface-dim": "#0b1326",
+              "outline": "#8b90a0",
+              "on-tertiary-fixed": "#001f25",
+              "surface-variant": "#2d3449",
+              "on-surface-variant": "#c1c6d7",
+              "on-primary-fixed": "#001d33",
+              "on-background": "#dae2fd",
+              "primary-container": "#0097ec",
+              "surface-container-low": "#131b2e",
+              "on-secondary-fixed": "#0d1c2e"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 4px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: #0b1326;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #414754;
+        border-radius: 10px;
+      }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="bg-[#0b1326] flex justify-between items-center w-full px-4 h-16 sticky top-0 z-40">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#98cbff]" data-icon="monitor_heart">monitor_heart</span>
+<h1 class="font-['Manrope'] font-bold text-lg tracking-tight text-[#98cbff]">Endpoint Monitor</h1>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-[#171f33] px-3 py-1.5 rounded-xl border border-[#414754]/15 hover:bg-[#222a3d] transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="ios_share">ios_share</span>
+<span class="text-xs font-medium">Export</span>
+</button>
+<button class="text-[#98cbff] font-extrabold tracking-widest uppercase text-sm hover:bg-[#222a3d] transition-colors active:scale-95 duration-150 px-2 py-1">Disconnect</button>
+</div>
+</header>
+<!-- Sub-Header / Filters Area -->
+<nav class="bg-surface-container-low px-4 py-3 sticky top-16 z-30 shadow-md">
+<div class="max-w-7xl mx-auto flex flex-col md:flex-row gap-4 justify-between items-center">
+<!-- Search -->
+<div class="relative w-full md:w-64">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm" data-icon="search">search</span>
+<input class="w-full bg-surface-container-lowest border border-outline-variant/15 rounded-xl py-2 pl-10 pr-4 text-xs focus:ring-1 focus:ring-primary focus:border-primary outline-none text-on-surface placeholder:text-on-surface-variant/50" placeholder="Search events..." type="text"/>
+</div>
+<!-- Severity Filters -->
+<div class="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
+<button class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-container-high border border-outline-variant/15 text-on-surface-variant text-[11px] font-semibold whitespace-nowrap hover:bg-surface-container-highest transition-colors">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+                    Error
+                </button>
+<button class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-container-high border border-outline-variant/15 text-on-surface-variant text-[11px] font-semibold whitespace-nowrap hover:bg-surface-container-highest transition-colors">
+<span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                    Warning
+                </button>
+<button class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-container-high border border-outline-variant/15 text-on-surface-variant text-[11px] font-semibold whitespace-nowrap hover:bg-surface-container-highest transition-colors">
+<span class="w-2 h-2 rounded-full bg-tertiary"></span>
+                    Information
+                </button>
+<div class="h-4 w-[1px] bg-outline-variant/30 mx-1"></div>
+<button class="flex items-center gap-1 text-[11px] font-medium text-primary px-2 py-1">
+                    Clear Filters
+                </button>
+</div>
+</div>
+</nav>
+<!-- Main Content: Bento Grid Layout -->
+<main class="flex-1 overflow-hidden flex flex-col md:flex-row max-w-[1600px] mx-auto w-full p-4 gap-4">
+<!-- Left: Scrollable Event List -->
+<section class="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-2 h-full">
+<h2 class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant px-2 mb-1">Live Feed</h2>
+<!-- Event Tile: Error -->
+<div class="group bg-surface-container p-4 rounded-xl cursor-pointer hover:bg-surface-container-high transition-all border-l-2 border-error/50">
+<div class="flex justify-between items-start mb-2">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-error-container/20 flex items-center justify-center text-error">
+<span class="material-symbols-outlined text-lg" data-icon="dangerous" style="font-variation-settings: 'FILL' 1;">dangerous</span>
+</div>
+<div>
+<div class="text-xs font-bold text-on-surface">Service Control Manager</div>
+<div class="text-[10px] text-on-surface-variant">Event ID: 7034</div>
+</div>
+</div>
+<div class="text-[10px] font-medium text-on-surface-variant bg-surface-container-lowest px-2 py-1 rounded">14:22:01.442</div>
+</div>
+<p class="text-xs text-on-secondary-container line-clamp-2 leading-relaxed">The WinDefend service terminated unexpectedly. It has done this 1 time(s). The following fatal error occurred: 0x80070005.</p>
+</div>
+<!-- Event Tile: Warning -->
+<div class="group bg-surface-container p-4 rounded-xl cursor-pointer hover:bg-surface-container-high transition-all border-l-2 border-amber-400/50">
+<div class="flex justify-between items-start mb-2">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-amber-400/10 flex items-center justify-center text-amber-400">
+<span class="material-symbols-outlined text-lg" data-icon="warning" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+<div>
+<div class="text-xs font-bold text-on-surface">DistributedCOM</div>
+<div class="text-[10px] text-on-surface-variant">Event ID: 10016</div>
+</div>
+</div>
+<div class="text-[10px] font-medium text-on-surface-variant bg-surface-container-lowest px-2 py-1 rounded">14:19:55.102</div>
+</div>
+<p class="text-xs text-on-secondary-container line-clamp-2 leading-relaxed">The machine-default permission settings do not grant Local Activation permission for the COM Server application.</p>
+</div>
+<!-- Event Tile: Info (Selected State) -->
+<div class="group bg-surface-container-high p-4 rounded-xl cursor-pointer transition-all border-l-2 border-primary ring-1 ring-primary/20">
+<div class="flex justify-between items-start mb-2">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-primary-container/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-lg" data-icon="info" style="font-variation-settings: 'FILL' 1;">info</span>
+</div>
+<div>
+<div class="text-xs font-bold text-on-surface">WindowsUpdateClient</div>
+<div class="text-[10px] text-on-surface-variant">Event ID: 44</div>
+</div>
+</div>
+<div class="text-[10px] font-medium text-primary bg-primary-container/10 px-2 py-1 rounded">14:15:30.000</div>
+</div>
+<p class="text-xs text-on-secondary-container line-clamp-2 leading-relaxed">Windows Update successfully completed the installation of the following update: Security Intelligence Update for Microsoft Defender Antivirus.</p>
+</div>
+<!-- Event Tile: Info -->
+<div class="group bg-surface-container p-4 rounded-xl cursor-pointer hover:bg-surface-container-high transition-all border-l-2 border-tertiary/50">
+<div class="flex justify-between items-start mb-2">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-tertiary-container/10 flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined text-lg" data-icon="login" style="font-variation-settings: 'FILL' 1;">login</span>
+</div>
+<div>
+<div class="text-xs font-bold text-on-surface">Microsoft-Windows-Security-Auditing</div>
+<div class="text-[10px] text-on-surface-variant">Event ID: 4624</div>
+</div>
+</div>
+<div class="text-[10px] font-medium text-on-surface-variant bg-surface-container-lowest px-2 py-1 rounded">14:12:44.298</div>
+</div>
+<p class="text-xs text-on-secondary-container line-clamp-2 leading-relaxed">An account was successfully logged on. Subject: Security ID: SYSTEM, Account Name: WORKSTATION-01$.</p>
+</div>
+<!-- Event Tile: Error Pulse (Signature Detail) -->
+<div class="group bg-surface-container p-4 rounded-xl cursor-pointer hover:bg-surface-container-high transition-all border-l-2 border-error animate-pulse">
+<div class="flex justify-between items-start mb-2">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-error-container/20 flex items-center justify-center text-error">
+<span class="material-symbols-outlined text-lg" data-icon="report" style="font-variation-settings: 'FILL' 1;">report</span>
+</div>
+<div>
+<div class="text-xs font-bold text-on-surface">Kernel-Power</div>
+<div class="text-[10px] text-on-surface-variant">Event ID: 41</div>
+</div>
+</div>
+<div class="text-[10px] font-medium text-error bg-error-container/10 px-2 py-1 rounded">14:05:11.002</div>
+</div>
+<p class="text-xs text-on-secondary-container line-clamp-2 leading-relaxed">The system has rebooted without cleanly shutting down first. This error could be caused if the system stopped responding.</p>
+</div>
+</section>
+<!-- Right: Detail Panel (Glassmorphism/Tabs) -->
+<aside class="hidden md:flex w-full md:w-[450px] flex-col gap-4">
+<div class="bg-surface-container-high/80 backdrop-blur-xl border border-outline-variant/15 rounded-2xl flex-1 flex flex-col overflow-hidden shadow-2xl">
+<!-- Detail Header -->
+<div class="p-6 border-b border-outline-variant/10">
+<div class="flex items-center justify-between mb-4">
+<span class="text-[10px] font-bold text-primary uppercase tracking-[0.2em]">Event Details</span>
+<div class="flex gap-2">
+<button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-container-highest text-on-surface-variant transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="content_copy">content_copy</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-container-highest text-on-surface-variant transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="open_in_new">open_in_new</span>
+</button>
+</div>
+</div>
+<h3 class="font-headline font-bold text-xl text-on-surface mb-1">WindowsUpdateClient</h3>
+<div class="flex items-center gap-2">
+<span class="text-xs font-medium text-on-surface-variant">ID: 44</span>
+<span class="w-1 h-1 rounded-full bg-outline-variant"></span>
+<span class="text-xs font-medium text-tertiary">Success</span>
+<span class="w-1 h-1 rounded-full bg-outline-variant"></span>
+<span class="text-xs font-medium text-on-surface-variant">Logged: Feb 24, 14:15:30</span>
+</div>
+</div>
+<!-- Tabs -->
+<div class="flex border-b border-outline-variant/10">
+<button class="flex-1 py-3 text-xs font-bold text-primary border-b-2 border-primary">General</button>
+<button class="flex-1 py-3 text-xs font-bold text-on-surface-variant hover:text-on-surface transition-colors">Details</button>
+<button class="flex-1 py-3 text-xs font-bold text-on-surface-variant hover:text-on-surface transition-colors">XML</button>
+</div>
+<!-- Tab Content -->
+<div class="flex-1 overflow-y-auto p-6 custom-scrollbar">
+<div class="space-y-6">
+<section>
+<h4 class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-3">Summary</h4>
+<p class="text-sm text-on-surface leading-relaxed">
+                                Windows Update successfully completed the installation of the following update: "Security Intelligence Update for Microsoft Defender Antivirus - KB2267602 (Version 1.405.418.0) - Current Channel (Broad)".
+                            </p>
+</section>
+<section class="grid grid-cols-2 gap-4">
+<div>
+<h4 class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1">User</h4>
+<p class="text-xs font-medium text-on-surface">SYSTEM</p>
+</div>
+<div>
+<h4 class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1">Computer</h4>
+<p class="text-xs font-medium text-on-surface">WS-PRO-012.local</p>
+</div>
+<div>
+<h4 class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1">Log Name</h4>
+<p class="text-xs font-medium text-on-surface">System</p>
+</div>
+<div>
+<h4 class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1">Keywords</h4>
+<p class="text-xs font-medium text-on-surface">Success, Installation</p>
+</div>
+</section>
+<section class="bg-surface-container-lowest/50 rounded-xl p-4 border border-outline-variant/5">
+<h4 class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-2">Technical Context</h4>
+<div class="font-mono text-[11px] text-tertiary-fixed leading-relaxed opacity-80">
+                                OpCode: 0<br/>
+                                Task: 6<br/>
+                                Level: 4<br/>
+                                Version: 0
+                            </div>
+</section>
+</div>
+</div>
+<!-- Bottom Footer of Panel -->
+<div class="p-4 bg-surface-container-highest/50">
+<button class="w-full py-2.5 bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold text-xs rounded-xl shadow-lg shadow-primary/10 active:scale-95 transition-transform">
+                        Investigate Endpoint
+                    </button>
+</div>
+</div>
+</aside></main>
+<!-- Spacer for BottomNavBar -->
+<div class="h-20"></div>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-2 py-3 bg-[#0b1326] shadow-[0_-4px_12px_rgba(0,0,0,0.4)] border-t border-[#414754]/15">
+<!-- Dashboard -->
+<a class="flex flex-col items-center justify-center text-[#c1c6d7] opacity-70 hover:text-[#98cbff] hover:opacity-100 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-['Inter'] text-[11px] font-medium tracking-wide">Dashboard</span>
+</a>
+<!-- Processes -->
+<a class="flex flex-col items-center justify-center text-[#c1c6d7] opacity-70 hover:text-[#98cbff] hover:opacity-100 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="memory">memory</span>
+<span class="font-['Inter'] text-[11px] font-medium tracking-wide">Processes</span>
+</a>
+<!-- Network -->
+<a class="flex flex-col items-center justify-center text-[#c1c6d7] opacity-70 hover:text-[#98cbff] hover:opacity-100 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="lan">lan</span>
+<span class="font-['Inter'] text-[11px] font-medium tracking-wide">Network</span>
+</a>
+<!-- Events (ACTIVE) -->
+<a class="flex flex-col items-center justify-center text-[#98cbff] bg-[#171f33] rounded-xl px-3 py-1 scale-105 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="event_note" style="font-variation-settings: 'FILL' 1;">event_note</span>
+<span class="font-['Inter'] text-[11px] font-medium tracking-wide">Events</span>
+</a>
+<!-- More -->
+<a class="flex flex-col items-center justify-center text-[#c1c6d7] opacity-70 hover:text-[#98cbff] hover:opacity-100 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+<span class="font-['Inter'] text-[11px] font-medium tracking-wide">More</span>
+</a>
+</nav>
+</body></html>

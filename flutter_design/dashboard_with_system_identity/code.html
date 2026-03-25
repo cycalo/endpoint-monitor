@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              colors: {
+                "on-tertiary-container": "#002f36",
+                "inverse-on-surface": "#283044",
+                "inverse-surface": "#dae2fd",
+                "secondary-container": "#3c4a5e",
+                "surface-container-low": "#131b2e",
+                "outline": "#8b90a0",
+                "on-secondary": "#233144",
+                "background": "#0b1326",
+                "error-container": "#93000a",
+                "on-secondary-container": "#abb9d1",
+                "surface-container-lowest": "#060e20",
+                "on-error-container": "#ffdad6",
+                "on-error": "#690005",
+                "surface-container": "#171f33",
+                "primary": "#98cbff",
+                "inverse-primary": "#00629d",
+                "on-surface-variant": "#c1c6d7",
+                "on-secondary-fixed": "#0d1c2e",
+                "tertiary": "#2fd9f4",
+                "surface": "#0b1326",
+                "surface-variant": "#2d3449",
+                "surface-container-high": "#222a3d",
+                "on-background": "#dae2fd",
+                "surface-tint": "#98cbff",
+                "on-tertiary-fixed": "#001f25",
+                "primary-fixed-dim": "#98cbff",
+                "on-tertiary-fixed-variant": "#004e5a",
+                "surface-container-highest": "#2d3449",
+                "on-surface": "#dae2fd",
+                "secondary": "#b9c7df",
+                "on-primary-fixed-variant": "#004a77",
+                "primary-container": "#0097ec",
+                "tertiary-fixed-dim": "#2fd9f4",
+                "on-secondary-fixed-variant": "#3a485b",
+                "on-primary": "#003354",
+                "error": "#ffb4ab",
+                "secondary-fixed-dim": "#b9c7df",
+                "secondary-fixed": "#d5e3fc",
+                "on-primary-container": "#002c4a",
+                "surface-dim": "#0b1326",
+                "tertiary-container": "#009fb4",
+                "tertiary-fixed": "#a2eeff",
+                "surface-bright": "#31394d",
+                "on-primary-fixed": "#001d33",
+                "primary-fixed": "#cfe5ff",
+                "outline-variant": "#414754",
+                "on-tertiary": "#00363e"
+              },
+              fontFamily: {
+                "headline": ["Manrope"],
+                "body": ["Inter"],
+                "label": ["Inter"]
+              },
+              borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+            },
+          },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #0b1326;
+            color: #dae2fd;
+        }
+        .custom-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: #060e20;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #414754;
+            border-radius: 2px;
+        }
+        body {
+          min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+<body class="bg-background font-body selection:bg-primary-container selection:text-on-primary-container">
+<div class="relative flex min-h-screen w-full flex-col bg-background">
+<!-- Shared TopAppBar -->
+<header class="flex items-center bg-surface p-4 pb-2 justify-between sticky top-0 z-50">
+<div class="text-white flex size-12 shrink-0 items-center" data-icon="Monitor" data-size="24px" data-weight="regular">
+<span class="material-symbols-outlined text-primary text-[24px]">monitor</span>
+</div>
+<h2 class="text-white font-headline text-lg font-bold leading-tight tracking-[-0.015em] flex-1">Endpoint Monitor</h2>
+<div class="flex w-24 items-center justify-end">
+<button class="text-primary font-label text-base font-bold leading-normal tracking-[0.015em] shrink-0 hover:text-white transition-colors">Disconnect</button>
+</div>
+</header>
+<!-- Main Scrollable Content -->
+<main class="flex-1 overflow-y-auto custom-scroll pb-24 px-4 space-y-6">
+<!-- Connection Status -->
+<section class="pt-4">
+<div class="flex items-stretch justify-between gap-4 rounded-xl bg-surface-container p-5 shadow-lg border border-outline-variant/10">
+<div class="flex flex-col gap-2 flex-[2_2_0px]">
+<p class="text-on-surface-variant font-label text-xs uppercase tracking-widest">Status</p>
+<div class="flex items-center gap-2">
+<span class="size-2 rounded-full bg-tertiary animate-pulse shadow-[0_0_8px_#2fd9f4]"></span>
+<p class="text-white font-headline text-xl font-bold leading-tight">Connected</p>
+</div>
+<p class="text-tertiary font-label text-sm font-medium">1.2ms latency • Secure Channel</p>
+</div>
+<div class="w-32 bg-surface-container-low rounded-lg overflow-hidden flex items-center justify-center border border-outline-variant/10">
+<div class="h-full w-full bg-center bg-no-repeat bg-cover opacity-60" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBlIE6QKB0UvwCFpOQaM_4kz3lekJbevVYPndok_U5lHJbXo5FG_hVO7ATP4jDmJL0W4oBUaQNhU0bQaqmOXCcC_eausZD57CCfxB61YTwu_x1j1Id60Q4D4E2_QU4kxOu8Z7rXoMsdsgVlI-K2oLNtiWPk0rUkJdKrO0gICOw75vLsHZo2SzcSjA9i4Q_eF_bVanGdB14cslSTtaF4Wo0ElAA5WoN4N2lkyVBC8kgmVBbOBfkI6I80kAk76d03FSUed6mM-vOs8o4");'></div>
+</div>
+</div>
+</section>
+<!-- Grid Layout for Resource Metrics -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<!-- CPU Utilization Chart -->
+<div class="bg-surface-container rounded-xl p-5 border border-outline-variant/10">
+<div class="flex justify-between items-start mb-4">
+<div>
+<p class="text-on-surface-variant font-label text-xs uppercase tracking-widest mb-1">CPU Load</p>
+<p class="text-white font-headline text-3xl font-extrabold leading-tight">24%</p>
+</div>
+<span class="material-symbols-outlined text-tertiary" style="font-variation-settings: 'FILL' 1;">speed</span>
+</div>
+<div class="flex min-h-[140px] flex-col gap-4">
+<svg fill="none" height="100" preserveaspectratio="none" viewbox="-3 0 478 150" width="100%" xmlns="http://www.w3.org/2000/svg">
+<path d="M0 109C18.1538 109 18.1538 21 36.3077 21C54.4615 21 54.4615 41 72.6154 41C90.7692 41 90.7692 93 108.923 93C127.077 93 127.077 33 145.231 33C163.385 33 163.385 101 181.538 101C199.692 101 199.692 61 217.846 61C236 61 236 45 254.154 45C272.308 45 272.308 121 290.462 121C308.615 121 308.615 149 326.769 149C344.923 149 344.923 1 363.077 1C381.231 1 381.231 81 399.385 81C417.538 81 417.538 129 435.692 129C453.846 129 453.846 25 472 25V149H326.769H0V109Z" fill="url(#paint0_linear_metrics)"></path>
+<path d="M0 109C18.1538 109 18.1538 21 36.3077 21C54.4615 21 54.4615 41 72.6154 41C90.7692 41 90.7692 93 108.923 93C127.077 93 127.077 33 145.231 33C163.385 33 163.385 101 181.538 101C199.692 101 199.692 61 217.846 61C236 61 236 45 254.154 45C272.308 45 272.308 121 290.462 121C308.615 121 308.615 149 326.769 149C344.923 149 344.923 1 363.077 1C381.231 1 381.231 81 399.385 81C417.538 81 417.538 129 435.692 129C453.846 129 453.846 25 472 25" stroke="#2fd9f4" stroke-linecap="round" stroke-width="3"></path>
+<defs>
+<lineargradient gradientunits="userSpaceOnUse" id="paint0_linear_metrics" x1="236" x2="236" y1="1" y2="149">
+<stop stop-color="#2fd9f4" stop-opacity="0.3"></stop>
+<stop offset="1" stop-color="#2fd9f4" stop-opacity="0"></stop>
+</lineargradient>
+</defs>
+</svg>
+<div class="flex justify-between text-on-surface-variant font-label text-[10px] uppercase font-bold tracking-tighter">
+<span>10:00</span>
+<span>10:15</span>
+<span>10:30</span>
+</div>
+</div>
+</div>
+<!-- RAM & Disk Usage -->
+<div class="bg-surface-container rounded-xl p-5 border border-outline-variant/10 flex flex-col justify-center space-y-6">
+<div class="space-y-2">
+<div class="flex justify-between font-label text-sm">
+<span class="text-on-surface">RAM Usage</span>
+<span class="text-primary">12.4 GB / 32 GB</span>
+</div>
+<div class="h-2 w-full bg-surface-container-low rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 38.7%"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between font-label text-sm">
+<span class="text-on-surface">Disk (C:)</span>
+<span class="text-tertiary">412 GB / 1 TB</span>
+</div>
+<div class="h-2 w-full bg-surface-container-low rounded-full overflow-hidden">
+<div class="h-full bg-tertiary rounded-full" style="width: 41.2%"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- System Identity & Expanded Info -->
+<div class="space-y-4">
+<!-- System Identity Card -->
+<div class="bg-surface-container rounded-xl p-5 border border-outline-variant/10">
+<div class="flex items-center gap-3 mb-4">
+<div class="p-2 bg-primary/10 rounded-lg">
+<span class="material-symbols-outlined text-primary text-xl">settings_input_component</span>
+</div>
+<h3 class="text-white font-headline font-bold text-base">System Identity</h3>
+</div>
+<div class="grid grid-cols-2 gap-x-6 gap-y-4">
+<div>
+<p class="text-on-surface-variant font-label text-[10px] uppercase tracking-widest mb-1">OS Build</p>
+<p class="text-on-surface font-headline font-bold text-sm">Windows 11 Pro 23H2</p>
+</div>
+<div>
+<p class="text-on-surface-variant font-label text-[10px] uppercase tracking-widest mb-1">Architecture</p>
+<p class="text-on-surface font-headline font-bold text-sm">x64 (64-bit)</p>
+</div>
+<div>
+<p class="text-on-surface-variant font-label text-[10px] uppercase tracking-widest mb-1">System Name</p>
+<p class="text-on-surface font-headline font-bold text-sm">DESKTOP-8KN2L5V</p>
+</div>
+<div>
+<p class="text-on-surface-variant font-label text-[10px] uppercase tracking-widest mb-1">Serial Number</p>
+<p class="text-on-surface font-headline font-bold text-sm">PF2X-9981-LMAO</p>
+</div>
+</div>
+</div>
+<!-- Secondary System Info (Uptime & Users) -->
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-surface-container-low p-4 rounded-xl border border-outline-variant/5">
+<p class="text-on-surface-variant font-label text-[10px] uppercase tracking-widest mb-2">Uptime</p>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-sm">history</span>
+<p class="text-on-surface font-headline font-bold text-xs">14d 06h 22m</p>
+</div>
+</div>
+<div class="bg-surface-container-low p-4 rounded-xl border border-outline-variant/5">
+<p class="text-on-surface-variant font-label text-[10px] uppercase tracking-widest mb-2">Active User</p>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-sm">person</span>
+<p class="text-on-surface font-headline font-bold text-xs truncate">ADM_J_SMITH</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Summary Metrics Cards -->
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-surface-container p-6 rounded-xl border-l-4 border-primary">
+<p class="text-on-surface font-headline text-3xl font-black">142</p>
+<p class="text-on-surface-variant font-label text-xs uppercase">Processes</p>
+</div>
+<div class="bg-surface-container p-6 rounded-xl border-l-4 border-tertiary">
+<p class="text-on-surface font-headline text-3xl font-black">28</p>
+<p class="text-on-surface-variant font-label text-xs uppercase">Net Conns</p>
+</div>
+</div>
+<!-- Danger Zone -->
+<section class="mt-8">
+<div class="bg-error-container/10 border border-error/20 rounded-xl p-5">
+<div class="flex items-center gap-3 mb-4">
+<span class="material-symbols-outlined text-error" style="font-variation-settings: 'FILL' 1;">warning</span>
+<h3 class="text-error font-headline font-bold text-lg">Danger Zone</h3>
+</div>
+<p class="text-on-surface-variant text-sm mb-5 leading-relaxed">Isolating the machine will terminate all network traffic except for this management console. Use only in case of suspected compromise.</p>
+<button class="w-full bg-error text-on-error font-headline font-bold py-3 rounded-lg shadow-[0_0_20px_rgba(255,180,171,0.2)] hover:bg-white hover:text-error transition-all uppercase tracking-widest text-xs">
+                        Isolate Machine
+                    </button>
+</div>
+</section>
+</main>
+<!-- Shared BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50">
+<div class="flex gap-2 border-t border-outline-variant/20 bg-surface-container-highest px-4 pb-4 pt-2 shadow-[0_-4px_12px_rgba(0,0,0,0.5)]">
+<a class="flex flex-1 flex-col items-center justify-end gap-1 rounded-full text-primary" href="#">
+<div class="flex h-8 items-center justify-center" data-icon="Gauge" data-size="24px" data-weight="fill">
+<svg fill="currentColor" height="24px" viewbox="0 0 256 256" width="24px" xmlns="http://www.w3.org/2000/svg">
+<path d="M240,160v24a16,16,0,0,1-16,16H115.93a4,4,0,0,1-3.24-6.35L174.27,109a8.21,8.21,0,0,0-1.37-11.3,8,8,0,0,0-11.37,1.61l-72,99.06A4,4,0,0,1,86.25,200H32a16,16,0,0,1-16-16V161.13c0-1.79,0-3.57.13-5.33a4,4,0,0,1,4-3.8H48a8,8,0,0,0,8-8.53A8.17,8.17,0,0,0,47.73,136H23.92a4,4,0,0,1-3.87-5c12-43.84,49.66-77.13,95.52-82.28a4,4,0,0,1,4.43,4V80a8,8,0,0,0,8.53,8A8.17,8.17,0,0,0,136,79.73V52.67a4,4,0,0,1,4.43-4A112.18,112.18,0,0,1,236.23,131a4,4,0,0,1-3.88,5H208.27a8.17,8.17,0,0,0-8.25,7.47,8,8,0,0,0,8,8.53h27.92a4,4,0,0,1,4,3.86C240,157.23,240,158.61,240,160Z"></path>
+</svg>
+</div>
+<p class="font-label text-xs font-medium leading-normal tracking-[0.015em]">Dashboard</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-on-surface-variant opacity-60 hover:opacity-100 transition-opacity" href="#">
+<div class="flex h-8 items-center justify-center" data-icon="List" data-size="24px" data-weight="regular">
+<svg fill="currentColor" height="24px" viewbox="0 0 256 256" width="24px" xmlns="http://www.w3.org/2000/svg">
+<path d="M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128ZM40,72H216a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16ZM216,184H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16Z"></path>
+</svg>
+</div>
+<p class="font-label text-xs font-medium leading-normal tracking-[0.015em]">Processes</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-on-surface-variant opacity-60 hover:opacity-100 transition-opacity" href="#">
+<div class="flex h-8 items-center justify-center" data-icon="Share" data-size="24px" data-weight="regular">
+<svg fill="currentColor" height="24px" viewbox="0 0 256 256" width="24px" xmlns="http://www.w3.org/2000/svg">
+<path d="M229.66,109.66l-48,48a8,8,0,0,1-11.32-11.32L204.69,112H165a88,88,0,0,0-85.23,66,8,8,0,0,1-15.5-4A103.94,103.94,0,0,1,165,96h39.71L170.34,61.66a8,8,0,0,1,11.32-11.32l48,48A8,8,0,0,1,229.66,109.66ZM192,208H40V88a8,8,0,0,0-16,0V208a16,16,0,0,0,16,16H192a8,8,0,0,0,0-16Z"></path>
+</svg>
+</div>
+<p class="font-label text-xs font-medium leading-normal tracking-[0.015em]">Network</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-on-surface-variant opacity-60 hover:opacity-100 transition-opacity" href="#">
+<div class="flex h-8 items-center justify-center" data-icon="ClockCounterClockwise" data-size="24px" data-weight="regular">
+<svg fill="currentColor" height="24px" viewbox="0 0 256 256" width="24px" xmlns="http://www.w3.org/2000/svg">
+<path d="M136,80v43.47l36.12,21.67a8,8,0,0,1-8.24,13.72l-40-24A8,8,0,0,1,120,128V80a8,8,0,0,1,16,0Zm-8-48A95.44,95.44,0,0,0,60.08,60.15C52.81,67.51,46.35,74.59,40,82V64a8,8,0,0,0-16,0v40a8,8,0,0,0,8,8H72a8,8,0,0,0,0-16H49c7.15-8.42,14.27-16.35,22.39-24.57a80,80,0,1,1,1.66,114.75,8,8,0,1,0-11,11.64A96,96,0,1,0,128,32Z"></path>
+</svg>
+</div>
+<p class="font-label text-xs font-medium leading-normal tracking-[0.015em]">Logs</p>
+</a>
+</div>
+</nav>
+</div>
+</body></html>

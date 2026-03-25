@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../bloc/process_bloc.dart';
 import '../models/ws_models.dart';
+import '../theme/em_design_system.dart';
 import '../widgets/em_brand_app_bar.dart';
 
 class ProcessesScreen extends StatefulWidget {
@@ -40,9 +41,9 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
             child: Text(
-              'SYSTEM PROCESSES',
+              'System processes',
               style: theme.textTheme.headlineSmall?.copyWith(
                 letterSpacing: -0.5,
                 fontWeight: FontWeight.w800,
@@ -55,34 +56,45 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextField(
-                  controller: _search,
-                  style: GoogleFonts.jetBrainsMono(fontSize: 13),
-                  onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(
-                    hintText: 'Search by name, PID, or user…',
-                    hintStyle: mono.copyWith(
-                      color: scheme.outline.withValues(alpha: 0.45),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerLowest,
+                    borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+                    border: EmDesign.ghostBorder(scheme),
+                  ),
+                  child: TextField(
+                    controller: _search,
+                    style: GoogleFonts.jetBrainsMono(fontSize: 13),
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.transparent,
+                      border: InputBorder.none,
+                      hintText: 'Search by name, PID, or user…',
+                      hintStyle: mono.copyWith(
+                        color: scheme.outline.withValues(alpha: 0.45),
+                      ),
+                      prefixIcon: Icon(Icons.search_rounded, color: scheme.outline, size: 22),
+                      suffixIcon: _search.text.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: 'Clear',
+                              onPressed: () {
+                                _search.clear();
+                                setState(() {});
+                              },
+                              icon: Icon(Icons.clear_rounded, color: scheme.outline, size: 22),
+                            ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                     ),
-                    prefixIcon: Icon(Icons.search_rounded, color: scheme.outline, size: 22),
-                    suffixIcon: _search.text.isEmpty
-                        ? null
-                        : IconButton(
-                            tooltip: 'Clear',
-                            onPressed: () {
-                              _search.clear();
-                              setState(() {});
-                            },
-                            icon: Icon(Icons.clear_rounded, color: scheme.outline, size: 22),
-                          ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                   ),
                 ),
                 const SizedBox(height: 10),
                 DecoratedBox(
                   decoration: BoxDecoration(
                     color: scheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(EmDesign.radiusMd),
                   ),
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
@@ -202,12 +214,13 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
                 return ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
                   itemCount: list.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 4),
+                  separatorBuilder: (_, __) => const SizedBox(height: 2),
                   itemBuilder: (context, i) {
                     final p = list[i];
                     final expanded = _expandedPid == p.pid;
                     return _ProcessRow(
                       p: p,
+                      index: i,
                       expanded: expanded,
                       mono: mono,
                       onToggle: () => setState(() {
@@ -247,6 +260,7 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
 class _ProcessRow extends StatelessWidget {
   const _ProcessRow({
     required this.p,
+    required this.index,
     required this.expanded,
     required this.mono,
     required this.onToggle,
@@ -255,6 +269,7 @@ class _ProcessRow extends StatelessWidget {
   });
 
   final ProcessInfo p;
+  final int index;
   final bool expanded;
   final TextStyle mono;
   final VoidCallback onToggle;
@@ -274,31 +289,38 @@ class _ProcessRow extends StatelessWidget {
     );
     final suspended = p.status.toLowerCase().contains('suspend');
 
+    final zebra = index.isEven ? scheme.surface : scheme.surfaceContainerLowest;
     return Material(
       color: Colors.transparent,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         decoration: BoxDecoration(
-          color: expanded ? scheme.surfaceContainerHighest : scheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(4),
-          border: hotCpu
+          color: expanded ? scheme.surfaceContainerHigh : zebra,
+          borderRadius: BorderRadius.circular(EmDesign.radiusSm),
+          // Never use width:0 with borderRadius — Flutter asserts (hairline rule).
+          border: expanded || hotCpu
               ? Border(
-                  left: BorderSide(color: scheme.primaryContainer, width: 2),
+                  left: BorderSide(
+                    color: expanded
+                        ? scheme.primary
+                        : scheme.primary.withValues(alpha: 0.7),
+                    width: 2,
+                  ),
                 )
               : null,
           boxShadow: expanded
               ? [
                   BoxShadow(
-                    color: scheme.outlineVariant.withValues(alpha: 0.12),
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
+                    color: scheme.onSurface.withValues(alpha: 0.06),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
                 ]
               : null,
         ),
         child: InkWell(
           onTap: onToggle,
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(EmDesign.radiusSm),
           hoverColor: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -374,7 +396,10 @@ class _ProcessRow extends StatelessWidget {
                 ),
               ),
               if (expanded) ...[
-                Container(height: 1, color: scheme.outlineVariant.withValues(alpha: 0.08)),
+                Container(
+                  height: 1,
+                  color: scheme.outlineVariant.withValues(alpha: 0.1),
+                ),
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(

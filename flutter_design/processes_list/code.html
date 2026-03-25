@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Endpoint Monitor - Processes</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-variant": "#2d3449",
+              "secondary-container": "#3c4a5e",
+              "surface-container": "#171f33",
+              "outline-variant": "#414754",
+              "surface-dim": "#0b1326",
+              "on-primary": "#003354",
+              "on-secondary-fixed-variant": "#3a485b",
+              "primary": "#98cbff",
+              "on-primary-container": "#002c4a",
+              "inverse-surface": "#dae2fd",
+              "secondary": "#b9c7df",
+              "outline": "#8b90a0",
+              "tertiary": "#2fd9f4",
+              "tertiary-container": "#009fb4",
+              "on-secondary-fixed": "#0d1c2e",
+              "surface": "#0b1326",
+              "on-error-container": "#ffdad6",
+              "on-error": "#690005",
+              "on-primary-fixed-variant": "#004a77",
+              "on-tertiary-fixed-variant": "#004e5a",
+              "secondary-fixed-dim": "#b9c7df",
+              "tertiary-fixed-dim": "#2fd9f4",
+              "on-surface-variant": "#c1c6d7",
+              "tertiary-fixed": "#a2eeff",
+              "on-tertiary-fixed": "#001f25",
+              "primary-fixed-dim": "#98cbff",
+              "surface-bright": "#31394d",
+              "surface-container-low": "#131b2e",
+              "on-secondary": "#233144",
+              "on-tertiary": "#00363e",
+              "on-primary-fixed": "#001d33",
+              "background": "#0b1326",
+              "surface-container-highest": "#2d3449",
+              "on-tertiary-container": "#002f36",
+              "secondary-fixed": "#d5e3fc",
+              "error": "#ffb4ab",
+              "error-container": "#93000a",
+              "primary-container": "#0097ec",
+              "primary-fixed": "#cfe5ff",
+              "inverse-on-surface": "#283044",
+              "surface-container-high": "#222a3d",
+              "on-surface": "#dae2fd",
+              "inverse-primary": "#00629d",
+              "surface-container-lowest": "#060e20",
+              "on-background": "#dae2fd",
+              "on-secondary-container": "#abb9d1",
+              "surface-tint": "#98cbff"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        details > summary::-webkit-details-marker {
+            display: none;
+        }
+        .signature-gradient {
+            background: linear-gradient(135deg, #98cbff 0%, #0097ec 100%);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body">
+<div class="flex h-screen w-full flex-col overflow-hidden">
+<!-- Header (Shared-ish structure with Design System refinements) -->
+<header class="flex items-center bg-surface p-4 justify-between border-b border-outline-variant/15">
+<div class="text-primary flex size-10 shrink-0 items-center justify-center">
+<span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 0;">monitor</span>
+</div>
+<h1 class="font-headline text-on-surface text-xl font-extrabold tracking-tight flex-1 ml-2">Endpoint Monitor</h1>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">search</span>
+</button>
+<div class="group relative">
+<button class="text-primary text-sm font-bold font-headline tracking-wider uppercase flex items-center gap-1">
+                        Sort <span class="material-symbols-outlined text-sm">filter_list</span>
+</button>
+<!-- Simulated Dropdown -->
+<div class="absolute right-0 mt-2 w-48 bg-surface-container-high rounded-lg shadow-2xl border border-outline-variant/20 hidden group-hover:block z-50 p-2 backdrop-blur-xl bg-opacity-90">
+<a class="block px-4 py-2 text-xs font-label text-on-surface hover:bg-surface-variant rounded" href="#">Name</a>
+<a class="block px-4 py-2 text-xs font-label text-on-surface hover:bg-surface-variant rounded border-t border-outline-variant/10" href="#">PID</a>
+<a class="block px-4 py-2 text-xs font-label text-on-surface hover:bg-surface-variant rounded border-t border-outline-variant/10" href="#">Resource Usage</a>
+</div>
+</div>
+</div>
+</header>
+<!-- Search Bar -->
+<div class="px-4 py-4 bg-surface-container-low">
+<label class="flex flex-col w-full">
+<div class="flex w-full items-stretch rounded-lg bg-surface-container-lowest border border-outline-variant/15 focus-within:border-primary/50 transition-all">
+<div class="text-outline flex items-center justify-center pl-4">
+<span class="material-symbols-outlined text-xl">search</span>
+</div>
+<input class="w-full bg-transparent border-none focus:ring-0 text-on-surface placeholder:text-outline p-3 text-sm font-body" placeholder="Search processes by name, PID, or user..."/>
+</div>
+</label>
+</div>
+<!-- Content Area: Process List -->
+<main class="flex-1 overflow-y-auto bg-surface-container-low">
+<div class="flex flex-col w-full">
+<!-- Process Row: Chrome (Open) -->
+<details class="group bg-surface hover:bg-surface-container transition-colors duration-200" open="">
+<summary class="flex cursor-pointer items-center justify-between gap-4 p-4 list-none select-none border-l-2 border-transparent group-open:border-primary">
+<div class="flex items-center gap-4 flex-1">
+<div class="w-10 h-10 rounded-lg bg-surface-variant flex items-center justify-center text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">browser_updated</span>
+</div>
+<div class="flex flex-col flex-1">
+<div class="flex items-center gap-2">
+<span class="text-on-surface font-headline font-bold text-sm">chrome.exe</span>
+<span class="text-[10px] bg-secondary-container/50 text-secondary px-1.5 py-0.5 rounded font-label uppercase tracking-widest">PID: 1024</span>
+</div>
+<div class="flex gap-4 mt-1">
+<span class="text-[11px] font-label text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">memory</span> 12% CPU
+                                    </span>
+<span class="text-[11px] font-label text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">storage</span> 450 MB RAM
+                                    </span>
+</div>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline transition-transform duration-300 group-open:rotate-180">expand_more</span>
+</summary>
+<div class="px-4 pb-6 pt-0 bg-surface-container-lowest border-t border-outline-variant/5">
+<div class="grid grid-cols-1 gap-4 py-4">
+<div class="space-y-1">
+<p class="text-[10px] font-label uppercase text-outline tracking-wider">Command Path</p>
+<p class="text-xs font-body text-primary/80 font-mono break-all leading-relaxed bg-surface-dim/50 p-2 rounded">C:\Program Files\Google\Chrome\chrome.exe --type=renderer --field-trial-handle=1748 --lang=en-US</p>
+</div>
+<div class="flex gap-8">
+<div>
+<p class="text-[10px] font-label uppercase text-outline tracking-wider">Parent PID</p>
+<p class="text-sm font-headline font-bold text-on-surface">884</p>
+</div>
+<div>
+<p class="text-[10px] font-label uppercase text-outline tracking-wider">Status</p>
+<p class="text-sm font-headline font-bold text-tertiary flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary shadow-[0_0_8px_#2fd9f4]"></span> Running
+                                    </p>
+</div>
+</div>
+</div>
+<div class="flex flex-wrap gap-2 pt-2">
+<button class="h-9 px-4 signature-gradient rounded text-on-primary text-xs font-bold font-headline flex items-center gap-2 transition-opacity hover:opacity-90">
+<span class="material-symbols-outlined text-sm">cancel</span> Kill
+                            </button>
+<button class="h-9 px-4 bg-surface-container-highest text-on-surface text-xs font-bold font-headline flex items-center gap-2 rounded hover:bg-outline-variant transition-colors">
+<span class="material-symbols-outlined text-sm">pause_circle</span> Suspend
+                            </button>
+<button class="h-9 px-4 bg-surface-container-highest text-on-surface text-xs font-bold font-headline flex items-center gap-2 rounded hover:bg-outline-variant transition-colors opacity-50 cursor-not-allowed">
+<span class="material-symbols-outlined text-sm">play_circle</span> Resume
+                            </button>
+<button class="h-9 px-4 border border-outline-variant/30 text-outline text-xs font-bold font-headline flex items-center gap-2 rounded hover:border-tertiary/50 hover:text-tertiary transition-colors">
+<span class="material-symbols-outlined text-sm">flag</span> Flag
+                            </button>
+</div>
+</div>
+</details>
+<!-- Process Row: System Server (Closed) -->
+<details class="group bg-surface-container-low hover:bg-surface-container transition-colors duration-200 border-t border-outline-variant/10">
+<summary class="flex cursor-pointer items-center justify-between gap-4 p-4 list-none select-none border-l-2 border-transparent group-open:border-primary">
+<div class="flex items-center gap-4 flex-1">
+<div class="w-10 h-10 rounded-lg bg-surface-variant flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">settings_suggest</span>
+</div>
+<div class="flex flex-col flex-1">
+<div class="flex items-center gap-2">
+<span class="text-on-surface font-headline font-bold text-sm">system_server</span>
+<span class="text-[10px] bg-secondary-container/50 text-secondary px-1.5 py-0.5 rounded font-label uppercase tracking-widest">PID: 550</span>
+</div>
+<div class="flex gap-4 mt-1">
+<span class="text-[11px] font-label text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">memory</span> 2.1% CPU
+                                    </span>
+<span class="text-[11px] font-label text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">storage</span> 120 MB RAM
+                                    </span>
+</div>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline transition-transform duration-300 group-open:rotate-180">expand_more</span>
+</summary>
+<div class="px-4 pb-6 pt-0 bg-surface-container-lowest">
+<!-- Content matches Chrome expanded pattern -->
+</div>
+</details>
+<!-- Process Row: VS Code (Closed) -->
+<details class="group bg-surface hover:bg-surface-container transition-colors duration-200 border-t border-outline-variant/10">
+<summary class="flex cursor-pointer items-center justify-between gap-4 p-4 list-none select-none border-l-2 border-transparent group-open:border-primary">
+<div class="flex items-center gap-4 flex-1">
+<div class="w-10 h-10 rounded-lg bg-surface-variant flex items-center justify-center text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">terminal</span>
+</div>
+<div class="flex flex-col flex-1">
+<div class="flex items-center gap-2">
+<span class="text-on-surface font-headline font-bold text-sm">vscode.exe</span>
+<span class="text-[10px] bg-secondary-container/50 text-secondary px-1.5 py-0.5 rounded font-label uppercase tracking-widest">PID: 2840</span>
+</div>
+<div class="flex gap-4 mt-1">
+<span class="text-[11px] font-label text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">memory</span> 5.4% CPU
+                                    </span>
+<span class="text-[11px] font-label text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">storage</span> 890 MB RAM
+                                    </span>
+</div>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline transition-transform duration-300 group-open:rotate-180">expand_more</span>
+</summary>
+<div class="px-4 pb-6 pt-0 bg-surface-container-lowest"></div>
+</details>
+<!-- Process Row: Defender (Warning state pulse) -->
+<details class="group bg-surface-container-low hover:bg-surface-container transition-colors duration-200 border-t border-outline-variant/10">
+<summary class="flex cursor-pointer items-center justify-between gap-4 p-4 list-none select-none border-l-2 border-transparent group-open:border-primary">
+<div class="flex items-center gap-4 flex-1">
+<div class="w-10 h-10 rounded-lg bg-error-container/20 flex items-center justify-center text-error">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">security</span>
+</div>
+<div class="flex flex-col flex-1">
+<div class="flex items-center gap-2">
+<span class="text-on-surface font-headline font-bold text-sm">MsMpEng.exe</span>
+<span class="text-[10px] bg-secondary-container/50 text-secondary px-1.5 py-0.5 rounded font-label uppercase tracking-widest">PID: 412</span>
+</div>
+<div class="flex gap-4 mt-1">
+<span class="text-[11px] font-label text-error font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">warning</span> High CPU Usage
+                                    </span>
+<span class="text-[11px] font-label text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">memory</span> 42% CPU
+                                    </span>
+</div>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline transition-transform duration-300 group-open:rotate-180">expand_more</span>
+</summary>
+<div class="px-4 pb-6 pt-0 bg-surface-container-lowest"></div>
+</details>
+</div>
+</main>
+<!-- Bottom Navigation Bar (Shared Component strictly applied) -->
+<div class="flex gap-2 border-t border-[#20354b] bg-[#172636] px-4 pb-3 pt-2">
+<a class="just flex flex-1 flex-col items-center justify-end gap-1 text-[#8dacce]" href="#">
+<div class="text-[#8dacce] flex h-8 items-center justify-center" data-icon="Gauge" data-size="24px" data-weight="regular">
+<svg fill="currentColor" height="24px" viewbox="0 0 256 256" width="24px" xmlns="http://www.w3.org/2000/svg">
+<path d="M207.06,80.67A111.24,111.24,0,0,0,128,48h-.4C66.07,48.21,16,99,16,161.13V184a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V160A111.25,111.25,0,0,0,207.06,80.67ZM224,184H119.71l54.76-75.3a8,8,0,0,0-12.94-9.42L99.92,184H32V161.13c0-3.08.15-6.12.43-9.13H56a8,8,0,0,0,0-16H35.27c10.32-38.86,44-68.24,84.73-71.66V88a8,8,0,0,0,16,0V64.33A96.14,96.14,0,0,1,221,136H200a8,8,0,0,0,0,16h23.67c.21,2.65.33,5.31.33,8Z"></path>
+</svg>
+</div>
+<p class="text-[#8dacce] text-xs font-medium leading-normal tracking-[0.015em]">Overview</p>
+</a>
+<a class="just flex flex-1 flex-col items-center justify-end gap-1 rounded-full text-white" href="#">
+<div class="text-white flex h-8 items-center justify-center" data-icon="List" data-size="24px" data-weight="fill">
+<svg fill="currentColor" height="24px" viewbox="0 0 256 256" width="24px" xmlns="http://www.w3.org/2000/svg">
+<path d="M224,120v16a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V120a8,8,0,0,1,8-8H216A8,8,0,0,1,224,120Zm-8,56H40a8,8,0,0,0-8,8v16a8,8,0,0,0,8,8H216a8,8,0,0,0,8-8V184A8,8,0,0,0,216,176Zm0-128H40a8,8,0,0,0-8,8V72a8,8,0,0,0,8,8H216a8,8,0,0,0,8-8V56A8,8,0,0,0,216,48Z"></path>
+</svg>
+</div>
+<p class="text-white text-xs font-medium leading-normal tracking-[0.015em]">Processes</p>
+</a>
+<a class="just flex flex-1 flex-col items-center justify-end gap-1 text-[#8dacce]" href="#">
+<div class="text-[#8dacce] flex h-8 items-center justify-center" data-icon="CubeFocus" data-size="24px" data-weight="regular">
+<svg fill="currentColor" height="24px" viewbox="0 0 256 256" width="24px" xmlns="http://www.w3.org/2000/svg">
+<path d="M192,157.43V98.57a13,13,0,0,0-6.42-11.24L134.24,57.68a12.48,12.48,0,0,0-12.48,0L70.43,87.33A13,13,0,0,0,64,98.57v58.86a13,13,0,0,0,6.42,11.24l51.34,29.65a12.49,12.49,0,0,0,12.48,0l51.33-29.65A13,13,0,0,0,192,157.43ZM128,72.55,168.59,96,128,119.43,87.41,96ZM80,110.19l40,23.1v45.54l-40-23.1Zm56,68.64V133.29l40-23.1v45.54ZM232,48V88a8,8,0,0,1-16,0V56H184a8,8,0,0,1,0-16h40A8,8,0,0,1,232,48ZM80,208a8,8,0,0,1-8,8H32a8,8,0,0,1-8-8V168a8,8,0,0,1,16,0v32H72A8,8,0,0,1,80,208Zm152-40v40a8,8,0,0,1-8,8H184a8,8,0,0,1,0-16h32V168a8,8,0,0,1,16,0ZM24,88V48a8,8,0,0,1,8-8H72a8,8,0,0,1,0,16H40V88a8,8,0,0,1-16,0Z"></path>
+</svg>
+</div>
+<p class="text-[#8dacce] text-xs font-medium leading-normal tracking-[0.015em]">Network</p>
+</a>
+<a class="just flex flex-1 flex-col items-center justify-end gap-1 text-[#8dacce]" href="#">
+<div class="text-[#8dacce] flex h-8 items-center justify-center" data-icon="ClockCounterClockwise" data-size="24px" data-weight="regular">
+<svg fill="currentColor" height="24px" viewbox="0 0 256 256" width="24px" xmlns="http://www.w3.org/2000/svg">
+<path d="M136,80v43.47l36.12,21.67a8,8,0,0,1-8.24,13.72l-40-24A8,8,0,0,1,120,128V80a8,8,0,0,1,16,0Zm-8-48A95.44,95.44,0,0,0,60.08,60.15C52.81,67.51,46.35,74.59,40,82V64a8,8,0,0,0-16,0v40a8,8,0,0,0,8,8H72a8,8,0,0,0,0-16H49c7.15-8.42,14.27-16.35,22.39-24.57a80,80,0,1,1,1.66,114.75,8,8,0,1,0-11,11.64A96,96,0,1,0,128,32Z"></path>
+</svg>
+</div>
+<p class="text-[#8dacce] text-xs font-medium leading-normal tracking-[0.015em]">Logs</p>
+</a>
+</div>
+</div>
+</body></html>

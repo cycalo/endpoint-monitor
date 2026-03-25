@@ -24,8 +24,8 @@ class _EmConnectionStatus extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final mono =
-        GoogleFonts.jetBrainsMono(fontSize: 11, color: scheme.onSurfaceVariant);
+    final dataStyle =
+        GoogleFonts.inter(fontSize: 11, color: scheme.onSurfaceVariant);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -37,7 +37,7 @@ class _EmConnectionStatus extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   'OFFLINE',
-                  style: mono.copyWith(fontSize: 10, color: scheme.outline),
+                  style: dataStyle.copyWith(fontSize: 10, color: scheme.outline),
                 ),
               );
             }
@@ -77,7 +77,7 @@ class _EmConnectionStatus extends StatelessWidget {
                         'CONNECTED — $host',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: mono.copyWith(
+                        style: dataStyle.copyWith(
                           fontSize: 10,
                           color: scheme.tertiary,
                           fontWeight: FontWeight.w600,
@@ -96,7 +96,7 @@ class _EmConnectionStatus extends StatelessWidget {
   }
 }
 
-/// Shell header: terminal mark, live connection pill, optional trailing actions, link icon.
+/// Shell header: monitor mark, live connection pill, optional trailing actions, link icon.
 class EmBrandAppBar extends StatelessWidget implements PreferredSizeWidget {
   const EmBrandAppBar({
     super.key,
@@ -122,7 +122,7 @@ class EmBrandAppBar extends StatelessWidget implements PreferredSizeWidget {
       titleSpacing: 12,
       title: Row(
         children: [
-          Icon(Icons.terminal_rounded, color: scheme.primary, size: 26),
+          Icon(Icons.monitor_heart_rounded, color: scheme.primary, size: 26),
           const SizedBox(width: 8),
           const Expanded(child: _EmConnectionStatus()),
           if (actions != null) ...actions!,

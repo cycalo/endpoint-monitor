@@ -45,7 +45,8 @@ class EmTechnicalGrid extends StatelessWidget {
               ),
             ),
           ),
-        child,
+        // Fill the stack so scroll views get a finite max height (avoids blank body).
+        Positioned.fill(child: child),
       ],
     );
   }
