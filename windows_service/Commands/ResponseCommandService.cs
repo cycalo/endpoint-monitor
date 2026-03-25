@@ -38,6 +38,7 @@ public sealed class ResponseCommandService(
                 "unflag_process" => await UnflagAsync(root, clientIp, cancellationToken).ConfigureAwait(false),
                 "get_browser_history" => await GetBrowserHistoryAsync(root, cancellationToken).ConfigureAwait(false),
                 "get_installed_software" => await GetInstalledSoftwareAsync(cancellationToken).ConfigureAwait(false),
+                "get_recent_events" => await GetRecentEventsAsync(root, cancellationToken).ConfigureAwait(false),
                 "ack_alert" => await AckAlertAsync(root, cancellationToken).ConfigureAwait(false),
                 _ => new CommandResult(false, type, "unknown_command")
             };
@@ -202,6 +203,36 @@ public sealed class ResponseCommandService(
         var items = await installedSoftwareCollector.CollectAsync(cancellationToken).ConfigureAwait(false);
         var data = JsonSerializer.SerializeToElement(items, AppJson.Options);
         return new CommandResult(true, "get_installed_software", "ok", data);
+    }
+
+    private async Task<CommandResult> GetRecentEventsAsync(JsonElement root, CancellationToken cancellationToken)
+    {
+        var limit = root.TryGetProperty("limit", out var limitEl) && limitEl.TryGetInt32(out var v)
+            ? Math.Clamp(v, 1, 5000)
+            : 500;
+        var rows = await database.QuerySysmonAsync(
+            from: null,
+            to: null,
+            typeFilter: null,
+            processFilter: null,
+            limit: limit,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+        var items = rows.Select(r => new Models.SysmonEvent
+        {
+            EventId = r.EventId,
+            Timestamp = r.Timestamp,
+            Type = r.Type,
+            Pid = r.Pid,
+            ProcessName = r.ProcessName,
+            CommandLine = r.CommandLine,
+            ParentPid = r.ParentPid,
+            RemoteAddress = r.RemoteAddress,
+            RemotePort = r.RemotePort,
+            DnsQuery = r.DnsQuery,
+            RawXml = r.RawXml
+        }).ToList();
+        var data = JsonSerializer.SerializeToElement(items, AppJson.Options);
+        return new CommandResult(true, "get_recent_events", "ok", data);
     }
 
     private async Task<CommandResult> AckAlertAsync(JsonElement root, CancellationToken cancellationToken)

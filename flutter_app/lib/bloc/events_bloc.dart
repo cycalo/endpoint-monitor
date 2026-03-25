@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
@@ -23,11 +25,28 @@ class EventsBloc extends Cubit<EventsState> {
   void _onData(Object data) {
     if (data is! Map) return;
     final m = Map<String, dynamic>.from(data);
-    if (m['type'] != 'sysmon_event') return;
-    final raw = m['data'];
-    if (raw is! Map) return;
-    final ev = SysmonEvent.fromJson(Map<String, dynamic>.from(raw));
-    emit(state.copyWith(items: [ev, ...state.items].take(2000).toList()));
+    final type = m['type']?.toString() ?? '';
+    if (type == 'sysmon_event') {
+      final raw = m['data'];
+      if (raw is! Map) return;
+      final ev = SysmonEvent.fromJson(Map<String, dynamic>.from(raw));
+      emit(state.copyWith(items: [ev, ...state.items].take(2000).toList()));
+      return;
+    }
+    if (type == 'command_result' &&
+        m['command']?.toString() == 'get_recent_events' &&
+        m['success'] == true) {
+      final raw = m['data'];
+      if (raw is! List) return;
+      final list = raw
+          .map((e) => SysmonEvent.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+      emit(state.copyWith(items: list));
+    }
+  }
+
+  void loadRecent({int limit = 500}) {
+    FlutterForegroundTask.sendDataToTask(jsonEncode({'type': 'get_recent_events', 'limit': limit}));
   }
 
   @override
