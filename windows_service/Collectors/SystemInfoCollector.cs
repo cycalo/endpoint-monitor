@@ -9,7 +9,9 @@ using static System.Management.ManagementDateTimeConverter;
 
 namespace EndpointMonitorService.Collectors;
 
-public sealed class SystemInfoCollector(ILogger<SystemInfoCollector> logger)
+public sealed class SystemInfoCollector(
+    ILogger<SystemInfoCollector> logger,
+    NetworkThroughputCollector networkThroughput)
 {
     private readonly PerformanceCounter? _cpuCounter = CreateCpuCounter();
 
@@ -132,6 +134,17 @@ public sealed class SystemInfoCollector(ILogger<SystemInfoCollector> logger)
         var (netDesc, netIp) = CollectPrimaryNetwork();
         info.PrimaryNetworkDescription = netDesc;
         info.PrimaryNetworkIpv4 = netIp;
+
+        try
+        {
+            networkThroughput.Sample(out var sent, out var recv);
+            info.NetworkBytesSentPerSec = Math.Round(sent, 2);
+            info.NetworkBytesReceivedPerSec = Math.Round(recv, 2);
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Network throughput sample failed");
+        }
 
         return info;
     }

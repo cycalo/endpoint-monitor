@@ -1,0 +1,14 @@
+GeoLite2-City.mmdb is NOT shipped with this repo.
+
+1) Create a free MaxMind account and download "GeoLite2 City" (MMDB format) from:
+   https://www.maxmind.com/en/accounts/current/geoip/downloads
+
+2) Save the file as exactly:
+   GeoLite2-City.mmdb
+
+3) Put that file in THIS folder (next to EndpointMonitorService.csproj).
+
+4) Rebuild the Windows service. The build copies the file to bin\ and publish output
+   next to EndpointMonitorService.exe, where GeoIpLookupService loads it.
+
+Optional: set environment variable GEOLITE2_CITY_DB_PATH to the full path of the .mmdb file.

@@ -1,4 +1,5 @@
 windows_service/appsettings.json
+windows_service/GeoLite2-City.mmdb
 **/bin/
 **/obj/
 **/.dart_tool/

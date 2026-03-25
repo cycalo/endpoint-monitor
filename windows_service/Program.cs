@@ -29,13 +29,20 @@ builder.Services.AddSingleton<AppDatabase>();
 builder.Services.AddSingleton<WebSocketConnectionManager>();
 builder.Services.AddSingleton<AuthTokenValidator>();
 builder.Services.AddSingleton<ProcessCollector>();
+builder.Services.AddSingleton<GeoIpLookupService>();
 builder.Services.AddSingleton<NetworkCollector>();
+builder.Services.AddSingleton<NetworkThroughputCollector>();
 builder.Services.AddSingleton<SystemInfoCollector>();
 builder.Services.AddSingleton<BrowserHistoryReader>();
 builder.Services.AddSingleton<InstalledSoftwareCollector>();
 builder.Services.AddSingleton<ResponseCommandService>();
 builder.Services.AddSingleton<AlertEngine>();
 builder.Services.AddSingleton<SysmonIngestService>();
+builder.Services.AddHttpClient(nameof(SysmonInstaller), client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(5);
+});
+builder.Services.AddSingleton<SysmonInstaller>();
 
 builder.Services.AddHostedService<MonitorBroadcastHostedService>();
 builder.Services.AddHostedService<SystemInfoHostedService>();

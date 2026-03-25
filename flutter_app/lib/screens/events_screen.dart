@@ -50,7 +50,8 @@ class _EventsScreenState extends State<EventsScreen> {
             onPressed: () async {
               try {
                 final p = await SharedPreferences.getInstance();
-                final base = p.getString('em_http_base') ?? 'http://192.168.1.10:5000';
+                final base =
+                    p.getString('em_http_base') ?? 'http://192.168.1.10:5000';
                 const s = FlutterSecureStorage();
                 final token = await s.read(key: 'em_token') ?? '';
                 final dio = Dio(BaseOptions(baseUrl: base));
@@ -70,12 +71,17 @@ class _EventsScreenState extends State<EventsScreen> {
                         return '${str.substring(0, 4000)}…';
                       }()),
                     ),
-                    actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('Close'))],
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(c),
+                          child: const Text('Close'))
+                    ],
                   ),
                 );
               } catch (e) {
                 if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(SnackBar(content: Text('$e')));
               }
             },
             icon: const Icon(Icons.ios_share_rounded),
@@ -97,10 +103,13 @@ class _EventsScreenState extends State<EventsScreen> {
                   ),
                   items: const [
                     DropdownMenuItem(value: 'all', child: Text('All')),
-                    DropdownMenuItem(value: 'ProcessCreate', child: Text('Process')),
-                    DropdownMenuItem(value: 'NetworkConnect', child: Text('Network')),
+                    DropdownMenuItem(
+                        value: 'ProcessCreate', child: Text('Process')),
+                    DropdownMenuItem(
+                        value: 'NetworkConnect', child: Text('Network')),
                     DropdownMenuItem(value: 'DnsQuery', child: Text('DNS')),
-                    DropdownMenuItem(value: 'ProcessTerminate', child: Text('Terminate')),
+                    DropdownMenuItem(
+                        value: 'ProcessTerminate', child: Text('Terminate')),
                   ],
                   onChanged: (v) => setState(() => _type = v ?? 'all'),
                 ),
@@ -115,11 +124,13 @@ class _EventsScreenState extends State<EventsScreen> {
                     prefixIcon: const Icon(Icons.search_rounded, size: 20),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(EmDesign.radiusMd),
-                      borderSide: BorderSide(color: EmDesign.ghostLine(scheme), width: 1),
+                      borderSide: BorderSide(
+                          color: EmDesign.ghostLine(scheme), width: 1),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(EmDesign.radiusMd),
-                      borderSide: BorderSide(color: EmDesign.ghostLine(scheme), width: 1),
+                      borderSide: BorderSide(
+                          color: EmDesign.ghostLine(scheme), width: 1),
                     ),
                   ),
                   onChanged: (_) => setState(() {}),
@@ -144,7 +155,8 @@ class _EventsScreenState extends State<EventsScreen> {
             return Center(
               child: Text(
                 'No events yet',
-                style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: scheme.onSurfaceVariant),
               ),
             );
           }
@@ -155,7 +167,9 @@ class _EventsScreenState extends State<EventsScreen> {
             itemBuilder: (context, i) {
               final e = list[i];
               final ts = DateTime.tryParse(e.timestamp);
-              final tsText = ts != null ? DateFormat('yyyy-MM-dd HH:mm:ss').format(ts.toLocal()) : e.timestamp;
+              final tsText = ts != null
+                  ? DateFormat('yyyy-MM-dd HH:mm:ss').format(ts.toLocal())
+                  : e.timestamp;
               final accent = _colorFor(e, scheme);
               return Material(
                 color: scheme.surfaceContainer,
@@ -170,7 +184,8 @@ class _EventsScreenState extends State<EventsScreen> {
                         padding: const EdgeInsets.all(16),
                         child: ListView(
                           children: [
-                            Text('PID ${e.pid}', style: Theme.of(context).textTheme.titleMedium),
+                            Text('PID ${e.pid}',
+                                style: Theme.of(context).textTheme.titleMedium),
                             const SizedBox(height: 8),
                             SelectableText(e.rawXml),
                           ],
@@ -183,10 +198,14 @@ class _EventsScreenState extends State<EventsScreen> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(EmDesign.radiusMd),
                       border: Border(
-                        left: BorderSide(color: accent.withValues(alpha: 0.75), width: 3),
-                        top: BorderSide(color: EmDesign.ghostLine(scheme), width: 1),
-                        right: BorderSide(color: EmDesign.ghostLine(scheme), width: 1),
-                        bottom: BorderSide(color: EmDesign.ghostLine(scheme), width: 1),
+                        left: BorderSide(
+                            color: accent.withValues(alpha: 0.75), width: 3),
+                        top: BorderSide(
+                            color: EmDesign.ghostLine(scheme), width: 1),
+                        right: BorderSide(
+                            color: EmDesign.ghostLine(scheme), width: 1),
+                        bottom: BorderSide(
+                            color: EmDesign.ghostLine(scheme), width: 1),
                       ),
                     ),
                     child: Column(
@@ -213,7 +232,9 @@ class _EventsScreenState extends State<EventsScreen> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          e.rawXml.length > 160 ? '${e.rawXml.substring(0, 160)}…' : e.rawXml,
+                          e.rawXml.length > 160
+                              ? '${e.rawXml.substring(0, 160)}…'
+                              : e.rawXml,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall?.copyWith(

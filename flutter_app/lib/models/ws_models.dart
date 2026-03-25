@@ -43,6 +43,11 @@ class NetworkConnection {
     required this.remotePort,
     required this.protocol,
     required this.state,
+    this.durationSeconds = 0,
+    this.countryCode = '',
+    this.countryName = '',
+    this.city = '',
+    this.org = '',
   });
 
   final int pid;
@@ -53,6 +58,13 @@ class NetworkConnection {
   final int remotePort;
   final String protocol;
   final String state;
+  final int durationSeconds;
+
+  /// ISO 3166-1 alpha-2 from GeoLite2 (empty if unknown / private IP).
+  final String countryCode;
+  final String countryName;
+  final String city;
+  final String org;
 
   factory NetworkConnection.fromJson(Map<String, dynamic> j) => NetworkConnection(
         pid: (j['pid'] as num?)?.toInt() ?? 0,
@@ -63,6 +75,11 @@ class NetworkConnection {
         remotePort: (j['remotePort'] as num?)?.toInt() ?? 0,
         protocol: j['protocol'] as String? ?? '',
         state: j['state'] as String? ?? '',
+        durationSeconds: (j['durationSeconds'] as num?)?.toInt() ?? 0,
+        countryCode: j['countryCode'] as String? ?? '',
+        countryName: j['countryName'] as String? ?? '',
+        city: j['city'] as String? ?? '',
+        org: j['org'] as String? ?? '',
       );
 }
 
@@ -131,6 +148,8 @@ class SystemInfo {
     this.primaryNetworkIpv4 = '',
     this.agentVersion = '',
     this.sysmonStatus = '',
+    this.networkBytesSentPerSec = 0,
+    this.networkBytesReceivedPerSec = 0,
   });
 
   /// Windows computer / device name (from agent).
@@ -170,6 +189,12 @@ class SystemInfo {
   /// Sysmon driver state: Running | Stopped | Not installed.
   final String sysmonStatus;
 
+  /// Machine-wide bytes sent per second (sum of interfaces; from agent perf counters).
+  final double networkBytesSentPerSec;
+
+  /// Machine-wide bytes received per second (sum of interfaces).
+  final double networkBytesReceivedPerSec;
+
   /// Display string for OS row: caption when present, else version.
   String get osDisplayLine {
     final c = osCaption.trim();
@@ -199,6 +224,8 @@ class SystemInfo {
         primaryNetworkIpv4: j['primaryNetworkIpv4'] as String? ?? '',
         agentVersion: j['agentVersion'] as String? ?? '',
         sysmonStatus: j['sysmonStatus'] as String? ?? '',
+        networkBytesSentPerSec: (j['networkBytesSentPerSec'] as num?)?.toDouble() ?? 0,
+        networkBytesReceivedPerSec: (j['networkBytesReceivedPerSec'] as num?)?.toDouble() ?? 0,
       );
 }
 

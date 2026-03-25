@@ -1,9 +1,18 @@
+using EndpointMonitorService.Sysmon;
+
 namespace EndpointMonitorService.Hosted;
 
 public sealed class SysmonHostedService(
     ILogger<SysmonHostedService> logger,
-    Sysmon.SysmonIngestService ingest) : BackgroundService
+    SysmonIngestService ingest,
+    SysmonInstaller sysmonInstaller) : BackgroundService
 {
+    public override async Task StartAsync(CancellationToken cancellationToken)
+    {
+        await sysmonInstaller.EnsureInstalledAsync(cancellationToken).ConfigureAwait(false);
+        await base.StartAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         try

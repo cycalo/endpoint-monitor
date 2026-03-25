@@ -40,4 +40,10 @@ public sealed class SystemInfo
     public int ProcessCount { get; set; }
     public int NetworkConnectionCount { get; set; }
     public int EventsTodayCount { get; set; }
+
+    /// <summary>Sum of bytes sent per second across included interfaces (perf counters).</summary>
+    public double NetworkBytesSentPerSec { get; set; }
+
+    /// <summary>Sum of bytes received per second across included interfaces (perf counters).</summary>
+    public double NetworkBytesReceivedPerSec { get; set; }
 }

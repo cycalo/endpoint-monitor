@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'bloc/connection_bloc.dart';
+import 'models/ws_models.dart';
 import 'router/go_router_refresh.dart';
 import 'screens/alerts_screen.dart';
 import 'screens/browser_screen.dart';
@@ -10,6 +11,7 @@ import 'screens/dashboard_screen.dart';
 import 'screens/events_screen.dart';
 import 'screens/firewall_screen.dart';
 import 'screens/more_screen.dart';
+import 'screens/network_connection_detail_screen.dart';
 import 'screens/network_screen.dart';
 import 'screens/process_detail_screen.dart';
 import 'screens/processes_screen.dart';
@@ -75,6 +77,21 @@ GoRouter createAppRouter(ConnectionBloc connectionBloc) {
                 name: 'network',
                 path: '/network',
                 builder: (context, state) => const NetworkScreen(),
+                routes: [
+                  GoRoute(
+                    name: 'networkConnectionDetail',
+                    path: 'detail',
+                    builder: (context, state) {
+                      final extra = state.extra;
+                      if (extra is! NetworkConnection) {
+                        return const Scaffold(
+                          body: Center(child: Text('Missing connection')),
+                        );
+                      }
+                      return NetworkConnectionDetailScreen(connection: extra);
+                    },
+                  ),
+                ],
               ),
             ],
           ),

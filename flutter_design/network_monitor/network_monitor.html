@@ -84,11 +84,11 @@
         }
     </style>
 <style>
-    body {
-      min-height: max(884px, 100dvh);
-    }
-  </style>
-  </head>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
 <body class="bg-surface font-body text-on-surface min-h-screen flex flex-col">
 <!-- Top AppBar -->
 <header class="flex items-center bg-surface p-4 pb-2 justify-between sticky top-0 z-20">
@@ -104,6 +104,19 @@
 </header>
 <!-- Content Area -->
 <main class="flex-1 flex flex-col px-4 gap-6 pb-24 overflow-y-auto no-scrollbar">
+<!-- Summary Header -->
+<div class="bg-surface-container-high/50 p-3 rounded-lg border border-primary/20 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">speed</span>
+<div>
+<p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">Total Bandwidth</p>
+<p class="text-sm font-headline font-bold text-on-surface">45.4 Mbps <span class="text-primary text-[10px]">UP</span> / 12.2 Mbps <span class="text-tertiary text-[10px]">DOWN</span></p>
+</div>
+</div>
+<div class="flex flex-col items-end">
+<span class="text-[10px] text-on-surface-variant font-medium">Uptime: 14h 22m</span>
+</div>
+</div>
 <!-- Search and Filters Section -->
 <section class="space-y-4">
 <div class="py-1">
@@ -116,31 +129,59 @@
 </div>
 </label>
 </div>
-<div class="flex flex-wrap gap-4">
+<div class="flex flex-wrap gap-3">
 <div class="flex-1 min-w-[140px]">
-<p class="text-on-surface-variant text-xs font-medium uppercase tracking-wider pb-2 px-1">Protocol</p>
+<p class="text-on-surface-variant text-[10px] font-bold uppercase tracking-wider pb-1.5 px-1">Protocol</p>
 <div class="relative">
-<select class="form-select w-full h-12 bg-surface-container border-none rounded text-on-surface px-4 appearance-none focus:ring-1 focus:ring-primary-container">
+<select class="form-select w-full h-10 bg-surface-container border-none rounded text-sm text-on-surface px-4 appearance-none focus:ring-1 focus:ring-primary-container">
 <option>All Protocols</option>
 <option>TCP</option>
 <option>UDP</option>
 </select>
 <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">
-<span class="material-symbols-outlined">expand_more</span>
+<span class="material-symbols-outlined text-lg">expand_more</span>
 </div>
 </div>
 </div>
 <div class="flex-1 min-w-[140px]">
-<p class="text-on-surface-variant text-xs font-medium uppercase tracking-wider pb-2 px-1">State</p>
+<p class="text-on-surface-variant text-[10px] font-bold uppercase tracking-wider pb-1.5 px-1">Min. Bandwidth</p>
 <div class="relative">
-<select class="form-select w-full h-12 bg-surface-container border-none rounded text-on-surface px-4 appearance-none focus:ring-1 focus:ring-primary-container">
+<select class="form-select w-full h-10 bg-surface-container border-none rounded text-sm text-on-surface px-4 appearance-none focus:ring-1 focus:ring-primary-container">
+<option>All Speeds</option>
+<option>&gt; 1 Mbps</option>
+<option>&gt; 10 Mbps</option>
+<option>&gt; 100 Mbps</option>
+</select>
+<div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">
+<span class="material-symbols-outlined text-lg">filter_alt</span>
+</div>
+</div>
+</div>
+<div class="flex-1 min-w-[140px]">
+<p class="text-on-surface-variant text-[10px] font-bold uppercase tracking-wider pb-1.5 px-1">State</p>
+<div class="relative">
+<select class="form-select w-full h-10 bg-surface-container border-none rounded text-sm text-on-surface px-4 appearance-none focus:ring-1 focus:ring-primary-container">
 <option>All States</option>
 <option>Established</option>
 <option>Listening</option>
 <option>Time Wait</option>
 </select>
 <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">
-<span class="material-symbols-outlined">expand_more</span>
+<span class="material-symbols-outlined text-lg">expand_more</span>
+</div>
+</div>
+</div>
+<div class="flex-1 min-w-[140px]">
+<p class="text-on-surface-variant text-[10px] font-bold uppercase tracking-wider pb-1.5 px-1">Geolocation</p>
+<div class="relative">
+<select class="form-select w-full h-10 bg-surface-container border-none rounded text-sm text-on-surface px-4 appearance-none focus:ring-1 focus:ring-primary-container">
+<option>Global</option>
+<option>North America</option>
+<option>Europe</option>
+<option>Asia</option>
+</select>
+<div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">
+<span class="material-symbols-outlined text-lg">public</span>
 </div>
 </div>
 </div>
@@ -149,7 +190,13 @@
 <!-- Active Connections List -->
 <section class="flex flex-col gap-1">
 <div class="flex items-center justify-between pb-2 border-b border-outline-variant/15">
+<div class="flex items-center gap-2">
 <h3 class="font-headline text-base font-bold text-on-surface">Active Connections</h3>
+<div class="flex items-center text-primary" title="Sorted by Bandwidth (Highest)">
+<span class="material-symbols-outlined text-base">arrow_downward</span>
+<span class="material-symbols-outlined text-base -ml-1">bar_chart</span>
+</div>
+</div>
 <span class="text-tertiary text-xs font-medium bg-tertiary/10 px-2 py-1 rounded">24 Active</span>
 </div>
 <!-- List Item: Chrome -->
@@ -166,11 +213,15 @@
 <span class="text-on-surface-variant text-[10px] bg-surface-container-highest px-1.5 py-0.5 rounded">PID: 14208</span>
 </div>
 <p class="text-on-surface-variant text-xs font-medium leading-normal mt-1">
-                                Local: <span class="text-on-surface">192.168.1.15:54322</span>
+                                Local: <span class="text-on-surface">192.168.1.145:54322</span>
 </p>
 <p class="text-on-surface-variant text-xs font-medium leading-normal">
-                                Remote: <span class="text-tertiary">142.250.190.46:443</span>
+                                Remote: <span class="text-tertiary">google.com | 142.250.190.46:443</span>
 </p>
+<p class="text-on-surface-variant text-[10px] flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-xs">schedule</span>
+                                Duration: 04:22:15
+                            </p>
 </div>
 </div>
 <div class="flex flex-col items-end justify-between">
@@ -178,74 +229,6 @@
 <div class="flex items-center gap-1">
 <span class="size-2 rounded-full bg-tertiary shadow-[0_0_8px_rgba(47,217,244,0.5)]"></span>
 <span class="text-on-surface-variant text-[10px] font-bold uppercase tracking-tighter">TCP | Established</span>
-</div>
-</div>
-</div>
-<div class="flex gap-2 pt-2">
-<button class="flex-1 bg-surface-container-highest text-on-surface text-sm font-semibold py-2 rounded hover:bg-outline-variant/30 transition-colors">Details</button>
-<button class="flex-1 bg-error-container text-error text-sm font-semibold py-2 rounded hover:brightness-125 transition-colors">Block Connection</button>
-</div>
-</div>
-<!-- List Item: Spotify -->
-<div class="flex flex-col gap-4 bg-surface-container-low p-4 rounded-lg hover:bg-surface-container-high transition-colors group relative overflow-hidden">
-<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary scale-y-0 group-hover:scale-y-100 transition-transform origin-top"></div>
-<div class="flex gap-4 justify-between">
-<div class="flex items-start gap-4">
-<div class="flex items-center justify-center rounded bg-surface-container text-primary size-12 shrink-0">
-<span class="material-symbols-outlined" data-icon="music">music_note</span>
-</div>
-<div class="flex flex-col">
-<div class="flex items-center gap-2">
-<p class="text-on-surface font-headline font-bold">spotify.exe</p>
-<span class="text-on-surface-variant text-[10px] bg-surface-container-highest px-1.5 py-0.5 rounded">PID: 8940</span>
-</div>
-<p class="text-on-surface-variant text-xs font-medium leading-normal mt-1">
-                                Local: <span class="text-on-surface">192.168.1.15:58441</span>
-</p>
-<p class="text-on-surface-variant text-xs font-medium leading-normal">
-                                Remote: <span class="text-tertiary">35.186.224.25:443</span>
-</p>
-</div>
-</div>
-<div class="flex flex-col items-end justify-between">
-<span class="text-primary font-headline font-bold text-sm">1.2 Mbps</span>
-<div class="flex items-center gap-1">
-<span class="size-2 rounded-full bg-tertiary"></span>
-<span class="text-on-surface-variant text-[10px] font-bold uppercase tracking-tighter">TCP | Established</span>
-</div>
-</div>
-</div>
-<div class="flex gap-2 pt-2">
-<button class="flex-1 bg-surface-container-highest text-on-surface text-sm font-semibold py-2 rounded hover:bg-outline-variant/30 transition-colors">Details</button>
-<button class="flex-1 bg-error-container text-error text-sm font-semibold py-2 rounded hover:brightness-125 transition-colors">Block Connection</button>
-</div>
-</div>
-<!-- List Item: System (UDP) -->
-<div class="flex flex-col gap-4 bg-surface-container p-4 rounded-lg hover:bg-surface-container-high transition-colors group relative overflow-hidden">
-<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary scale-y-0 group-hover:scale-y-100 transition-transform origin-top"></div>
-<div class="flex gap-4 justify-between">
-<div class="flex items-start gap-4">
-<div class="flex items-center justify-center rounded bg-surface-container-low text-primary size-12 shrink-0">
-<span class="material-symbols-outlined" data-icon="settings">settings</span>
-</div>
-<div class="flex flex-col">
-<div class="flex items-center gap-2">
-<p class="text-on-surface font-headline font-bold">System</p>
-<span class="text-on-surface-variant text-[10px] bg-surface-container-highest px-1.5 py-0.5 rounded">PID: 4</span>
-</div>
-<p class="text-on-surface-variant text-xs font-medium leading-normal mt-1">
-                                Local: <span class="text-on-surface">0.0.0.0:135</span>
-</p>
-<p class="text-on-surface-variant text-xs font-medium leading-normal">
-                                Remote: <span class="text-on-surface-variant">0.0.0.0:*</span>
-</p>
-</div>
-</div>
-<div class="flex flex-col items-end justify-between">
-<span class="text-on-surface-variant font-headline font-bold text-sm">0.0 Kbps</span>
-<div class="flex items-center gap-1">
-<span class="size-2 rounded-full bg-outline-variant"></span>
-<span class="text-on-surface-variant text-[10px] font-bold uppercase tracking-tighter">UDP | Listening</span>
 </div>
 </div>
 </div>
@@ -268,11 +251,15 @@
 <span class="text-on-surface-variant text-[10px] bg-surface-container-highest px-1.5 py-0.5 rounded">PID: 15622</span>
 </div>
 <p class="text-on-surface-variant text-xs font-medium leading-normal mt-1">
-                                Local: <span class="text-on-surface">192.168.1.15:61204</span>
+                                Local: <span class="text-on-surface">192.168.1.145:61204</span>
 </p>
 <p class="text-on-surface-variant text-xs font-medium leading-normal">
-                                Remote: <span class="text-tertiary">162.159.135.233:443</span>
+                                Remote: <span class="text-tertiary">gateway.discord.gg | 162.159.135.233:443</span>
 </p>
+<p class="text-on-surface-variant text-[10px] flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-xs">schedule</span>
+                                Duration: 01:45:30
+                            </p>
 </div>
 </div>
 <div class="flex flex-col items-end justify-between">
@@ -286,6 +273,82 @@
 <div class="flex gap-2 pt-2">
 <button class="flex-1 bg-surface-container-highest text-on-surface text-sm font-semibold py-2 rounded hover:bg-outline-variant/30 transition-colors">Details</button>
 <button class="flex-1 bg-error-container text-error text-sm font-semibold py-2 rounded hover:brightness-125 transition-colors">Block Connection</button>
+</div>
+</div>
+<!-- List Item: Spotify -->
+<div class="flex flex-col gap-4 bg-surface-container p-4 rounded-lg hover:bg-surface-container-high transition-colors group relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary scale-y-0 group-hover:scale-y-100 transition-transform origin-top"></div>
+<div class="flex gap-4 justify-between">
+<div class="flex items-start gap-4">
+<div class="flex items-center justify-center rounded bg-surface-container-low text-primary size-12 shrink-0">
+<span class="material-symbols-outlined" data-icon="music">music_note</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<p class="text-on-surface font-headline font-bold">spotify.exe</p>
+<span class="text-on-surface-variant text-[10px] bg-surface-container-highest px-1.5 py-0.5 rounded">PID: 8940</span>
+</div>
+<p class="text-on-surface-variant text-xs font-medium leading-normal mt-1">
+                                Local: <span class="text-on-surface">192.168.1.145:58441</span>
+</p>
+<p class="text-on-surface-variant text-xs font-medium leading-normal">
+                                Remote: <span class="text-tertiary">sp-client.spotify.com | 35.186.224.25:443</span>
+</p>
+<p class="text-on-surface-variant text-[10px] flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-xs">schedule</span>
+                                Duration: 00:58:12
+                            </p>
+</div>
+</div>
+<div class="flex flex-col items-end justify-between">
+<span class="text-primary font-headline font-bold text-sm">1.2 Mbps</span>
+<div class="flex items-center gap-1">
+<span class="size-2 rounded-full bg-tertiary"></span>
+<span class="text-on-surface-variant text-[10px] font-bold uppercase tracking-tighter">TCP | Established</span>
+</div>
+</div>
+</div>
+<div class="flex gap-2 pt-2">
+<button class="flex-1 bg-surface-container-highest text-on-surface text-sm font-semibold py-2 rounded hover:bg-outline-variant/30 transition-colors">Details</button>
+<button class="flex-1 bg-error-container text-error text-sm font-semibold py-2 rounded hover:brightness-125 transition-colors">Block Connection</button>
+</div>
+</div>
+<!-- List Item: System (UDP) -->
+<div class="flex flex-col gap-4 bg-surface-container-low p-4 rounded-lg hover:bg-surface-container-high transition-colors group relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary scale-y-0 group-hover:scale-y-100 transition-transform origin-top"></div>
+<div class="flex gap-4 justify-between">
+<div class="flex items-start gap-4">
+<div class="flex items-center justify-center rounded bg-surface-container text-primary size-12 shrink-0">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<p class="text-on-surface font-headline font-bold">System</p>
+<span class="text-on-surface-variant text-[10px] bg-surface-container-highest px-1.5 py-0.5 rounded">PID: 4</span>
+</div>
+<p class="text-on-surface-variant text-xs font-medium leading-normal mt-1">
+                                Local: <span class="text-on-surface">0.0.0.0:135</span>
+</p>
+<p class="text-on-surface-variant text-xs font-medium leading-normal">
+                                Remote: <span class="text-on-surface-variant">localhost | 0.0.0.0:*</span>
+</p>
+<p class="text-on-surface-variant text-[10px] flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-xs">schedule</span>
+                                Duration: 14:22:15
+                            </p>
+</div>
+</div>
+<div class="flex flex-col items-end justify-between">
+<span class="text-on-surface-variant font-headline font-bold text-sm">0.0 Kbps</span>
+<div class="flex items-center gap-1">
+<span class="size-2 rounded-full bg-outline-variant"></span>
+<span class="text-on-surface-variant text-[10px] font-bold uppercase tracking-tighter">UDP | Listening</span>
+</div>
+</div>
+</div>
+<div class="flex gap-2 pt-2">
+<button class="flex-1 bg-surface-container-highest text-on-surface text-sm font-semibold py-2 rounded hover:bg-outline-variant/30 transition-colors">Details</button>
+<button class="flex-1 bg-surface-container-highest/20 text-on-surface-variant/40 text-sm font-semibold py-2 rounded cursor-not-allowed" disabled="">Block Connection</button>
 </div>
 </div>
 </section>

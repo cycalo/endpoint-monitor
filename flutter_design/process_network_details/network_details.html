@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Network Process Monitor - chrome.exe Detail</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-secondary-container": "#abb9d1",
+              "error": "#ffb4ab",
+              "surface-container-lowest": "#060e20",
+              "on-error-container": "#ffdad6",
+              "on-surface-variant": "#c1c6d7",
+              "on-primary": "#003354",
+              "secondary": "#b9c7df",
+              "outline": "#8b90a0",
+              "tertiary-fixed": "#a2eeff",
+              "on-primary-container": "#002c4a",
+              "primary-fixed": "#cfe5ff",
+              "surface-container": "#171f33",
+              "surface-tint": "#98cbff",
+              "on-tertiary-container": "#002f36",
+              "on-background": "#dae2fd",
+              "surface-container-high": "#222a3d",
+              "surface-variant": "#2d3449",
+              "surface-dim": "#0b1326",
+              "on-tertiary": "#00363e",
+              "tertiary-fixed-dim": "#2fd9f4",
+              "on-secondary-fixed": "#0d1c2e",
+              "on-secondary-fixed-variant": "#3a485b",
+              "surface": "#0b1326",
+              "primary-fixed-dim": "#98cbff",
+              "surface-container-highest": "#2d3449",
+              "on-tertiary-fixed-variant": "#004e5a",
+              "secondary-fixed": "#d5e3fc",
+              "inverse-surface": "#dae2fd",
+              "on-secondary": "#233144",
+              "on-surface": "#dae2fd",
+              "inverse-on-surface": "#283044",
+              "on-tertiary-fixed": "#001f25",
+              "secondary-fixed-dim": "#b9c7df",
+              "primary-container": "#0097ec",
+              "inverse-primary": "#00629d",
+              "tertiary": "#2fd9f4",
+              "error-container": "#93000a",
+              "secondary-container": "#3c4a5e",
+              "primary": "#98cbff",
+              "surface-container-low": "#131b2e",
+              "on-primary-fixed-variant": "#004a77",
+              "outline-variant": "#414754",
+              "background": "#0b1326",
+              "tertiary-container": "#009fb4",
+              "surface-bright": "#31394d",
+              "on-primary-fixed": "#001d33",
+              "on-error": "#690005"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .glass-panel {
+        background: rgba(34, 42, 61, 0.8);
+        backdrop-filter: blur(20px);
+      }
+      .pulse-bg {
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+      }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary-container selection:text-on-primary-container overflow-x-hidden">
+<!-- Navigation Drawer (Desktop) -->
+<aside class="hidden md:flex h-full w-72 fixed left-0 top-0 bg-[#0b1326] border-r border-[#414754]/15 shadow-2xl flex flex-col py-8 z-50">
+<div class="px-6 mb-10">
+<div class="flex items-center gap-3 mb-8">
+<span class="material-symbols-outlined text-primary text-3xl" style="font-variation-settings: 'FILL' 1;">hub</span>
+<span class="font-['Manrope'] text-[#98cbff] font-bold text-xl tracking-tight">ORCHESTRATOR</span>
+</div>
+<div class="flex items-center gap-4 p-4 rounded-xl bg-surface-container-low">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container font-bold">
+                    AU
+                </div>
+<div>
+<p class="font-headline font-bold text-sm text-on-surface">Orchestrator Admin</p>
+<p class="text-[10px] text-on-surface-variant uppercase tracking-widest">Node: DX-01</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 px-4 space-y-1">
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-[#171f33] transition-all" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="text-sm font-medium">System Overview</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg bg-[#131b2e] text-[#98cbff] border-l-4 border-[#98cbff] transition-all" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">memory</span>
+<span class="text-sm font-medium">Processes</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-[#171f33] transition-all" href="#">
+<span class="material-symbols-outlined">hub</span>
+<span class="text-sm font-medium">Network Topology</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-[#171f33] transition-all" href="#">
+<span class="material-symbols-outlined">security</span>
+<span class="text-sm font-medium">Security Logs</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-[#171f33] transition-all" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-sm font-medium">Settings</span>
+</a>
+</nav>
+</aside>
+<!-- Main Content Area -->
+<main class="md:ml-72 min-h-screen pb-24 md:pb-8">
+<!-- Top App Bar -->
+<header class="w-full top-0 sticky z-40 bg-[#131b2e] border-none flex items-center justify-between px-6 h-16 w-full">
+<div class="flex items-center gap-4">
+<button class="text-[#98cbff] active:scale-95 transition-transform">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<h1 class="font-['Manrope'] font-bold text-xl tracking-tight text-[#98cbff]">chrome.exe Detail</h1>
+</div>
+<div class="flex items-center gap-4">
+<div class="hidden sm:flex items-center gap-2 bg-surface-container-lowest px-3 py-1.5 rounded-full border border-outline-variant/15">
+<span class="w-2 h-2 rounded-full bg-tertiary shadow-[0_0_8px_rgba(47,217,244,0.6)]"></span>
+<span class="text-[10px] font-bold uppercase tracking-tighter text-on-surface-variant">Live Monitor Active</span>
+</div>
+<button class="text-[#98cbff] active:scale-95 transition-transform">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</header>
+<div class="p-6 space-y-8 max-w-7xl mx-auto">
+<!-- Process Identity Header (Bento Grid Style) -->
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<!-- Main Identity Card -->
+<div class="lg:col-span-2 bg-surface-container rounded-xl p-6 relative overflow-hidden group">
+<div class="relative z-10">
+<div class="flex items-start justify-between mb-6">
+<div>
+<span class="text-xs font-bold uppercase tracking-widest text-primary mb-1 block">Process Path</span>
+<h2 class="font-headline font-extrabold text-lg text-on-surface break-all">C:\Program Files\Google\Chrome\Application\chrome.exe</h2>
+</div>
+<div class="p-3 bg-surface-container-high rounded-xl">
+<span class="material-symbols-outlined text-primary text-3xl">language</span>
+</div>
+</div>
+<div class="flex flex-wrap gap-4">
+<div class="bg-surface-container-low px-4 py-2 rounded-lg border border-outline-variant/10">
+<p class="text-[10px] uppercase text-on-surface-variant font-bold">PID</p>
+<p class="font-headline font-bold text-primary">12480</p>
+</div>
+<div class="bg-surface-container-low px-4 py-2 rounded-lg border border-outline-variant/10">
+<p class="text-[10px] uppercase text-on-surface-variant font-bold">CPU Usage</p>
+<p class="font-headline font-bold text-primary">4.2%</p>
+</div>
+<div class="bg-surface-container-low px-4 py-2 rounded-lg border border-outline-variant/10">
+<p class="text-[10px] uppercase text-on-surface-variant font-bold">Memory</p>
+<p class="font-headline font-bold text-primary">842.5 MB</p>
+</div>
+<div class="bg-surface-container-low px-4 py-2 rounded-lg border border-outline-variant/10">
+<p class="text-[10px] uppercase text-on-surface-variant font-bold">Threads</p>
+<p class="font-headline font-bold text-primary">42</p>
+</div>
+</div>
+</div>
+<div class="absolute -right-8 -bottom-8 opacity-5 group-hover:opacity-10 transition-opacity">
+<span class="material-symbols-outlined text-[160px]">google</span>
+</div>
+</div>
+<!-- Total Bandwidth Hero Card -->
+<div class="bg-primary-container rounded-xl p-6 flex flex-col justify-between text-on-primary-container shadow-xl">
+<div>
+<div class="flex items-center justify-between mb-2">
+<span class="text-xs font-black uppercase tracking-widest opacity-80">Network Throughput</span>
+<span class="material-symbols-outlined">speed</span>
+</div>
+<p class="font-headline font-black text-5xl tracking-tighter">4.8 <span class="text-2xl">Mbps</span></p>
+</div>
+<div class="mt-6 pt-6 border-t border-white/10 flex justify-between items-end">
+<div class="space-y-1">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-xs">arrow_downward</span>
+<span class="text-sm font-bold">3.2 Mbps Down</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-xs">arrow_upward</span>
+<span class="text-sm font-bold">1.6 Mbps Up</span>
+</div>
+</div>
+<div class="text-right">
+<p class="text-[10px] font-black uppercase tracking-widest opacity-70">Total Today</p>
+<p class="font-headline font-bold text-lg leading-none">1.24 GB</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Network Connections Table Section -->
+<section class="space-y-4">
+<div class="flex items-center justify-between px-2">
+<h3 class="font-headline font-bold text-on-surface text-lg">Active Connections (12)</h3>
+<div class="flex gap-2">
+<button class="bg-surface-container-high text-on-surface-variant text-xs font-bold px-3 py-1.5 rounded-lg hover:text-primary transition-colors">Export Logs</button>
+<button class="bg-surface-container-high text-on-surface-variant text-xs font-bold px-3 py-1.5 rounded-lg hover:text-primary transition-colors">Filter</button>
+</div>
+</div>
+<div class="bg-surface-container-low rounded-xl overflow-hidden shadow-sm">
+<!-- Table Header -->
+<div class="grid grid-cols-12 gap-4 px-6 py-4 bg-surface-container-highest/50 text-[10px] font-black uppercase tracking-widest text-on-surface-variant border-b border-outline-variant/5">
+<div class="col-span-4 lg:col-span-3">Remote Endpoint</div>
+<div class="hidden lg:block col-span-2">WHOIS / ASN</div>
+<div class="col-span-4 lg:col-span-3">Location</div>
+<div class="col-span-2 text-right">Speed</div>
+<div class="col-span-2 lg:col-span-2 text-right">Status</div>
+</div>
+<!-- Connection Row 1 -->
+<div class="grid grid-cols-12 gap-4 px-6 py-5 items-center hover:bg-surface-container-highest transition-all group border-b border-outline-variant/5">
+<div class="col-span-4 lg:col-span-3">
+<div class="flex items-center gap-3">
+<div class="w-1.5 h-6 bg-primary rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div>
+<p class="font-bold text-sm text-on-surface">172.217.16.196</p>
+<p class="text-[10px] text-on-surface-variant font-mono">PORT: 443 (HTTPS)</p>
+</div>
+</div>
+</div>
+<div class="hidden lg:block col-span-2">
+<p class="text-xs font-medium text-primary">Google LLC</p>
+<p class="text-[10px] text-on-surface-variant">AS15169</p>
+</div>
+<div class="col-span-4 lg:col-span-3">
+<div class="flex items-center gap-3">
+<span class="text-xl grayscale group-hover:grayscale-0 transition-all">🇺🇸</span>
+<div>
+<p class="text-xs font-bold text-on-surface">Mountain View, US</p>
+<p class="text-[10px] text-on-surface-variant">California, North America</p>
+</div>
+</div>
+</div>
+<div class="col-span-2 text-right">
+<p class="text-xs font-bold text-tertiary">1.2 MB/s</p>
+<span class="text-[10px] text-on-surface-variant">Lat: 24ms</span>
+</div>
+<div class="col-span-2 lg:col-span-2 text-right">
+<span class="bg-surface-container px-2 py-1 rounded text-[10px] font-black uppercase text-tertiary border border-tertiary/20">Established</span>
+</div>
+</div>
+<!-- Connection Row 2 (Alert State) -->
+<div class="grid grid-cols-12 gap-4 px-6 py-5 items-center hover:bg-surface-container-highest transition-all group border-b border-outline-variant/5">
+<div class="col-span-4 lg:col-span-3">
+<div class="flex items-center gap-3">
+<div class="w-1.5 h-6 bg-error rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div>
+<p class="font-bold text-sm text-on-surface">52.223.189.102</p>
+<p class="text-[10px] text-on-surface-variant font-mono">PORT: 80 (HTTP)</p>
+</div>
+</div>
+</div>
+<div class="hidden lg:block col-span-2">
+<p class="text-xs font-medium text-primary">Amazon.com</p>
+<p class="text-[10px] text-on-surface-variant">AS16509</p>
+</div>
+<div class="col-span-4 lg:col-span-3">
+<div class="flex items-center gap-3">
+<span class="text-xl grayscale group-hover:grayscale-0 transition-all">🇮🇪</span>
+<div>
+<p class="text-xs font-bold text-on-surface">Dublin, IE</p>
+<p class="text-[10px] text-on-surface-variant">Leinster, Europe</p>
+</div>
+</div>
+</div>
+<div class="col-span-2 text-right">
+<p class="text-xs font-bold text-on-surface">45 KB/s</p>
+<span class="text-[10px] text-on-surface-variant">Lat: 112ms</span>
+</div>
+<div class="col-span-2 lg:col-span-2 text-right">
+<span class="bg-error-container/20 pulse-bg px-2 py-1 rounded text-[10px] font-black uppercase text-error border border-error/20">Insecure</span>
+</div>
+</div>
+<!-- Connection Row 3 -->
+<div class="grid grid-cols-12 gap-4 px-6 py-5 items-center hover:bg-surface-container-highest transition-all group border-b border-outline-variant/5">
+<div class="col-span-4 lg:col-span-3">
+<div class="flex items-center gap-3">
+<div class="w-1.5 h-6 bg-primary rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div>
+<p class="font-bold text-sm text-on-surface">13.224.161.42</p>
+<p class="text-[10px] text-on-surface-variant font-mono">PORT: 443 (HTTPS)</p>
+</div>
+</div>
+</div>
+<div class="hidden lg:block col-span-2">
+<p class="text-xs font-medium text-primary">Cloudflare, Inc.</p>
+<p class="text-[10px] text-on-surface-variant">AS13335</p>
+</div>
+<div class="col-span-4 lg:col-span-3">
+<div class="flex items-center gap-3">
+<span class="text-xl grayscale group-hover:grayscale-0 transition-all">🇯🇵</span>
+<div>
+<p class="text-xs font-bold text-on-surface">Tokyo, JP</p>
+<p class="text-[10px] text-on-surface-variant">Kanto, Asia</p>
+</div>
+</div>
+</div>
+<div class="col-span-2 text-right">
+<p class="text-xs font-bold text-tertiary">2.1 MB/s</p>
+<span class="text-[10px] text-on-surface-variant">Lat: 184ms</span>
+</div>
+<div class="col-span-2 lg:col-span-2 text-right">
+<span class="bg-surface-container px-2 py-1 rounded text-[10px] font-black uppercase text-tertiary border border-tertiary/20">Established</span>
+</div>
+</div>
+<!-- Connection Row 4 -->
+<div class="grid grid-cols-12 gap-4 px-6 py-5 items-center hover:bg-surface-container-highest transition-all group">
+<div class="col-span-4 lg:col-span-3">
+<div class="flex items-center gap-3">
+<div class="w-1.5 h-6 bg-primary rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div>
+<p class="font-bold text-sm text-on-surface">104.16.248.249</p>
+<p class="text-[10px] text-on-surface-variant font-mono">PORT: 443 (HTTPS)</p>
+</div>
+</div>
+</div>
+<div class="hidden lg:block col-span-2">
+<p class="text-xs font-medium text-primary">Fastly</p>
+<p class="text-[10px] text-on-surface-variant">AS54113</p>
+</div>
+<div class="col-span-4 lg:col-span-3">
+<div class="flex items-center gap-3">
+<span class="text-xl grayscale group-hover:grayscale-0 transition-all">🇩🇪</span>
+<div>
+<p class="text-xs font-bold text-on-surface">Frankfurt, DE</p>
+<p class="text-[10px] text-on-surface-variant">Hesse, Europe</p>
+</div>
+</div>
+</div>
+<div class="col-span-2 text-right">
+<p class="text-xs font-bold text-on-surface">112 KB/s</p>
+<span class="text-[10px] text-on-surface-variant">Lat: 38ms</span>
+</div>
+<div class="col-span-2 lg:col-span-2 text-right">
+<span class="bg-surface-container-highest px-2 py-1 rounded text-[10px] font-black uppercase text-on-surface-variant border border-outline-variant/15">Closing</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Bottom Detail Grid -->
+<section class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Data Distribution Map Preview -->
+<div class="bg-surface-container rounded-xl p-6 h-64 relative overflow-hidden flex flex-col justify-between">
+<div>
+<h4 class="font-headline font-bold text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">map</span>
+                            Traffic Geodistribution
+                        </h4>
+</div>
+<div class="absolute inset-0 z-0 opacity-20 pointer-events-none">
+<img alt="World Map Topology" class="w-full h-full object-cover grayscale" data-alt="a stylized dark digital world map with glowing blue nodes and connecting lines representing network traffic routes on a black background" data-location="Global" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA4Lxm5oea3NRsiIzoes-tBHHRtFPFZZ2LD_dA203Xkpng7h6OXV3i6eOPSh-mhGzkB1lWfn4zWtbOFlb--ETkktTUH9x112Xpkegn43W7gdcNFOdWJYvBwD-Sy_DQJchp4V5Bf4jO1o_vnaBrov8iroqnP5GbnFpziMgMqMoUQxZI1CWD1MLN-cUOfz89WehU-PzxVyOb6ReCuVVEvWXl3FgqF5NwBvMmeYn3YtVSLbhECxwHHOJ_Gpyw6HfOxbXLi7Bbf8xAZQMY"/>
+</div>
+<div class="relative z-10 flex gap-4">
+<div class="bg-surface-container-high/80 backdrop-blur-md p-3 rounded-lg flex-1">
+<p class="text-[10px] uppercase font-black text-on-surface-variant tracking-wider">Top Region</p>
+<p class="text-sm font-bold text-primary">North America (62%)</p>
+</div>
+<div class="bg-surface-container-high/80 backdrop-blur-md p-3 rounded-lg flex-1">
+<p class="text-[10px] uppercase font-black text-on-surface-variant tracking-wider">Nodes Connected</p>
+<p class="text-sm font-bold text-primary">12 Countries</p>
+</div>
+</div>
+</div>
+<!-- Security Context / WHOIS Summary -->
+<div class="bg-surface-container rounded-xl p-6 flex flex-col">
+<h4 class="font-headline font-bold text-on-surface mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">policy</span>
+                        Security Context
+                    </h4>
+<div class="space-y-4 flex-1">
+<div class="flex items-center justify-between py-2 border-b border-outline-variant/5">
+<span class="text-xs text-on-surface-variant">Signature Status</span>
+<span class="text-xs font-bold text-tertiary flex items-center gap-1">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">verified</span>
+                                Verified (Google)
+                            </span>
+</div>
+<div class="flex items-center justify-between py-2 border-b border-outline-variant/5">
+<span class="text-xs text-on-surface-variant">Network Policy</span>
+<span class="text-xs font-bold text-on-surface">Default Allow-List</span>
+</div>
+<div class="flex items-center justify-between py-2 border-b border-outline-variant/5">
+<span class="text-xs text-on-surface-variant">Parent Process</span>
+<span class="text-xs font-bold text-primary">explorer.exe (PID: 4120)</span>
+</div>
+<div class="flex items-center justify-between py-2">
+<span class="text-xs text-on-surface-variant">Data Sovereignty</span>
+<span class="text-xs font-bold text-on-surface">Cross-Border Active</span>
+</div>
+</div>
+<button class="mt-4 w-full bg-surface-container-high py-2 rounded-lg text-xs font-bold text-primary hover:bg-surface-container-highest transition-all">
+                        View Detailed WHOIS Audit
+                    </button>
+</div>
+</section>
+</div>
+</main>
+<!-- Bottom Nav Bar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center h-20 px-4 pb-safe bg-[#0b1326]/80 backdrop-blur-xl z-50 rounded-t-xl border-t border-[#414754]/15 shadow-[0_-4px_12px_rgba(0,0,0,0.5)]">
+<a class="flex flex-col items-center justify-center text-[#c1c6d7] opacity-60 hover:text-[#98cbff] hover:opacity-100 active:scale-90 transition-all" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-['Inter'] text-[10px] font-medium uppercase tracking-wider">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#98cbff] bg-[#171f33] rounded-xl px-3 py-1 shadow-[0_0_8px_rgba(152,203,255,0.2)] active:scale-90 transition-all" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">memory</span>
+<span class="font-['Inter'] text-[10px] font-medium uppercase tracking-wider">Processes</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#c1c6d7] opacity-60 hover:text-[#98cbff] hover:opacity-100 active:scale-90 transition-all" href="#">
+<span class="material-symbols-outlined">lan</span>
+<span class="font-['Inter'] text-[10px] font-medium uppercase tracking-wider">Network</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#c1c6d7] opacity-60 hover:text-[#98cbff] hover:opacity-100 active:scale-90 transition-all" href="#">
+<span class="material-symbols-outlined">notifications_active</span>
+<span class="font-['Inter'] text-[10px] font-medium uppercase tracking-wider">Alerts</span>
+</a>
+</nav>
+</body></html>

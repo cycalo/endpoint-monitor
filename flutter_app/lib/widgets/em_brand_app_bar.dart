@@ -114,6 +114,16 @@ class EmBrandAppBar extends StatelessWidget implements PreferredSizeWidget {
   Size get preferredSize =>
       Size.fromHeight(kToolbarHeight + (bottom?.preferredSize.height ?? 0));
 
+  Future<void> _scrollToTop(BuildContext context) async {
+    final controller = PrimaryScrollController.maybeOf(context);
+    if (controller == null || !controller.hasClients) return;
+    await controller.animateTo(
+      0,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -125,14 +135,38 @@ class EmBrandAppBar extends StatelessWidget implements PreferredSizeWidget {
       titleSpacing: 12,
       title: Row(
         children: [
-          Icon(Icons.monitor_heart_rounded, color: scheme.primary, size: 26),
-          const SizedBox(width: 8),
-          if (title != null) ...[
-            title!,
-            const SizedBox(width: 8),
-          ],
-          const Expanded(child: _EmConnectionStatus()),
+          Expanded(
+            child: Tooltip(
+              message: 'Tap to scroll to top',
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () => _scrollToTop(context),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    children: [
+                      Icon(Icons.monitor_heart_rounded, color: scheme.primary, size: 26),
+                      const SizedBox(width: 8),
+                      if (title != null) ...[
+                        title!,
+                        const SizedBox(width: 8),
+                      ],
+                      const Expanded(child: _EmConnectionStatus()),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
           if (actions != null) ...actions!,
+          IconButton(
+            tooltip: 'Scroll to top',
+            onPressed: () => _scrollToTop(context),
+            icon: Icon(
+              Icons.vertical_align_top_rounded,
+              color: scheme.primary,
+            ),
+          ),
           BlocBuilder<ConnectionBloc, EmConnectionState>(
             builder: (context, c) {
               return IconButton(

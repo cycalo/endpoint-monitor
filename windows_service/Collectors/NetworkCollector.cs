@@ -1,20 +1,51 @@
+using System.Collections.Concurrent;
 using System.Management;
 using EndpointMonitorService.Models;
+using EndpointMonitorService.Services;
 
 namespace EndpointMonitorService.Collectors;
 
-public sealed class NetworkCollector(ILogger<NetworkCollector> logger)
+public sealed class NetworkCollector(ILogger<NetworkCollector> logger, GeoIpLookupService geo)
 {
+    private readonly ConcurrentDictionary<string, DateTime> _firstSeenUtc = new(StringComparer.Ordinal);
+
     public IReadOnlyList<NetworkConnection> Collect()
     {
         var pidToName = GetProcessNames();
         var list = new List<NetworkConnection>();
+        var now = DateTime.UtcNow;
+        var seenKeys = new HashSet<string>(StringComparer.Ordinal);
 
         CollectTcp(list, pidToName);
         CollectUdp(list, pidToName);
 
+        foreach (var c in list)
+        {
+            var key = BuildConnectionKey(c);
+            seenKeys.Add(key);
+            var firstSeen = _firstSeenUtc.GetOrAdd(key, now);
+            var elapsed = now - firstSeen;
+            c.DurationSeconds = Math.Max(0, (long)elapsed.TotalSeconds);
+
+            if (string.IsNullOrWhiteSpace(c.RemoteAddress)) continue;
+            var g = geo.Lookup(c.RemoteAddress);
+            c.CountryCode = g.CountryCode;
+            c.CountryName = g.CountryName;
+            c.City = g.City;
+            c.Org = g.Org;
+        }
+
+        foreach (var key in _firstSeenUtc.Keys)
+        {
+            if (!seenKeys.Contains(key))
+                _firstSeenUtc.TryRemove(key, out _);
+        }
+
         return list;
     }
+
+    private static string BuildConnectionKey(NetworkConnection c)
+        => $"{c.Pid}|{c.LocalAddress}|{c.LocalPort}|{c.RemoteAddress}|{c.RemotePort}|{c.Protocol}";
 
     private static Dictionary<int, string> GetProcessNames()
     {
