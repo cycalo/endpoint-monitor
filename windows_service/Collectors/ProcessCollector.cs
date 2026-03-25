@@ -9,6 +9,9 @@ public sealed class ProcessCollector(ILogger<ProcessCollector> logger)
     {
         var list = new List<ProcessInfo>();
         var cpuByPid = GetCpuPercentByPid();
+        // Win32_PerfFormattedData_PerfProc_Process.PercentProcessorTime can exceed 100% on multi-core
+        // systems (max is roughly 100 × logical processor count). Normalize to 0–100% of total CPU.
+        var processors = Math.Max(1, Environment.ProcessorCount);
 
         try
         {
@@ -39,13 +42,14 @@ public sealed class ProcessCollector(ILogger<ProcessCollector> logger)
                     }
 
                     cpuByPid.TryGetValue(pid, out var cpu);
+                    var cpuNormalized = Math.Clamp(cpu / processors, 0.0, 100.0);
                     list.Add(new ProcessInfo
                     {
                         Pid = pid,
                         Name = name,
                         CommandLine = cmd,
                         ParentPid = parent,
-                        CpuPercent = Math.Round(cpu, 2),
+                        CpuPercent = Math.Round(cpuNormalized, 2),
                         MemoryMb = Math.Round(memMb, 2),
                         StartTime = start,
                         Status = "Running"

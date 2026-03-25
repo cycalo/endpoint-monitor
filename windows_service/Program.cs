@@ -185,7 +185,8 @@ static string BuildOutboundJson(string originalType, CommandResult r)
         success = r.Success,
         command = r.Command,
         message = r.Message,
-        data = r.Data
+        data = r.Data,
+        pid = r.Pid
     }, AppJson.Options);
 }
 

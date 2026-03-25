@@ -100,10 +100,13 @@ class _EmConnectionStatus extends StatelessWidget {
 class EmBrandAppBar extends StatelessWidget implements PreferredSizeWidget {
   const EmBrandAppBar({
     super.key,
+    this.title,
     this.actions,
     this.bottom,
   });
 
+  /// Shown after the monitor icon (e.g. "Endpoint Monitor" on tab screens).
+  final Widget? title;
   final List<Widget>? actions;
   final PreferredSizeWidget? bottom;
 
@@ -124,6 +127,10 @@ class EmBrandAppBar extends StatelessWidget implements PreferredSizeWidget {
         children: [
           Icon(Icons.monitor_heart_rounded, color: scheme.primary, size: 26),
           const SizedBox(width: 8),
+          if (title != null) ...[
+            title!,
+            const SizedBox(width: 8),
+          ],
           const Expanded(child: _EmConnectionStatus()),
           if (actions != null) ...actions!,
           BlocBuilder<ConnectionBloc, EmConnectionState>(

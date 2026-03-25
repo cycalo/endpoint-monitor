@@ -63,11 +63,11 @@ public sealed class ResponseCommandService(
             using var p = Process.GetProcessById(pid);
             p.Kill(entireProcessTree: true);
             await database.AppendAuditAsync("kill_process", $"pid={pid}", clientIp, cancellationToken).ConfigureAwait(false);
-            return new CommandResult(true, "kill_process", "ok");
+            return new CommandResult(true, "kill_process", "ok", null, pid);
         }
         catch (Exception ex)
         {
-            return new CommandResult(false, "kill_process", ex.Message);
+            return new CommandResult(false, "kill_process", ex.Message, null, pid);
         }
     }
 
@@ -138,14 +138,14 @@ public sealed class ResponseCommandService(
         if (!root.TryGetProperty("pid", out var pidEl) || !pidEl.TryGetInt32(out var pid))
             return new CommandResult(false, "suspend_process", "invalid_pid");
         if (!NativeMethods.TryOpenProcess(pid, out var handle))
-            return new CommandResult(false, "suspend_process", "open_failed");
+            return new CommandResult(false, "suspend_process", "open_failed", null, pid);
         try
         {
             var s = NativeMethods.NtSuspendProcess(handle);
             await database.AppendAuditAsync("suspend_process", $"pid={pid}", clientIp, cancellationToken).ConfigureAwait(false);
             return s == 0
-                ? new CommandResult(true, "suspend_process", "ok")
-                : new CommandResult(false, "suspend_process", $"ntstatus={s}");
+                ? new CommandResult(true, "suspend_process", "ok", null, pid)
+                : new CommandResult(false, "suspend_process", $"ntstatus={s}", null, pid);
         }
         finally
         {
@@ -158,14 +158,14 @@ public sealed class ResponseCommandService(
         if (!root.TryGetProperty("pid", out var pidEl) || !pidEl.TryGetInt32(out var pid))
             return new CommandResult(false, "resume_process", "invalid_pid");
         if (!NativeMethods.TryOpenProcess(pid, out var handle))
-            return new CommandResult(false, "resume_process", "open_failed");
+            return new CommandResult(false, "resume_process", "open_failed", null, pid);
         try
         {
             var s = NativeMethods.NtResumeProcess(handle);
             await database.AppendAuditAsync("resume_process", $"pid={pid}", clientIp, cancellationToken).ConfigureAwait(false);
             return s == 0
-                ? new CommandResult(true, "resume_process", "ok")
-                : new CommandResult(false, "resume_process", $"ntstatus={s}");
+                ? new CommandResult(true, "resume_process", "ok", null, pid)
+                : new CommandResult(false, "resume_process", $"ntstatus={s}", null, pid);
         }
         finally
         {
