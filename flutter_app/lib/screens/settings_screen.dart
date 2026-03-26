@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../app_version.dart';
 import '../theme/theme_cubit.dart';
 import '../widgets/em_brand_app_bar.dart';
 
@@ -154,6 +155,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 12),
           FilledButton(onPressed: _savePrefs, child: const Text('Save settings')),
           if (_message != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_message!)),
+          const SizedBox(height: 32),
+          Text(
+            'About',
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'App version $kAppVersion',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+          ),
         ],
       ),
     );

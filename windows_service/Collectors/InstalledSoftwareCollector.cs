@@ -21,8 +21,6 @@ public sealed class InstalledSoftwareCollector(ILogger<InstalledSoftwareCollecto
         }
 
         return Task.FromResult<IReadOnlyList<InstalledSoftwareItem>>(list
-            .GroupBy(x => x.Name + x.Version)
-            .Select(g => g.First())
             .OrderBy(x => x.Name)
             .ToList());
     }
@@ -40,14 +38,34 @@ public sealed class InstalledSoftwareCollector(ILogger<InstalledSoftwareCollecto
             var ver = app.GetValue("DisplayVersion")?.ToString() ?? "";
             var vendor = app.GetValue("Publisher")?.ToString() ?? "";
             var rawDate = app.GetValue("InstallDate")?.ToString() ?? "";
+            var installLocation = app.GetValue("InstallLocation")?.ToString() ?? "";
+            var quiet = app.GetValue("QuietUninstallString")?.ToString() ?? "";
+            var uninstall = app.GetValue("UninstallString")?.ToString() ?? "";
+            var noRemove = app.GetValue("NoRemove");
+            var noRemoveFlag = noRemove is int nr && nr != 0;
+            var hasUninstall = !string.IsNullOrWhiteSpace(quiet) || !string.IsNullOrWhiteSpace(uninstall);
+            var installSizeKb = ReadEstimatedSizeKb(app);
+
             list.Add(new InstalledSoftwareItem
             {
                 Name = disp,
                 Version = ver,
                 Vendor = vendor,
-                InstallDate = NormalizeInstallDate(rawDate)
+                InstallDate = NormalizeInstallDate(rawDate),
+                InstallLocation = installLocation,
+                UninstallRegistrySubKey = name,
+                InstallSizeKb = installSizeKb,
+                CanUninstall = !noRemoveFlag && hasUninstall
             });
         }
+    }
+
+    private static int ReadEstimatedSizeKb(RegistryKey app)
+    {
+        var v = app.GetValue("EstimatedSize");
+        if (v is int i) return Math.Max(0, i);
+        if (v is long l) return (int)Math.Clamp(l, 0, int.MaxValue);
+        return 0;
     }
 
     private static string NormalizeInstallDate(string raw)

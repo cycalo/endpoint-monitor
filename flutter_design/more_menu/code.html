@@ -4,63 +4,63 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Endpoint Monitor - More</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
       tailwind.config = {
         darkMode: "class",
         theme: {
           extend: {
             colors: {
-              "secondary-container": "#3c4a5e",
-              "on-secondary-container": "#abb9d1",
-              "primary": "#98cbff",
-              "tertiary-fixed": "#a2eeff",
-              "on-primary": "#003354",
-              "background": "#0b1326",
-              "on-tertiary-container": "#002f36",
-              "primary-fixed": "#cfe5ff",
-              "on-secondary": "#233144",
-              "tertiary-container": "#009fb4",
-              "inverse-primary": "#00629d",
-              "surface-container-lowest": "#060e20",
-              "on-tertiary-fixed-variant": "#004e5a",
-              "inverse-surface": "#dae2fd",
-              "secondary-fixed-dim": "#b9c7df",
-              "error": "#ffb4ab",
-              "tertiary": "#2fd9f4",
-              "outline-variant": "#414754",
               "secondary": "#b9c7df",
-              "surface-container-highest": "#2d3449",
-              "surface-container-high": "#222a3d",
-              "secondary-fixed": "#d5e3fc",
-              "error-container": "#93000a",
-              "surface-container": "#171f33",
-              "surface": "#0b1326",
-              "surface-tint": "#98cbff",
-              "on-error": "#690005",
-              "on-primary-fixed-variant": "#004a77",
+              "primary": "#98cbff",
               "on-primary-container": "#002c4a",
-              "on-error-container": "#ffdad6",
-              "primary-fixed-dim": "#98cbff",
-              "on-secondary-fixed-variant": "#3a485b",
-              "inverse-on-surface": "#283044",
+              "background": "#0b1326",
               "on-surface": "#dae2fd",
-              "on-tertiary": "#00363e",
-              "surface-bright": "#31394d",
-              "tertiary-fixed-dim": "#2fd9f4",
-              "surface-dim": "#0b1326",
-              "outline": "#8b90a0",
-              "on-tertiary-fixed": "#001f25",
-              "surface-variant": "#2d3449",
-              "on-surface-variant": "#c1c6d7",
-              "on-primary-fixed": "#001d33",
               "on-background": "#dae2fd",
-              "primary-container": "#0097ec",
+              "on-error": "#690005",
+              "inverse-surface": "#dae2fd",
+              "on-tertiary-container": "#002f36",
+              "on-primary": "#003354",
+              "surface-container-highest": "#2d3449",
+              "on-tertiary-fixed-variant": "#004e5a",
+              "secondary-fixed": "#d5e3fc",
+              "primary-fixed-dim": "#98cbff",
+              "tertiary-container": "#009fb4",
+              "surface-container-lowest": "#060e20",
+              "inverse-primary": "#00629d",
+              "primary-fixed": "#cfe5ff",
+              "surface-bright": "#31394d",
+              "surface-container": "#171f33",
+              "tertiary-fixed-dim": "#2fd9f4",
+              "outline": "#8b90a0",
+              "tertiary": "#2fd9f4",
+              "surface-container-high": "#222a3d",
+              "on-surface-variant": "#c1c6d7",
+              "tertiary-fixed": "#a2eeff",
+              "on-secondary-container": "#abb9d1",
+              "surface": "#0b1326",
               "surface-container-low": "#131b2e",
-              "on-secondary-fixed": "#0d1c2e"
+              "on-tertiary": "#00363e",
+              "inverse-on-surface": "#283044",
+              "secondary-container": "#3c4a5e",
+              "outline-variant": "#414754",
+              "surface-dim": "#0b1326",
+              "surface-variant": "#2d3449",
+              "on-secondary": "#233144",
+              "secondary-fixed-dim": "#b9c7df",
+              "on-primary-fixed-variant": "#004a77",
+              "on-error-container": "#ffdad6",
+              "error": "#ffb4ab",
+              "on-secondary-fixed-variant": "#3a485b",
+              "on-secondary-fixed": "#0d1c2e",
+              "primary-container": "#0097ec",
+              "error-container": "#93000a",
+              "surface-tint": "#98cbff",
+              "on-tertiary-fixed": "#001f25",
+              "on-primary-fixed": "#001d33"
             },
             fontFamily: {
               "headline": ["Manrope"],
@@ -73,14 +73,17 @@
       }
     </script>
 <style>
-      body { background-color: #0b1326; }
-      .material-symbols-outlined {
-        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-      }
-      .glass-panel {
-        background: rgba(34, 42, 61, 0.8);
-        backdrop-filter: blur(20px);
-      }
+        body { font-family: 'Inter', sans-serif; background-color: #0b1326; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
     </style>
 <style>
     body {
@@ -88,119 +91,157 @@
     }
   </style>
   </head>
-<body class="font-body text-on-surface select-none">
-<!-- TopAppBar from JSON -->
-<header class="fixed top-0 left-0 w-full z-50 bg-[#0b1326] flex justify-between items-center px-4 h-16">
-<div class="flex items-center gap-3">
-<span class="material-symbols-outlined text-[#98cbff]" data-icon="monitor_heart">monitor_heart</span>
-<h1 class="font-['Manrope'] font-bold text-lg tracking-tight text-[#98cbff]">Endpoint Monitor</h1>
+<body class="bg-background text-on-background">
+<div class="flex h-screen w-full flex-col overflow-hidden max-w-md mx-auto border-x border-outline-variant/15 shadow-2xl">
+<!-- TopAppBar (Simulated from Shared Assets Theme) -->
+<header class="flex items-center bg-surface p-4 justify-between">
+<div class="text-on-surface flex size-12 shrink-0 items-center" data-icon="menu">
+<span class="material-symbols-outlined text-[24px]">menu</span>
 </div>
-<button class="bg-surface-container-highest px-4 py-1.5 rounded text-sm font-medium text-[#98cbff] hover:bg-[#222a3d] transition-colors active:scale-95 duration-150">
-            Disconnect
-        </button>
+<h2 class="text-on-surface text-lg font-headline font-bold leading-tight tracking-[-0.015em] flex-1">More</h2>
+<div class="flex gap-2">
+<div class="text-on-surface flex size-10 items-center justify-center" data-icon="search">
+<span class="material-symbols-outlined text-[24px]">search</span>
+</div>
+</div>
 </header>
-<main class="pt-20 pb-24 px-4 max-w-2xl mx-auto">
-<!-- Profile Anchor / System Identity -->
-<section class="mb-8 p-6 rounded-xl bg-surface-container-low flex items-center gap-4">
-<div class="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primary-container flex items-center justify-center text-on-primary">
-<span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1;">account_circle</span>
+<!-- Main Content Area: Scrollable Menu -->
+<main class="flex-1 overflow-y-auto bg-background">
+<!-- Profile Section (Visual Polish) -->
+<div class="px-4 py-6 mb-2 bg-surface-container-low">
+<div class="flex items-center gap-4">
+<div class="size-14 rounded-full bg-primary-container flex items-center justify-center overflow-hidden border-2 border-primary/20">
+<img alt="Admin Avatar" class="size-full" data-alt="Stylized 3D avatar of a professional system administrator with tech glasses and a sleek dark uniform" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCsIFClUTohtb3Ad4y3uoaU7TezAtnz9K1Elr0BSaJITkAiZRujduv5w9JBuKTPwp4JdXtTbKyhvrqukMkozLH55lYqt9qVZcxVuh6W2XP820bCeweYLyX3yXrQB9au-3sfIse-uGqR8x79j0rn4dRHgBLePVN3eedzltQ6nxIBOQxjX7jmMav20V-gZ2utZ52jyMsmmz5R8MxL2W_DeSsMKsQlB-8AQ3pumoeJasZsORh7ssNOW32o5kux5OChbXx272BrEIIcpaI"/>
 </div>
 <div>
-<h2 class="font-headline font-bold text-xl text-on-surface">System Administrator</h2>
-<p class="font-label text-sm text-on-surface-variant">Endpoint: WIN-SRV-0842-PRO</p>
+<h3 class="font-headline font-bold text-on-surface">Terminal Admin</h3>
+<p class="text-xs font-label text-on-surface-variant">Console Version 4.8.2-Alpha</p>
 </div>
-</section>
-<!-- More Navigation Tiles -->
-<div class="space-y-1">
-<h3 class="px-2 pb-4 font-headline text-xs font-extrabold uppercase tracking-[0.2em] text-on-surface-variant opacity-60">Operations &amp; Security</h3>
-<nav class="flex flex-col gap-px overflow-hidden rounded-xl bg-outline-variant/15">
+</div>
+</div>
+<!-- List Tiles Section -->
+<div class="flex flex-col">
 <!-- Browser History -->
-<a class="flex items-center justify-between p-5 bg-surface-container hover:bg-surface-container-high transition-colors group" href="#">
-<div class="flex items-center gap-4">
-<span class="material-symbols-outlined text-primary" data-icon="history">history</span>
-<span class="font-label text-base font-medium">Browser History</span>
+<button class="flex items-center gap-4 px-4 py-4 bg-surface hover:bg-surface-container-high transition-colors text-left border-b border-outline-variant/5">
+<div class="flex items-center justify-center rounded bg-surface-container-highest shrink-0 size-10 text-primary" data-icon="history">
+<span class="material-symbols-outlined text-[24px]">history</span>
 </div>
-<span class="material-symbols-outlined text-on-surface-variant group-hover:translate-x-1 transition-transform" data-icon="chevron_right">chevron_right</span>
-</a>
+<div class="flex-1">
+<p class="text-on-surface text-base font-body font-medium leading-normal truncate">Browser History</p>
+<p class="text-on-surface-variant text-xs font-label">View endpoint web activity</p>
+</div>
+<div class="text-on-surface-variant/50 flex size-7 items-center justify-center" data-icon="chevron_right">
+<span class="material-symbols-outlined text-[24px]">chevron_right</span>
+</div>
+</button>
 <!-- Installed Software -->
-<a class="flex items-center justify-between p-5 bg-surface-container hover:bg-surface-container-high transition-colors group" href="#">
-<div class="flex items-center gap-4">
-<span class="material-symbols-outlined text-primary" data-icon="apps">apps</span>
-<span class="font-label text-base font-medium">Installed Software</span>
+<button class="flex items-center gap-4 px-4 py-4 bg-surface hover:bg-surface-container-high transition-colors text-left border-b border-outline-variant/5">
+<div class="flex items-center justify-center rounded bg-surface-container-highest shrink-0 size-10 text-primary" data-icon="apps">
+<span class="material-symbols-outlined text-[24px]">apps</span>
 </div>
-<span class="material-symbols-outlined text-on-surface-variant group-hover:translate-x-1 transition-transform" data-icon="chevron_right">chevron_right</span>
-</a>
+<div class="flex-1">
+<p class="text-on-surface text-base font-body font-medium leading-normal truncate">Installed Software</p>
+<p class="text-on-surface-variant text-xs font-label">Manage applications and versions</p>
+</div>
+<div class="text-on-surface-variant/50 flex size-7 items-center justify-center" data-icon="chevron_right">
+<span class="material-symbols-outlined text-[24px]">chevron_right</span>
+</div>
+</button>
 <!-- Alerts -->
-<a class="flex items-center justify-between p-5 bg-surface-container hover:bg-surface-container-high transition-colors group" href="#">
-<div class="flex items-center gap-4">
-<span class="material-symbols-outlined text-primary" data-icon="notifications">notifications</span>
-<span class="font-label text-base font-medium">Alerts</span>
+<button class="flex items-center gap-4 px-4 py-4 bg-surface hover:bg-surface-container-high transition-colors text-left border-b border-outline-variant/5">
+<div class="flex items-center justify-center rounded bg-surface-container-highest shrink-0 size-10 text-error" data-icon="notifications">
+<span class="material-symbols-outlined text-[24px]">notifications</span>
 </div>
-<div class="flex items-center gap-3">
-<span class="bg-error-container text-on-error-container text-[10px] px-2 py-0.5 rounded-full font-bold">12</span>
-<span class="material-symbols-outlined text-on-surface-variant group-hover:translate-x-1 transition-transform" data-icon="chevron_right">chevron_right</span>
+<div class="flex-1">
+<p class="text-on-surface text-base font-body font-medium leading-normal truncate">Alerts</p>
+<p class="text-error text-xs font-label font-medium">3 Critical Notifications</p>
 </div>
-</a>
+<div class="text-on-surface-variant/50 flex size-7 items-center justify-center" data-icon="chevron_right">
+<span class="material-symbols-outlined text-[24px]">chevron_right</span>
+</div>
+</button>
 <!-- Firewall -->
-<a class="flex items-center justify-between p-5 bg-surface-container hover:bg-surface-container-high transition-colors group" href="#">
-<div class="flex items-center gap-4">
-<span class="material-symbols-outlined text-primary" data-icon="shield">shield</span>
-<span class="font-label text-base font-medium">Firewall</span>
+<button class="flex items-center gap-4 px-4 py-4 bg-surface hover:bg-surface-container-high transition-colors text-left border-b border-outline-variant/5">
+<div class="flex items-center justify-center rounded bg-surface-container-highest shrink-0 size-10 text-tertiary" data-icon="shield">
+<span class="material-symbols-outlined text-[24px]">shield</span>
 </div>
-<span class="material-symbols-outlined text-on-surface-variant group-hover:translate-x-1 transition-transform" data-icon="chevron_right">chevron_right</span>
-</a>
+<div class="flex-1">
+<p class="text-on-surface text-base font-body font-medium leading-normal truncate">Firewall</p>
+<p class="text-on-surface-variant text-xs font-label">Network security and rule sets</p>
+</div>
+<div class="text-on-surface-variant/50 flex size-7 items-center justify-center" data-icon="chevron_right">
+<span class="material-symbols-outlined text-[24px]">chevron_right</span>
+</div>
+</button>
 <!-- Watchlist -->
-<a class="flex items-center justify-between p-5 bg-surface-container hover:bg-surface-container-high transition-colors group" href="#">
-<div class="flex items-center gap-4">
-<span class="material-symbols-outlined text-primary" data-icon="visibility">visibility</span>
-<span class="font-label text-base font-medium">Watchlist</span>
+<button class="flex items-center gap-4 px-4 py-4 bg-surface hover:bg-surface-container-high transition-colors text-left border-b border-outline-variant/5">
+<div class="flex items-center justify-center rounded bg-surface-container-highest shrink-0 size-10 text-primary" data-icon="visibility">
+<span class="material-symbols-outlined text-[24px]">visibility</span>
 </div>
-<span class="material-symbols-outlined text-on-surface-variant group-hover:translate-x-1 transition-transform" data-icon="chevron_right">chevron_right</span>
-</a>
-</nav>
-<h3 class="px-2 pt-8 pb-4 font-headline text-xs font-extrabold uppercase tracking-[0.2em] text-on-surface-variant opacity-60">Configuration</h3>
-<nav class="flex flex-col gap-px overflow-hidden rounded-xl bg-outline-variant/15">
+<div class="flex-1">
+<p class="text-on-surface text-base font-body font-medium leading-normal truncate">Watchlist</p>
+<p class="text-on-surface-variant text-xs font-label">Monitor priority endpoints</p>
+</div>
+<div class="text-on-surface-variant/50 flex size-7 items-center justify-center" data-icon="chevron_right">
+<span class="material-symbols-outlined text-[24px]">chevron_right</span>
+</div>
+</button>
 <!-- Settings -->
-<a class="flex items-center justify-between p-5 bg-surface-container hover:bg-surface-container-high transition-colors group" href="#">
-<div class="flex items-center gap-4">
-<span class="material-symbols-outlined text-primary" data-icon="settings">settings</span>
-<span class="font-label text-base font-medium">Settings</span>
+<button class="flex items-center gap-4 px-4 py-4 bg-surface hover:bg-surface-container-high transition-colors text-left">
+<div class="flex items-center justify-center rounded bg-surface-container-highest shrink-0 size-10 text-on-surface-variant" data-icon="settings">
+<span class="material-symbols-outlined text-[24px]">settings</span>
 </div>
-<span class="material-symbols-outlined text-on-surface-variant group-hover:translate-x-1 transition-transform" data-icon="chevron_right">chevron_right</span>
-</a>
-</nav>
+<div class="flex-1">
+<p class="text-on-surface text-base font-body font-medium leading-normal truncate">Settings</p>
+<p class="text-on-surface-variant text-xs font-label">Global console configurations</p>
 </div>
-<!-- System Version Footer -->
-<div class="mt-12 text-center">
-<p class="font-label text-xs text-on-surface-variant opacity-40 uppercase tracking-widest">v4.2.0-stable | build 882</p>
+<div class="text-on-surface-variant/50 flex size-7 items-center justify-center" data-icon="chevron_right">
+<span class="material-symbols-outlined text-[24px]">chevron_right</span>
+</div>
+</button>
+</div>
+<!-- Logout Button -->
+<div class="p-6">
+<button class="w-full py-3 rounded-lg bg-surface-container-highest text-error font-body font-semibold border border-error/20 hover:bg-error/10 transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[20px]">logout</span>
+                    Sign Out
+                </button>
 </div>
 </main>
-<!-- BottomNavBar from JSON -->
-<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-2 py-3 bg-[#0b1326] border-t border-[#414754]/15 shadow-[0_-4px_12px_rgba(0,0,0,0.4)]">
-<!-- Dashboard -->
-<a class="flex flex-col items-center justify-center text-[#c1c6d7] opacity-70 hover:text-[#98cbff] hover:opacity-100 transition-all active:scale-95" href="#">
-<span class="material-symbols-outlined mb-1" data-icon="dashboard">dashboard</span>
-<span class="font-['Inter'] text-[11px] font-medium tracking-wide">Dashboard</span>
+<!-- BottomNavBar (Shared Component) -->
+<div class="flex gap-2 border-t border-[#20354b] bg-[#172636] px-4 pb-3 pt-2">
+<a class="just flex flex-1 flex-col items-center justify-end gap-1 text-[#8dacce]" href="#">
+<div class="text-[#8dacce] flex h-8 items-center justify-center" data-icon="Gauge" data-size="24px" data-weight="regular">
+<svg fill="currentColor" height="24px" viewbox="0 0 256 256" width="24px" xmlns="http://www.w3.org/2000/svg">
+<path d="M207.06,80.67A111.24,111.24,0,0,0,128,48h-.4C66.07,48.21,16,99,16,161.13V184a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V160A111.25,111.25,0,0,0,207.06,80.67ZM224,184H119.71l54.76-75.3a8,8,0,0,0-12.94-9.42L99.92,184H32V161.13c0-3.08.15-6.12.43-9.13H56a8,8,0,0,0,0-16H35.27c10.32-38.86,44-68.24,84.73-71.66V88a8,8,0,0,0,16,0V64.33A96.14,96.14,0,0,1,221,136H200a8,8,0,0,0,0,16h23.67c.21,2.65.33,5.31.33,8Z"></path>
+</svg>
+</div>
+<p class="text-[#8dacce] text-xs font-medium leading-normal tracking-[0.015em]">Dashboard</p>
 </a>
-<!-- Processes -->
-<a class="flex flex-col items-center justify-center text-[#c1c6d7] opacity-70 hover:text-[#98cbff] hover:opacity-100 transition-all active:scale-95" href="#">
-<span class="material-symbols-outlined mb-1" data-icon="memory">memory</span>
-<span class="font-['Inter'] text-[11px] font-medium tracking-wide">Processes</span>
+<a class="just flex flex-1 flex-col items-center justify-end gap-1 text-[#8dacce]" href="#">
+<div class="text-[#8dacce] flex h-8 items-center justify-center" data-icon="Devices" data-size="24px" data-weight="regular">
+<svg fill="currentColor" height="24px" viewbox="0 0 256 256" width="24px" xmlns="http://www.w3.org/2000/svg">
+<path d="M224,72H208V64a24,24,0,0,0-24-24H40A24,24,0,0,0,16,64v96a24,24,0,0,0,24,24H152v8a24,24,0,0,0,24,24h48a24,24,0,0,0,24-24V96A24,24,0,0,0,224,72ZM40,168a8,8,0,0,1-8-8V64a8,8,0,0,1,8-8H184a8,8,0,0,1,8,8v8H176a24,24,0,0,0-24,24v72Zm192,24a8,8,0,0,1-8,8H176a8,8,0,0,1-8-8V96a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8Zm-96,16a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h40A8,8,0,0,1,136,208Zm80-96a8,8,0,0,1-8,8H192a8,8,0,0,1,0-16h16A8,8,0,0,1,216,112Z"></path>
+</svg>
+</div>
+<p class="text-[#8dacce] text-xs font-medium leading-normal tracking-[0.015em]">Devices</p>
 </a>
-<!-- Network -->
-<a class="flex flex-col items-center justify-center text-[#c1c6d7] opacity-70 hover:text-[#98cbff] hover:opacity-100 transition-all active:scale-95" href="#">
-<span class="material-symbols-outlined mb-1" data-icon="lan">lan</span>
-<span class="font-['Inter'] text-[11px] font-medium tracking-wide">Network</span>
+<a class="just flex flex-1 flex-col items-center justify-end gap-1 text-[#8dacce]" href="#">
+<div class="text-[#8dacce] flex h-8 items-center justify-center" data-icon="ListPlus" data-size="24px" data-weight="regular">
+<svg fill="currentColor" height="24px" viewbox="0 0 256 256" width="24px" xmlns="http://www.w3.org/2000/svg">
+<path d="M32,64a8,8,0,0,1,8-8H216a8,8,0,0,1,0,16H40A8,8,0,0,1,32,64Zm8,72H216a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16Zm104,48H40a8,8,0,0,0,0,16H144a8,8,0,0,0,0-16Zm88,0H216V168a8,8,0,0,0-16,0v16H184a8,8,0,0,0,0,16h16v16a8,8,0,0,0,16,0V200h16a8,8,0,0,0,0-16Z"></path>
+</svg>
+</div>
+<p class="text-[#8dacce] text-xs font-medium leading-normal tracking-[0.015em]">Logs</p>
 </a>
-<!-- Events -->
-<a class="flex flex-col items-center justify-center text-[#c1c6d7] opacity-70 hover:text-[#98cbff] hover:opacity-100 transition-all active:scale-95" href="#">
-<span class="material-symbols-outlined mb-1" data-icon="event_note">event_note</span>
-<span class="font-['Inter'] text-[11px] font-medium tracking-wide">Events</span>
+<a class="just flex flex-1 flex-col items-center justify-end gap-1 rounded-full text-white" href="#">
+<div class="text-white flex h-8 items-center justify-center" data-icon="RoadHorizon" data-size="24px" data-weight="fill">
+<svg fill="currentColor" height="24px" viewbox="0 0 256 256" width="24px" xmlns="http://www.w3.org/2000/svg">
+<path d="M239,188.08,173.68,72h58A8.17,8.17,0,0,0,240,64.53,8,8,0,0,0,232,56H24.27A8.17,8.17,0,0,0,16,63.47,8,8,0,0,0,24,72H82.32L17,188.08a8,8,0,0,0,1.17,9.43,8.24,8.24,0,0,0,6,2.49H116a4,4,0,0,0,4-4V176.27a8.17,8.17,0,0,1,7.47-8.25,8,8,0,0,1,8.53,8v20a4,4,0,0,0,4,4h91.77a8.24,8.24,0,0,0,6-2.49A8,8,0,0,0,239,188.08ZM136,140a8,8,0,0,1-16,0V124a8,8,0,0,1,16,0Zm0-52a8,8,0,0,1-16,0V80a8,8,0,0,1,16,0Z"></path>
+</svg>
+</div>
+<p class="text-white text-xs font-medium leading-normal tracking-[0.015em]">More</p>
 </a>
-<!-- More (Active) -->
-<a class="flex flex-col items-center justify-center text-[#98cbff] bg-[#171f33] rounded-xl px-3 py-1 transition-all active:scale-95" href="#">
-<span class="material-symbols-outlined mb-1" data-icon="menu" style="font-variation-settings: 'FILL' 1;">menu</span>
-<span class="font-['Inter'] text-[11px] font-medium tracking-wide">More</span>
-</a>
-</nav>
+</div>
+</div>
 </body></html>

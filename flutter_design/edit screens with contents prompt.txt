@@ -1,6 +1,5 @@
-Now lets move on to the Network screen. 
-Ruminate and implement both the following steps in the best possible way without losing functionality of the program.
+Now lets move on to @flutter_app/lib/screens/more_screen.dart screen. 
+Remember you are the best GUI/UI/UX desinger in the world.
+Ruminate and implement the following steps in the best possible way without losing functionality of the program.
 
-1. @flutter_design/network_monitor/ Contains html code and a screenshot. Use the screenshot as a guide to make it look as close to this as possible for design. Use the html code as a guide to do your best to convert it to the flutter. *Do not change our current header or footer tabs*
-
-2. @flutter_design/process_network_details/ Contains html code and a screenshot. Use the screenshot as a guide to make it look as close to this as possible for design. Use the html code as a guide to do your best to convert it to the flutter. *Do not change our current header or footer tabs*
+1. @flutter_design/more_menu/ Contains html code and a screenshot. Use the screenshot as a guide to make it look as close to this as possible for design but still matching the theme of program well. Use the html code as a guide to do your best to convert it to the flutter. *Do not change our current header or footer tabs*

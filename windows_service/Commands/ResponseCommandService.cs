@@ -5,6 +5,7 @@ using EndpointMonitorService.Database;
 using EndpointMonitorService.Options;
 using EndpointMonitorService.Services;
 using Microsoft.Extensions.Options;
+using Microsoft.Win32;
 
 namespace EndpointMonitorService.Commands;
 
@@ -38,6 +39,7 @@ public sealed class ResponseCommandService(
                 "unflag_process" => await UnflagAsync(root, clientIp, cancellationToken).ConfigureAwait(false),
                 "get_browser_history" => await GetBrowserHistoryAsync(root, cancellationToken).ConfigureAwait(false),
                 "get_installed_software" => await GetInstalledSoftwareAsync(cancellationToken).ConfigureAwait(false),
+                "uninstall_software" => await UninstallSoftwareAsync(root, clientIp, cancellationToken).ConfigureAwait(false),
                 "get_recent_events" => await GetRecentEventsAsync(root, cancellationToken).ConfigureAwait(false),
                 "ack_alert" => await AckAlertAsync(root, cancellationToken).ConfigureAwait(false),
                 _ => new CommandResult(false, type, "unknown_command")
@@ -203,6 +205,66 @@ public sealed class ResponseCommandService(
         var items = await installedSoftwareCollector.CollectAsync(cancellationToken).ConfigureAwait(false);
         var data = JsonSerializer.SerializeToElement(items, AppJson.Options);
         return new CommandResult(true, "get_installed_software", "ok", data);
+    }
+
+    private async Task<CommandResult> UninstallSoftwareAsync(JsonElement root, string? clientIp, CancellationToken cancellationToken)
+    {
+        var subKeyName = root.TryGetProperty("registrySubKey", out var sk) ? sk.GetString() ?? "" : "";
+        if (string.IsNullOrWhiteSpace(subKeyName))
+            return new CommandResult(false, "uninstall_software", "invalid_registry_subkey");
+        if (subKeyName.Contains('\\') || subKeyName.Contains('/') || subKeyName.Contains("..", StringComparison.Ordinal))
+            return new CommandResult(false, "uninstall_software", "invalid_registry_subkey");
+
+        using var appKey = OpenUninstallSubKey(subKeyName);
+        if (appKey == null)
+            return new CommandResult(false, "uninstall_software", "not_found");
+
+        var noRemove = appKey.GetValue("NoRemove");
+        if (noRemove is int nr && nr != 0)
+            return new CommandResult(false, "uninstall_software", "no_remove");
+
+        var quiet = appKey.GetValue("QuietUninstallString")?.ToString();
+        var normal = appKey.GetValue("UninstallString")?.ToString();
+        var uninstallCmd = !string.IsNullOrWhiteSpace(quiet) ? quiet : normal;
+        if (string.IsNullOrWhiteSpace(uninstallCmd))
+            return new CommandResult(false, "uninstall_software", "no_uninstall_string");
+
+        var displayName = appKey.GetValue("DisplayName")?.ToString() ?? subKeyName;
+
+        try
+        {
+            using var p = Process.Start(new ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = "/c " + uninstallCmd,
+                UseShellExecute = true,
+            });
+            if (p == null)
+                return new CommandResult(false, "uninstall_software", "start_failed");
+
+            await database.AppendAuditAsync("uninstall_software", displayName, clientIp, cancellationToken).ConfigureAwait(false);
+            return new CommandResult(true, "uninstall_software", "ok");
+        }
+        catch (Exception ex)
+        {
+            return new CommandResult(false, "uninstall_software", ex.Message);
+        }
+    }
+
+    private static RegistryKey? OpenUninstallSubKey(string subKeyName)
+    {
+        (RegistryKey Root, string Path)[] paths =
+        [
+            (Registry.LocalMachine, @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+            (Registry.LocalMachine, @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
+            (Registry.CurrentUser, @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+        ];
+        foreach (var (root, path) in paths)
+        {
+            var k = root.OpenSubKey(path + "\\" + subKeyName);
+            if (k != null) return k;
+        }
+        return null;
     }
 
     private async Task<CommandResult> GetRecentEventsAsync(JsonElement root, CancellationToken cancellationToken)

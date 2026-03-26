@@ -31,13 +31,13 @@ class _EmConnectionStatus extends StatelessWidget {
       builder: (context, constraints) {
         return BlocBuilder<ConnectionBloc, EmConnectionState>(
           builder: (context, c) {
-            final host = emDisplayConnectionHost(c.host);
             if (!c.isConnected) {
               return Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
                   'OFFLINE',
-                  style: dataStyle.copyWith(fontSize: 10, color: scheme.outline),
+                  style:
+                      dataStyle.copyWith(fontSize: 10, color: scheme.outline),
                 ),
               );
             }
@@ -74,7 +74,7 @@ class _EmConnectionStatus extends StatelessWidget {
                     const SizedBox(width: 8),
                     Flexible(
                       child: Text(
-                        'CONNECTED — $host',
+                        'CONNECTED',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: dataStyle.copyWith(
@@ -145,7 +145,8 @@ class EmBrandAppBar extends StatelessWidget implements PreferredSizeWidget {
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   child: Row(
                     children: [
-                      Icon(Icons.monitor_heart_rounded, color: scheme.primary, size: 26),
+                      Icon(Icons.monitor_heart_rounded,
+                          color: scheme.primary, size: 26),
                       const SizedBox(width: 8),
                       if (title != null) ...[
                         title!,

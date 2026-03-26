@@ -286,6 +286,10 @@ class InstalledSoftwareItem {
     required this.version,
     required this.installDate,
     required this.vendor,
+    this.installLocation = '',
+    this.uninstallRegistrySubKey = '',
+    this.installSizeKb = 0,
+    this.canUninstall = false,
   });
 
   final String name;
@@ -293,11 +297,27 @@ class InstalledSoftwareItem {
   final String installDate;
   final String vendor;
 
+  /// Install folder from registry, when present.
+  final String installLocation;
+
+  /// Registry subkey under Uninstall (used to trigger uninstall on the agent).
+  final String uninstallRegistrySubKey;
+
+  /// Estimated install size from registry (KB), 0 if unknown.
+  final int installSizeKb;
+
+  /// Agent reports whether uninstall is allowed (registry has uninstall command, NoRemove not set).
+  final bool canUninstall;
+
   factory InstalledSoftwareItem.fromJson(Map<String, dynamic> j) => InstalledSoftwareItem(
         name: j['name'] as String? ?? '',
         version: j['version'] as String? ?? '',
         installDate: j['installDate'] as String? ?? '',
         vendor: j['vendor'] as String? ?? '',
+        installLocation: j['installLocation'] as String? ?? '',
+        uninstallRegistrySubKey: j['uninstallRegistrySubKey'] as String? ?? '',
+        installSizeKb: (j['installSizeKb'] as num?)?.toInt() ?? 0,
+        canUninstall: j['canUninstall'] as bool? ?? false,
       );
 }
 

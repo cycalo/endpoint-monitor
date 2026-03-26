@@ -16,6 +16,7 @@ import 'screens/network_screen.dart';
 import 'screens/process_detail_screen.dart';
 import 'screens/processes_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/software_detail_screen.dart';
 import 'screens/software_screen.dart';
 import 'screens/watchlist_screen.dart';
 
@@ -124,6 +125,21 @@ GoRouter createAppRouter(ConnectionBloc connectionBloc) {
         name: 'software',
         path: '/software',
         builder: (context, state) => const SoftwareScreen(),
+        routes: [
+          GoRoute(
+            name: 'softwareDetail',
+            path: 'detail',
+            builder: (context, state) {
+              final extra = state.extra;
+              if (extra is! InstalledSoftwareItem) {
+                return const Scaffold(
+                  body: Center(child: Text('Missing software entry')),
+                );
+              }
+              return SoftwareDetailScreen(item: extra);
+            },
+          ),
+        ],
       ),
       GoRoute(
         name: 'alerts',
