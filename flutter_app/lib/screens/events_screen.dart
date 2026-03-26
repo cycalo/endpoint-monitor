@@ -26,6 +26,8 @@ class EventsScreen extends StatefulWidget {
 class _EventsScreenState extends State<EventsScreen> {
   final _search = TextEditingController();
 
+  static const _allFilter = '__all__';
+
   /// Empty set = show all types (no type filter).
   final Set<String> _typeFilter = {};
 
@@ -54,6 +56,18 @@ class _EventsScreenState extends State<EventsScreen> {
   bool _passesTypeFilter(SysmonEvent e) {
     if (_typeFilter.isEmpty) return true;
     return _typeFilter.contains(e.type);
+  }
+
+  void _toggleType(String type) {
+    setState(() {
+      if (type == _allFilter) {
+        _typeFilter.clear();
+        return;
+      }
+      if (!_typeFilter.remove(type)) {
+        _typeFilter.add(type);
+      }
+    });
   }
 
   _EventVisualStyle _styleFor(SysmonEvent e, ColorScheme scheme) {
@@ -114,63 +128,82 @@ class _EventsScreenState extends State<EventsScreen> {
       backgroundColor: scheme.surface,
       appBar: EmBrandAppBar(
         actions: [
-          TextButton.icon(
-            style: TextButton.styleFrom(
-              foregroundColor: scheme.onSurface,
-              backgroundColor: scheme.surfaceContainer,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(EmDesign.radiusLg),
-                side: BorderSide(color: EmDesign.ghostLine(scheme)),
-              ),
-            ),
-            onPressed: () async {
-              try {
-                final p = await SharedPreferences.getInstance();
-                final base =
-                    p.getString('em_http_base') ?? 'http://192.168.1.10:5000';
-                const s = FlutterSecureStorage();
-                final token = await s.read(key: 'em_token') ?? '';
-                final dio = Dio(BaseOptions(baseUrl: base));
-                final res = await dio.get<dynamic>(
-                  '/export/events',
-                  options: Options(headers: {'Authorization': 'Bearer $token'}),
-                );
-                if (!context.mounted) return;
-                await showDialog<void>(
-                  context: context,
-                  builder: (c) => AlertDialog(
-                    title: const Text('Export preview'),
-                    content: SingleChildScrollView(
-                      child: Text(() {
-                        final str = res.data?.toString() ?? '';
-                        if (str.length <= 4000) return str;
-                        return '${str.substring(0, 4000)}…';
-                      }()),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(c),
-                        child: const Text('Close'),
+          Builder(
+            builder: (context) {
+              final isNarrow = MediaQuery.sizeOf(context).width < 460;
+              Future<void> exportEvents() async {
+                try {
+                  final p = await SharedPreferences.getInstance();
+                  final base =
+                      p.getString('em_http_base') ?? 'http://192.168.1.10:5000';
+                  const s = FlutterSecureStorage();
+                  final token = await s.read(key: 'em_token') ?? '';
+                  final dio = Dio(BaseOptions(baseUrl: base));
+                  final res = await dio.get<dynamic>(
+                    '/export/events',
+                    options: Options(headers: {'Authorization': 'Bearer $token'}),
+                  );
+                  if (!context.mounted) return;
+                  await showDialog<void>(
+                    context: context,
+                    builder: (c) => AlertDialog(
+                      title: const Text('Export preview'),
+                      content: SingleChildScrollView(
+                        child: Text(() {
+                          final str = res.data?.toString() ?? '';
+                          if (str.length <= 4000) return str;
+                          return '${str.substring(0, 4000)}…';
+                        }()),
                       ),
-                    ],
-                  ),
-                );
-              } catch (e) {
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(SnackBar(content: Text('$e')));
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(c),
+                          child: const Text('Close'),
+                        ),
+                      ],
+                    ),
+                  );
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(SnackBar(content: Text('$e')));
+                }
               }
+
+              if (isNarrow) {
+                return IconButton(
+                  tooltip: 'Export (HTTP)',
+                  onPressed: exportEvents,
+                  icon: Icon(Icons.ios_share_rounded, color: scheme.primary),
+                );
+              }
+
+              return TextButton.icon(
+                style: TextButton.styleFrom(
+                  foregroundColor: scheme.onSurface,
+                  backgroundColor: scheme.surfaceContainer,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(EmDesign.radiusLg),
+                    side: BorderSide(color: EmDesign.ghostLine(scheme)),
+                  ),
+                ),
+                onPressed: exportEvents,
+                icon: Icon(
+                  Icons.ios_share_rounded,
+                  size: 18,
+                  color: scheme.primary,
+                ),
+                label: Text(
+                  'Export',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: scheme.onSurface,
+                  ),
+                ),
+              );
             },
-            icon:
-                Icon(Icons.ios_share_rounded, size: 18, color: scheme.primary),
-            label: Text(
-              'Export',
-              style: theme.textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: scheme.onSurface,
-              ),
-            ),
           ),
           const SizedBox(width: 4),
         ],
@@ -230,52 +263,48 @@ class _EventsScreenState extends State<EventsScreen> {
                     onChanged: (_) => setState(() {}),
                   ),
                   const SizedBox(height: 12),
+                  _FilterStatusRow(
+                    activeCount: _typeFilter.length,
+                    hasSearch: _search.text.trim().isNotEmpty,
+                  ),
+                  const SizedBox(height: 10),
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
                         _FilterChip(
+                          label: 'All',
+                          dotColor: scheme.primary,
+                          selected: _typeFilter.isEmpty,
+                          onTap: () => _toggleType(_allFilter),
+                        ),
+                        const SizedBox(width: 8),
+                        _FilterChip(
                           label: 'Terminate',
                           dotColor: scheme.error,
                           selected: _typeFilter.contains(_kTypeTerminate),
-                          onTap: () => setState(() {
-                            if (!_typeFilter.remove(_kTypeTerminate)) {
-                              _typeFilter.add(_kTypeTerminate);
-                            }
-                          }),
+                          onTap: () => _toggleType(_kTypeTerminate),
                         ),
                         const SizedBox(width: 8),
                         _FilterChip(
                           label: 'Network',
                           dotColor: const Color(0xFFFBBF24),
                           selected: _typeFilter.contains(_kTypeNetwork),
-                          onTap: () => setState(() {
-                            if (!_typeFilter.remove(_kTypeNetwork)) {
-                              _typeFilter.add(_kTypeNetwork);
-                            }
-                          }),
+                          onTap: () => _toggleType(_kTypeNetwork),
                         ),
                         const SizedBox(width: 8),
                         _FilterChip(
                           label: 'Process',
                           dotColor: scheme.primary,
                           selected: _typeFilter.contains(_kTypeProcess),
-                          onTap: () => setState(() {
-                            if (!_typeFilter.remove(_kTypeProcess)) {
-                              _typeFilter.add(_kTypeProcess);
-                            }
-                          }),
+                          onTap: () => _toggleType(_kTypeProcess),
                         ),
                         const SizedBox(width: 8),
                         _FilterChip(
                           label: 'DNS',
                           dotColor: scheme.tertiary,
                           selected: _typeFilter.contains(_kTypeDns),
-                          onTap: () => setState(() {
-                            if (!_typeFilter.remove(_kTypeDns)) {
-                              _typeFilter.add(_kTypeDns);
-                            }
-                          }),
+                          onTap: () => _toggleType(_kTypeDns),
                         ),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -314,7 +343,7 @@ class _EventsScreenState extends State<EventsScreen> {
             child: BlocBuilder<EventsBloc, EventsState>(
               builder: (context, state) {
                 final q = _search.text.trim().toLowerCase();
-                final list = state.items.where((e) {
+                final filtered = state.items.where((e) {
                   if (!_passesTypeFilter(e)) return false;
                   if (q.isEmpty) return true;
                   return e.processName.toLowerCase().contains(q) ||
@@ -324,6 +353,7 @@ class _EventsScreenState extends State<EventsScreen> {
                       e.type.toLowerCase().contains(q) ||
                       '${e.eventId}'.contains(q);
                 }).toList();
+                final list = filtered;
 
                 if (list.isEmpty) {
                   return Center(
@@ -344,7 +374,7 @@ class _EventsScreenState extends State<EventsScreen> {
                       return Padding(
                         padding: const EdgeInsets.only(left: 4, bottom: 8),
                         child: Text(
-                          'LIVE FEED',
+                          'LIVE FEED · ${list.length} / ${state.items.length}',
                           style: EmDesign.labelCaps(context, scheme),
                         ),
                       );
@@ -539,8 +569,13 @@ class _FilterChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
-    final bg =
-        selected ? scheme.surfaceContainerHighest : scheme.surfaceContainerHigh;
+    final bg = selected
+        ? dotColor.withValues(alpha: 0.18)
+        : scheme.surfaceContainerHigh;
+    final fg = selected ? scheme.onSurface : scheme.onSurfaceVariant;
+    final borderColor = selected
+        ? dotColor.withValues(alpha: 0.65)
+        : scheme.outlineVariant.withValues(alpha: 0.15);
     return Material(
       color: bg,
       borderRadius: BorderRadius.circular(999),
@@ -552,8 +587,17 @@ class _FilterChip extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
-              color: scheme.outlineVariant.withValues(alpha: 0.15),
+              color: borderColor,
             ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: dotColor.withValues(alpha: 0.25),
+                      blurRadius: 10,
+                      spreadRadius: 0.5,
+                    ),
+                  ]
+                : null,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -572,13 +616,46 @@ class _FilterChip extends StatelessWidget {
                 style: theme.textTheme.labelSmall?.copyWith(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: scheme.onSurfaceVariant,
+                  color: fg,
                 ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _FilterStatusRow extends StatelessWidget {
+  const _FilterStatusRow({
+    required this.activeCount,
+    required this.hasSearch,
+  });
+
+  final int activeCount;
+  final bool hasSearch;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final typeText =
+        activeCount == 0 ? 'All event types' : '$activeCount type filter(s)';
+    final searchText = hasSearch ? 'search active' : 'no search';
+
+    return Row(
+      children: [
+        Icon(Icons.filter_alt_rounded, size: 14, color: scheme.primary),
+        const SizedBox(width: 6),
+        Text(
+          '$typeText · $searchText',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: scheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }

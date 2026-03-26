@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'app.dart';
 
@@ -21,12 +20,5 @@ Future<void> main() async {
     ),
   );
 
-  final notifications = FlutterLocalNotificationsPlugin();
-  await notifications.initialize(
-    const InitializationSettings(
-      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-    ),
-  );
-
-  runApp(EndpointMonitorApp(notifications: notifications));
+  runApp(const EndpointMonitorApp());
 }
