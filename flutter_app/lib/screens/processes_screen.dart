@@ -2,14 +2,103 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../bloc/process_bloc.dart';
 import '../models/ws_models.dart';
+import '../settings/app_settings_keys.dart';
 import '../theme/em_design_system.dart';
 import '../widgets/em_brand_app_bar.dart';
 
+Future<void> _openVirusTotalSheet(BuildContext context, ProcessInfo p) async {
+  final bloc = context.read<ProcessBloc>();
+  bloc.requestVirusTotalCheck(p.pid);
+  await showModalBottomSheet<void>(
+    context: context,
+    useRootNavigator: true,
+    showDragHandle: true,
+    builder: (c) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          child: BlocBuilder<ProcessBloc, ProcessState>(
+            bloc: bloc,
+            builder: (c, st) {
+              final loading =
+                  st.vtLoadingPid == p.pid && st.vtByPid[p.pid] == null;
+              final data = st.vtByPid[p.pid];
+              if (loading) {
+                return const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(height: 20),
+                    Center(child: CircularProgressIndicator()),
+                    SizedBox(height: 16),
+                    Text('Checking VirusTotal…'),
+                    SizedBox(height: 12),
+                  ],
+                );
+              }
+              if (data == null) {
+                return const Text('Waiting for response…');
+              }
+              final ok = data['ok'] == true;
+              if (!ok) {
+                return Text(
+                  'Check failed: ${data['error'] ?? 'unknown'}',
+                  style: TextStyle(color: Theme.of(c).colorScheme.error),
+                );
+              }
+              final verdict = data['verdict']?.toString() ?? '—';
+              final sha = data['sha256']?.toString() ?? '';
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    p.name,
+                    style: Theme.of(c).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text('Verdict: $verdict'),
+                  Text(
+                    'Malicious: ${data['malicious']} · Suspicious: ${data['suspicious']}',
+                  ),
+                  if (sha.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    FilledButton(
+                      onPressed: () async {
+                        final u = Uri.parse(
+                          'https://www.virustotal.com/gui/file/$sha',
+                        );
+                        if (await canLaunchUrl(u)) {
+                          await launchUrl(
+                            u,
+                            mode: LaunchMode.externalApplication,
+                          );
+                        }
+                      },
+                      child: const Text('Open in VirusTotal'),
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
+        ),
+      );
+    },
+  );
+}
+
 class ProcessesScreen extends StatefulWidget {
-  const ProcessesScreen({super.key});
+  const ProcessesScreen({super.key, this.initialWatchFilter});
+
+  /// Pre-fills search when opened from Watchlist (e.g. `notepad.exe`).
+  final String? initialWatchFilter;
 
   @override
   State<ProcessesScreen> createState() => _ProcessesScreenState();
@@ -29,7 +118,8 @@ class _ProcessViewRowData {
       _ProcessViewRowData._(snapshot: p, isKilledGhost: false);
 
   factory _ProcessViewRowData.killed(KilledProcessGhost g) =>
-      _ProcessViewRowData._(snapshot: g.snapshot, isKilledGhost: true, killedAt: g.killedAt);
+      _ProcessViewRowData._(
+          snapshot: g.snapshot, isKilledGhost: true, killedAt: g.killedAt);
 
   final ProcessInfo snapshot;
   final bool isKilledGhost;
@@ -40,6 +130,22 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
   final _search = TextEditingController();
   _Sort _sort = _Sort.cpu;
   int? _expandedPid;
+  bool _compactCards = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final w = widget.initialWatchFilter?.trim();
+    if (w != null && w.isNotEmpty) {
+      _search.text = w;
+    }
+    SharedPreferences.getInstance().then((p) {
+      if (!mounted) return;
+      setState(() {
+        _compactCards = p.getBool(AppSettingsKeys.compactProcessCards) ?? false;
+      });
+    });
+  }
 
   @override
   void dispose() {
@@ -74,7 +180,8 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
     var live = state.items.where(_matchesSearch).toList();
     switch (_sort) {
       case _Sort.name:
-        live.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        live.sort(
+            (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
       case _Sort.cpu:
         live.sort((a, b) => b.cpuPercent.compareTo(a.cpuPercent));
       case _Sort.memory:
@@ -97,7 +204,8 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final mono = GoogleFonts.jetBrainsMono(color: scheme.onSurfaceVariant, fontSize: 11);
+    final mono =
+        GoogleFonts.jetBrainsMono(color: scheme.onSurfaceVariant, fontSize: 11);
 
     return Scaffold(
       backgroundColor: scheme.surface,
@@ -113,14 +221,17 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
               children: [
                 TextField(
                   controller: _search,
-                  style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurface),
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: scheme.onSurface),
                   onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: scheme.surfaceContainerLowest,
                     isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-                    prefixIcon: Icon(Icons.search_rounded, color: scheme.outline, size: 22),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+                    prefixIcon: Icon(Icons.search_rounded,
+                        color: scheme.outline, size: 22),
                     suffixIcon: _search.text.isEmpty
                         ? null
                         : IconButton(
@@ -129,7 +240,8 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
                               _search.clear();
                               setState(() {});
                             },
-                            icon: Icon(Icons.clear_rounded, color: scheme.outline, size: 20),
+                            icon: Icon(Icons.clear_rounded,
+                                color: scheme.outline, size: 20),
                           ),
                     hintText: 'Search processes by name, PID, or user...',
                     hintStyle: theme.textTheme.bodySmall?.copyWith(
@@ -137,15 +249,18 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(EmDesign.radiusMd),
-                      borderSide: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.15)),
+                      borderSide: BorderSide(
+                          color: scheme.outlineVariant.withValues(alpha: 0.15)),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(EmDesign.radiusMd),
-                      borderSide: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.15)),
+                      borderSide: BorderSide(
+                          color: scheme.outlineVariant.withValues(alpha: 0.15)),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(EmDesign.radiusMd),
-                      borderSide: BorderSide(color: scheme.primary.withValues(alpha: 0.5)),
+                      borderSide: BorderSide(
+                          color: scheme.primary.withValues(alpha: 0.5)),
                     ),
                   ),
                 ),
@@ -169,7 +284,8 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
                           tooltip: 'Sort',
                           offset: const Offset(0, 40),
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -182,7 +298,8 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 4),
-                                Icon(Icons.filter_list_rounded, size: 18, color: scheme.primary),
+                                Icon(Icons.filter_list_rounded,
+                                    size: 18, color: scheme.primary),
                               ],
                             ),
                           ),
@@ -190,19 +307,23 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
                           itemBuilder: (context) => [
                             PopupMenuItem(
                               value: _Sort.name,
-                              child: Text('Name', style: theme.textTheme.bodyMedium),
+                              child: Text('Name',
+                                  style: theme.textTheme.bodyMedium),
                             ),
                             PopupMenuItem(
                               value: _Sort.pid,
-                              child: Text('PID', style: theme.textTheme.bodyMedium),
+                              child: Text('PID',
+                                  style: theme.textTheme.bodyMedium),
                             ),
                             PopupMenuItem(
                               value: _Sort.cpu,
-                              child: Text('Resource usage (CPU)', style: theme.textTheme.bodyMedium),
+                              child: Text('Resource usage (CPU)',
+                                  style: theme.textTheme.bodyMedium),
                             ),
                             PopupMenuItem(
                               value: _Sort.memory,
-                              child: Text('Resource usage (RAM)', style: theme.textTheme.bodyMedium),
+                              child: Text('Resource usage (RAM)',
+                                  style: theme.textTheme.bodyMedium),
                             ),
                           ],
                         ),
@@ -218,7 +339,9 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
               color: scheme.surfaceContainerLow,
               child: BlocBuilder<ProcessBloc, ProcessState>(
                 builder: (context, state) {
-                  if (state.loading && state.items.isEmpty && state.killedGhosts.isEmpty) {
+                  if (state.loading &&
+                      state.items.isEmpty &&
+                      state.killedGhosts.isEmpty) {
                     return const Center(child: CircularProgressIndicator());
                   }
                   final rows = _buildDisplayRows(state);
@@ -226,7 +349,8 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
                     return Center(
                       child: Text(
                         'No processes match',
-                        style: theme.textTheme.bodyMedium?.copyWith(color: scheme.outline),
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(color: scheme.outline),
                       ),
                     );
                   }
@@ -248,15 +372,22 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
                         isKilledGhost: row.isKilledGhost,
                         killedAt: row.killedAt,
                         expanded: expanded,
+                        compact: _compactCards,
                         mono: mono,
                         onToggle: () => setState(() {
                           _expandedPid = expanded ? null : p.pid;
                         }),
-                        onOpenDetail:
-                            row.isKilledGhost ? null : () => context.push('/processes/${p.pid}'),
-                        onKill: row.isKilledGhost ? null : () => _confirmKill(context, p),
-                        onDismissGhost:
-                            row.isKilledGhost ? () => context.read<ProcessBloc>().dismissKilledGhost(p.pid) : null,
+                        onOpenDetail: row.isKilledGhost
+                            ? null
+                            : () => context.push('/processes/${p.pid}'),
+                        onKill: row.isKilledGhost
+                            ? null
+                            : () => _confirmKill(context, p),
+                        onDismissGhost: row.isKilledGhost
+                            ? () => context
+                                .read<ProcessBloc>()
+                                .dismissKilledGhost(p.pid)
+                            : null,
                       );
                     },
                   );
@@ -276,13 +407,19 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
         title: const Text('Kill process?'),
         content: Text('${p.name} (${p.pid})'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Kill')),
+          TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('Kill')),
         ],
       ),
     );
     if (ok == true && context.mounted) {
-      context.read<ProcessBloc>().sendCommand({'type': 'kill_process', 'pid': p.pid});
+      context
+          .read<ProcessBloc>()
+          .sendCommand({'type': 'kill_process', 'pid': p.pid});
     }
   }
 }
@@ -300,7 +437,10 @@ class _ProcessCategory {
 
   static _ProcessCategory forName(String name, ColorScheme scheme) {
     final n = name.toLowerCase();
-    if (n.contains('chrome') || n.contains('msedge') || n.contains('firefox') || n.contains('browser')) {
+    if (n.contains('chrome') ||
+        n.contains('msedge') ||
+        n.contains('firefox') ||
+        n.contains('browser')) {
       return _ProcessCategory(
         icon: Icons.travel_explore_rounded,
         background: scheme.surfaceContainerHighest,
@@ -324,7 +464,10 @@ class _ProcessCategory {
         foreground: scheme.primary,
       );
     }
-    if (n.contains('svchost') || n.contains('system') || n.contains('service') || n.contains('host')) {
+    if (n.contains('svchost') ||
+        n.contains('system') ||
+        n.contains('service') ||
+        n.contains('host')) {
       return _ProcessCategory(
         icon: Icons.settings_suggest_rounded,
         background: scheme.surfaceContainerHighest,
@@ -363,6 +506,7 @@ class _ProcessRow extends StatelessWidget {
     required this.isKilledGhost,
     this.killedAt,
     required this.expanded,
+    this.compact = false,
     required this.mono,
     required this.onToggle,
     this.onOpenDetail,
@@ -375,6 +519,7 @@ class _ProcessRow extends StatelessWidget {
   final bool isKilledGhost;
   final DateTime? killedAt;
   final bool expanded;
+  final bool compact;
   final TextStyle mono;
   final VoidCallback onToggle;
   final VoidCallback? onOpenDetail;
@@ -429,10 +574,12 @@ class _ProcessRow extends StatelessWidget {
 
     Widget wrapDisabledTap(Widget child, {required bool disabled}) {
       if (!disabled) return child;
-      return _TapDisabledCollapses(onCollapse: collapseIfExpanded, child: child);
+      return _TapDisabledCollapses(
+          onCollapse: collapseIfExpanded, child: child);
     }
 
-    Widget dimIf(bool dim, Widget child) => dim ? Opacity(opacity: 0.4, child: child) : child;
+    Widget dimIf(bool dim, Widget child) =>
+        dim ? Opacity(opacity: 0.4, child: child) : child;
 
     return Material(
       color: Colors.transparent,
@@ -451,7 +598,7 @@ class _ProcessRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 12, 16),
+              padding: EdgeInsets.fromLTRB(16, compact ? 8 : 16, 12, compact ? 8 : 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -459,7 +606,8 @@ class _ProcessRow extends StatelessWidget {
                     color: Colors.transparent,
                     child: InkWell(
                       onTap: onToggle,
-                      hoverColor: scheme.surfaceContainer.withValues(alpha: 0.4),
+                      hoverColor:
+                          scheme.surfaceContainer.withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(EmDesign.radiusSm),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -469,9 +617,11 @@ class _ProcessRow extends StatelessWidget {
                             height: 40,
                             decoration: BoxDecoration(
                               color: cat.background,
-                              borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+                              borderRadius:
+                                  BorderRadius.circular(EmDesign.radiusMd),
                             ),
-                            child: Icon(cat.icon, color: cat.foreground, size: 22),
+                            child:
+                                Icon(cat.icon, color: cat.foreground, size: 22),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
@@ -488,7 +638,8 @@ class _ProcessRow extends StatelessWidget {
                                             color: scheme.outline,
                                           )
                                         : (isKilledGhost
-                                            ? nameStyle?.copyWith(color: scheme.onSurfaceVariant)
+                                            ? nameStyle?.copyWith(
+                                                color: scheme.onSurfaceVariant)
                                             : nameStyle),
                                   ),
                                 ),
@@ -497,9 +648,11 @@ class _ProcessRow extends StatelessWidget {
                                 if (isKilledGhost) ...[
                                   const SizedBox(width: 6),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: scheme.errorContainer.withValues(alpha: 0.45),
+                                      color: scheme.errorContainer
+                                          .withValues(alpha: 0.45),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text(
@@ -519,7 +672,8 @@ class _ProcessRow extends StatelessWidget {
                           AnimatedRotation(
                             turns: expanded ? 0.5 : 0,
                             duration: const Duration(milliseconds: 200),
-                            child: Icon(Icons.expand_more_rounded, color: scheme.outline, size: 24),
+                            child: Icon(Icons.expand_more_rounded,
+                                color: scheme.outline, size: 24),
                           ),
                         ],
                       ),
@@ -531,303 +685,359 @@ class _ProcessRow extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                          if (isKilledGhost) ...[
-                            Row(
-                              children: [
-                                Icon(Icons.memory_rounded,
-                                    size: 14, color: scheme.onSurfaceVariant.withValues(alpha: 0.65)),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${p.cpuPercent.toStringAsFixed(1)}% CPU',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11,
-                                    color: scheme.onSurfaceVariant.withValues(alpha: 0.75),
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                        if (isKilledGhost) ...[
+                          Row(
+                            children: [
+                              Icon(Icons.memory_rounded,
+                                  size: 14,
+                                  color: scheme.onSurfaceVariant
+                                      .withValues(alpha: 0.65)),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${p.cpuPercent.toStringAsFixed(1)}% CPU',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: scheme.onSurfaceVariant
+                                      .withValues(alpha: 0.75),
+                                  fontWeight: FontWeight.w500,
                                 ),
-                                const SizedBox(width: 16),
-                                Icon(Icons.storage_rounded,
-                                    size: 14, color: scheme.onSurfaceVariant.withValues(alpha: 0.65)),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${p.memoryMb.toStringAsFixed(0)} MB RAM (snapshot)',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11,
-                                    color: scheme.onSurfaceVariant.withValues(alpha: 0.75),
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                              ),
+                              const SizedBox(width: 16),
+                              Icon(Icons.storage_rounded,
+                                  size: 14,
+                                  color: scheme.onSurfaceVariant
+                                      .withValues(alpha: 0.65)),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${p.memoryMb.toStringAsFixed(0)} MB RAM (snapshot)',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: scheme.onSurfaceVariant
+                                      .withValues(alpha: 0.75),
+                                  fontWeight: FontWeight.w500,
                                 ),
-                              ],
-                            ),
-                          ] else if (highCpu && !suspended) ...[
-                            Row(
-                              children: [
-                                Icon(Icons.warning_amber_rounded, size: 14, color: scheme.error),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'High CPU usage',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: scheme.error,
-                                  ),
+                              ),
+                            ],
+                          ),
+                        ] else if (highCpu && !suspended) ...[
+                          Row(
+                            children: [
+                              Icon(Icons.warning_amber_rounded,
+                                  size: 14, color: scheme.error),
+                              const SizedBox(width: 4),
+                              Text(
+                                'High CPU usage',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: scheme.error,
                                 ),
-                                const SizedBox(width: 12),
-                                Icon(Icons.memory_rounded, size: 14, color: scheme.onSurfaceVariant),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${p.cpuPercent.toStringAsFixed(1)}% CPU',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11,
-                                    color: scheme.onSurfaceVariant,
-                                  ),
+                              ),
+                              const SizedBox(width: 12),
+                              Icon(Icons.memory_rounded,
+                                  size: 14, color: scheme.onSurfaceVariant),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${p.cpuPercent.toStringAsFixed(1)}% CPU',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: scheme.onSurfaceVariant,
                                 ),
-                              ],
-                            ),
-                          ] else ...[
-                            Row(
-                              children: [
-                                Icon(Icons.memory_rounded, size: 14, color: scheme.onSurfaceVariant),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${p.cpuPercent.toStringAsFixed(1)}% CPU',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11,
-                                    color: highCpu ? scheme.primary : scheme.onSurfaceVariant,
-                                    fontWeight: highCpu ? FontWeight.w700 : FontWeight.w500,
-                                  ),
+                              ),
+                            ],
+                          ),
+                        ] else ...[
+                          Row(
+                            children: [
+                              Icon(Icons.memory_rounded,
+                                  size: 14, color: scheme.onSurfaceVariant),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${p.cpuPercent.toStringAsFixed(1)}% CPU',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: highCpu
+                                      ? scheme.primary
+                                      : scheme.onSurfaceVariant,
+                                  fontWeight: highCpu
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
                                 ),
-                                const SizedBox(width: 16),
-                                Icon(Icons.storage_rounded, size: 14, color: scheme.onSurfaceVariant),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${p.memoryMb.toStringAsFixed(0)} MB RAM',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11,
-                                    color: scheme.onSurfaceVariant,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                              ),
+                              const SizedBox(width: 16),
+                              Icon(Icons.storage_rounded,
+                                  size: 14, color: scheme.onSurfaceVariant),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${p.memoryMb.toStringAsFixed(0)} MB RAM',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: scheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.w500,
                                 ),
-                              ],
-                            ),
-                          ],
+                              ),
+                            ],
+                          ),
                         ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (expanded)
+              Container(
+                color: scheme.surfaceContainerLowest,
+                padding: EdgeInsets.fromLTRB(16, 0, 16, compact ? 12 : 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Divider(
+                        height: 1,
+                        color: scheme.outlineVariant.withValues(alpha: 0.08)),
+                    const SizedBox(height: 16),
+                    Text(
+                      'COMMAND PATH',
+                      style: EmDesign.labelCaps(context, scheme),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: scheme.surface.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(EmDesign.radiusSm),
                       ),
+                      child: SelectableText(
+                        p.commandLine.isEmpty
+                            ? '(no command line)'
+                            : p.commandLine,
+                        style: mono.copyWith(
+                          fontSize: 12,
+                          color: scheme.primary.withValues(alpha: 0.85),
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'PARENT PID',
+                                style: EmDesign.labelCaps(context, scheme),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${p.parentPid}',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: scheme.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'STATUS',
+                                style: EmDesign.labelCaps(context, scheme),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: isKilledGhost
+                                          ? scheme.error
+                                          : (suspended
+                                              ? scheme.outline
+                                              : scheme.tertiary),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: (isKilledGhost
+                                                  ? scheme.error
+                                                  : (suspended
+                                                      ? scheme.outline
+                                                      : scheme.tertiary))
+                                              .withValues(alpha: 0.45),
+                                          blurRadius: 8,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Flexible(
+                                    child: Text(
+                                      isKilledGhost
+                                          ? 'Killed'
+                                          : suspended
+                                              ? 'Suspended'
+                                              : (p.status.isEmpty
+                                                  ? 'Running'
+                                                  : p.status),
+                                      style:
+                                          theme.textTheme.titleSmall?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        color: isKilledGhost
+                                            ? scheme.error
+                                            : (suspended
+                                                ? scheme.outline
+                                                : scheme.tertiary),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    wrapDisabledTap(
+                      TextButton(
+                        onPressed: onOpenDetail,
+                        child: const Text('Open full detail'),
+                      ),
+                      disabled: onOpenDetail == null,
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        dimIf(
+                          isKilledGhost || onKill == null,
+                          wrapDisabledTap(
+                            _GradientKillButton(
+                              onPressed: onKill,
+                              label: isKilledGhost ? 'Killed' : 'Kill',
+                              scheme: scheme,
+                            ),
+                            disabled: onKill == null,
+                          ),
+                        ),
+                        dimIf(
+                          isKilledGhost || suspended,
+                          wrapDisabledTap(
+                            _GhostProcessButton(
+                              scheme: scheme,
+                              icon: Icons.pause_circle_outline_rounded,
+                              label: 'Suspend',
+                              onPressed: isKilledGhost || suspended
+                                  ? null
+                                  : () =>
+                                      context.read<ProcessBloc>().sendCommand({
+                                        'type': 'suspend_process',
+                                        'pid': p.pid,
+                                      }),
+                            ),
+                            disabled: isKilledGhost || suspended,
+                          ),
+                        ),
+                        dimIf(
+                          isKilledGhost || !suspended,
+                          wrapDisabledTap(
+                            _GhostProcessButton(
+                              scheme: scheme,
+                              icon: Icons.play_circle_outline_rounded,
+                              label: 'Resume',
+                              dimmed: isKilledGhost || !suspended,
+                              onPressed: isKilledGhost || !suspended
+                                  ? null
+                                  : () =>
+                                      context.read<ProcessBloc>().sendCommand({
+                                        'type': 'resume_process',
+                                        'pid': p.pid,
+                                      }),
+                            ),
+                            disabled: isKilledGhost || !suspended,
+                          ),
+                        ),
+                        dimIf(
+                          isKilledGhost,
+                          wrapDisabledTap(
+                            OutlinedButton.icon(
+                              onPressed: isKilledGhost
+                                  ? null
+                                  : () =>
+                                      context.read<ProcessBloc>().sendCommand({
+                                        'type': 'flag_process',
+                                        'name': p.name,
+                                      }),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: scheme.outline,
+                                side: BorderSide(
+                                    color: scheme.outlineVariant
+                                        .withValues(alpha: 0.3)),
+                              ),
+                              icon: const Icon(Icons.flag_outlined, size: 18),
+                              label: const Text('Flag'),
+                            ),
+                            disabled: isKilledGhost,
+                          ),
+                        ),
+                        dimIf(
+                          isKilledGhost,
+                          wrapDisabledTap(
+                            OutlinedButton.icon(
+                              onPressed: isKilledGhost
+                                  ? null
+                                  : () => _openVirusTotalSheet(context, p),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: scheme.primary,
+                                side: BorderSide(
+                                  color: scheme.primary
+                                      .withValues(alpha: 0.35),
+                                ),
+                              ),
+                              icon: const Icon(Icons.verified_user_outlined,
+                                  size: 18),
+                              label: const Text('Reputation'),
+                            ),
+                            disabled: isKilledGhost,
+                          ),
+                        ),
+                        if (onDismissGhost != null)
+                          OutlinedButton(
+                            onPressed: onDismissGhost,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: scheme.error,
+                              side: BorderSide(
+                                  color: scheme.error.withValues(alpha: 0.45)),
+                              backgroundColor:
+                                  scheme.errorContainer.withValues(alpha: 0.16),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 10),
+                            ),
+                            child: Text(
+                              'Dismiss',
+                              style: GoogleFonts.manrope(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              if (expanded)
-                Container(
-                  color: scheme.surfaceContainerLowest,
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Divider(height: 1, color: scheme.outlineVariant.withValues(alpha: 0.08)),
-                      const SizedBox(height: 16),
-                      Text(
-                        'COMMAND PATH',
-                        style: EmDesign.labelCaps(context, scheme),
-                      ),
-                      const SizedBox(height: 6),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: scheme.surface.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(EmDesign.radiusSm),
-                        ),
-                        child: SelectableText(
-                          p.commandLine.isEmpty ? '(no command line)' : p.commandLine,
-                          style: mono.copyWith(
-                            fontSize: 12,
-                            color: scheme.primary.withValues(alpha: 0.85),
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'PARENT PID',
-                                  style: EmDesign.labelCaps(context, scheme),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${p.parentPid}',
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: scheme.onSurface,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'STATUS',
-                                  style: EmDesign.labelCaps(context, scheme),
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 6,
-                                      height: 6,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: isKilledGhost
-                                            ? scheme.error
-                                            : (suspended ? scheme.outline : scheme.tertiary),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: (isKilledGhost
-                                                    ? scheme.error
-                                                    : (suspended ? scheme.outline : scheme.tertiary))
-                                                .withValues(alpha: 0.45),
-                                            blurRadius: 8,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Flexible(
-                                      child: Text(
-                                        isKilledGhost
-                                            ? 'Killed'
-                                            : suspended
-                                                ? 'Suspended'
-                                                : (p.status.isEmpty ? 'Running' : p.status),
-                                        style: theme.textTheme.titleSmall?.copyWith(
-                                          fontWeight: FontWeight.w800,
-                                          color: isKilledGhost
-                                              ? scheme.error
-                                              : (suspended ? scheme.outline : scheme.tertiary),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      wrapDisabledTap(
-                        TextButton(
-                          onPressed: onOpenDetail,
-                          child: const Text('Open full detail'),
-                        ),
-                        disabled: onOpenDetail == null,
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          dimIf(
-                            isKilledGhost || onKill == null,
-                            wrapDisabledTap(
-                              _GradientKillButton(
-                                onPressed: onKill,
-                                label: isKilledGhost ? 'Killed' : 'Kill',
-                                scheme: scheme,
-                              ),
-                              disabled: onKill == null,
-                            ),
-                          ),
-                          dimIf(
-                            isKilledGhost || suspended,
-                            wrapDisabledTap(
-                              _GhostProcessButton(
-                                scheme: scheme,
-                                icon: Icons.pause_circle_outline_rounded,
-                                label: 'Suspend',
-                                onPressed: isKilledGhost || suspended
-                                    ? null
-                                    : () => context.read<ProcessBloc>().sendCommand({
-                                          'type': 'suspend_process',
-                                          'pid': p.pid,
-                                        }),
-                              ),
-                              disabled: isKilledGhost || suspended,
-                            ),
-                          ),
-                          dimIf(
-                            isKilledGhost || !suspended,
-                            wrapDisabledTap(
-                              _GhostProcessButton(
-                                scheme: scheme,
-                                icon: Icons.play_circle_outline_rounded,
-                                label: 'Resume',
-                                dimmed: isKilledGhost || !suspended,
-                                onPressed: isKilledGhost || !suspended
-                                    ? null
-                                    : () => context.read<ProcessBloc>().sendCommand({
-                                          'type': 'resume_process',
-                                          'pid': p.pid,
-                                        }),
-                              ),
-                              disabled: isKilledGhost || !suspended,
-                            ),
-                          ),
-                          dimIf(
-                            isKilledGhost,
-                            wrapDisabledTap(
-                              OutlinedButton.icon(
-                                onPressed: isKilledGhost
-                                    ? null
-                                    : () => context.read<ProcessBloc>().sendCommand({
-                                          'type': 'flag_process',
-                                          'name': p.name,
-                                        }),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: scheme.outline,
-                                  side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.3)),
-                                ),
-                                icon: const Icon(Icons.flag_outlined, size: 18),
-                                label: const Text('Flag'),
-                              ),
-                              disabled: isKilledGhost,
-                            ),
-                          ),
-                          if (onDismissGhost != null)
-                            OutlinedButton(
-                              onPressed: onDismissGhost,
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: scheme.error,
-                                side: BorderSide(color: scheme.error.withValues(alpha: 0.45)),
-                                backgroundColor: scheme.errorContainer.withValues(alpha: 0.16),
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                              ),
-                              child: Text(
-                                'Dismiss',
-                                style: GoogleFonts.manrope(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -851,34 +1061,34 @@ class _GradientKillButton extends StatelessWidget {
         onTap: onPressed,
         borderRadius: BorderRadius.circular(EmDesign.radiusMd),
         child: Ink(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(EmDesign.radiusMd),
-              gradient: LinearGradient(
-                colors: [scheme.primary, scheme.primaryContainer],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+            gradient: LinearGradient(
+              colors: [scheme.primary, scheme.primaryContainer],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.cancel_rounded, size: 18, color: scheme.onPrimary),
-                  const SizedBox(width: 8),
-                  Text(
-                    label,
-                    style: GoogleFonts.manrope(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: scheme.onPrimary,
-                    ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.cancel_rounded, size: 18, color: scheme.onPrimary),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: GoogleFonts.manrope(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: scheme.onPrimary,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
+      ),
     );
   }
 }

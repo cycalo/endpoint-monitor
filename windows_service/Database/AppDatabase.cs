@@ -15,10 +15,16 @@ public sealed class AppDatabase(ILogger<AppDatabase> logger)
         _db = new SQLiteAsyncConnection(path);
         await _db.CreateTableAsync<SysmonEventRow>().ConfigureAwait(false);
         await _db.CreateTableAsync<FlaggedProcessRow>().ConfigureAwait(false);
+        await TryAddFlaggedAddedAtColumnAsync().ConfigureAwait(false);
         await _db.CreateTableAsync<FirewallBlockRow>().ConfigureAwait(false);
+        await _db.CreateTableAsync<FirewallProcessBlockRow>().ConfigureAwait(false);
+        await TryAddFirewallSourceProcessColumnAsync().ConfigureAwait(false);
+        await TryAddFirewallRemotePortExpiresColumnsAsync().ConfigureAwait(false);
         await _db.CreateTableAsync<AuditLogRow>().ConfigureAwait(false);
         await _db.CreateTableAsync<IsolationStateRow>().ConfigureAwait(false);
         await _db.CreateTableAsync<BadIpRow>().ConfigureAwait(false);
+        await TryMigrateBadIpColumnsAsync().ConfigureAwait(false);
+        await _db.CreateTableAsync<AlertHistoryRow>().ConfigureAwait(false);
         await _db.CreateTableAsync<AlertAckRow>().ConfigureAwait(false);
 
         var iso = await _db.Table<IsolationStateRow>().FirstOrDefaultAsync().ConfigureAwait(false);
@@ -58,10 +64,42 @@ public sealed class AppDatabase(ILogger<AppDatabase> logger)
         return rows.Select(r => r.Name).ToList();
     }
 
+    public async Task<IReadOnlyList<FlaggedProcessRow>> GetFlaggedProcessesAsync(CancellationToken cancellationToken = default)
+    {
+        if (_db == null) return [];
+        return await _db.Table<FlaggedProcessRow>().ToListAsync().ConfigureAwait(false);
+    }
+
     public async Task AddFlagAsync(string name, CancellationToken cancellationToken = default)
     {
         if (_db == null) return;
-        await _db.InsertOrReplaceAsync(new FlaggedProcessRow { Name = name }).ConfigureAwait(false);
+        var existing = await _db.Table<FlaggedProcessRow>().Where(x => x.Name == name).FirstOrDefaultAsync().ConfigureAwait(false);
+        var addedAt = string.IsNullOrEmpty(existing?.AddedAt)
+            ? DateTime.UtcNow.ToString("O")
+            : existing!.AddedAt;
+        await _db.InsertOrReplaceAsync(new FlaggedProcessRow { Name = name, AddedAt = addedAt }).ConfigureAwait(false);
+    }
+
+    private async Task TryAddFlaggedAddedAtColumnAsync()
+    {
+        if (_db == null) return;
+        try
+        {
+            await _db.ExecuteAsync("ALTER TABLE FlaggedProcesses ADD COLUMN AddedAt TEXT NOT NULL DEFAULT ''").ConfigureAwait(false);
+        }
+        catch
+        {
+        }
+
+        var rows = await _db.Table<FlaggedProcessRow>().ToListAsync().ConfigureAwait(false);
+        foreach (var r in rows)
+        {
+            if (string.IsNullOrEmpty(r.AddedAt))
+            {
+                r.AddedAt = DateTime.UtcNow.ToString("O");
+                await _db.UpdateAsync(r).ConfigureAwait(false);
+            }
+        }
     }
 
     public async Task RemoveFlagAsync(string name, CancellationToken cancellationToken = default)
@@ -76,15 +114,72 @@ public sealed class AppDatabase(ILogger<AppDatabase> logger)
         return await _db.Table<FirewallBlockRow>().ToListAsync().ConfigureAwait(false);
     }
 
-    public async Task AddFirewallBlockAsync(string ip, string direction, CancellationToken cancellationToken = default)
+    public async Task AddFirewallBlockAsync(string ip, string direction, string? sourceProcessName, int remotePort = 0, string? expiresAtUtc = null, CancellationToken cancellationToken = default)
     {
         if (_db == null) return;
         await _db.InsertOrReplaceAsync(new FirewallBlockRow
         {
             Ip = ip,
             Direction = direction,
-            CreatedAt = DateTime.UtcNow.ToString("O")
+            CreatedAt = DateTime.UtcNow.ToString("O"),
+            SourceProcessName = sourceProcessName ?? "",
+            RemotePort = remotePort,
+            ExpiresAt = expiresAtUtc ?? ""
         }).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<FirewallProcessBlockRow>> GetFirewallProcessBlocksAsync(CancellationToken cancellationToken = default)
+    {
+        if (_db == null) return [];
+        return await _db.Table<FirewallProcessBlockRow>().ToListAsync().ConfigureAwait(false);
+    }
+
+    public async Task AddFirewallProcessBlockAsync(string ruleKey, string processName, string direction, string executablePath, string? expiresAtUtc, CancellationToken cancellationToken = default)
+    {
+        if (_db == null) return;
+        await _db.InsertOrReplaceAsync(new FirewallProcessBlockRow
+        {
+            RuleKey = ruleKey,
+            ProcessName = processName,
+            Direction = direction,
+            ExecutablePath = executablePath,
+            CreatedAt = DateTime.UtcNow.ToString("O"),
+            ExpiresAt = expiresAtUtc ?? ""
+        }).ConfigureAwait(false);
+    }
+
+    public async Task RemoveFirewallProcessBlockAsync(string ruleKey, CancellationToken cancellationToken = default)
+    {
+        if (_db == null) return;
+        await _db.DeleteAsync<FirewallProcessBlockRow>(ruleKey).ConfigureAwait(false);
+    }
+
+    private async Task TryAddFirewallSourceProcessColumnAsync()
+    {
+        if (_db == null) return;
+        try
+        {
+            await _db.ExecuteAsync("ALTER TABLE FirewallBlocks ADD COLUMN SourceProcessName TEXT NOT NULL DEFAULT ''").ConfigureAwait(false);
+        }
+        catch
+        {
+            // Column already present on existing DBs.
+        }
+    }
+
+    private async Task TryAddFirewallRemotePortExpiresColumnsAsync()
+    {
+        if (_db == null) return;
+        try
+        {
+            await _db.ExecuteAsync("ALTER TABLE FirewallBlocks ADD COLUMN RemotePort INTEGER NOT NULL DEFAULT 0").ConfigureAwait(false);
+        }
+        catch { }
+        try
+        {
+            await _db.ExecuteAsync("ALTER TABLE FirewallBlocks ADD COLUMN ExpiresAt TEXT NOT NULL DEFAULT ''").ConfigureAwait(false);
+        }
+        catch { }
     }
 
     public async Task RemoveFirewallBlockAsync(string ip, CancellationToken cancellationToken = default)
@@ -127,13 +222,192 @@ public sealed class AppDatabase(ILogger<AppDatabase> logger)
     public async Task<bool> IsBadIpAsync(string ip, CancellationToken cancellationToken = default)
     {
         if (_db == null) return false;
-        return await _db.Table<BadIpRow>().Where(x => x.Ip == ip).CountAsync() > 0;
+        var row = await _db.Table<BadIpRow>().Where(x => x.Ip == ip).FirstOrDefaultAsync().ConfigureAwait(false);
+        if (row == null) return false;
+        if (!string.IsNullOrEmpty(row.ExpiresAt) &&
+            DateTime.TryParse(row.ExpiresAt, out var exp) &&
+            exp <= DateTime.UtcNow)
+            return false;
+        return true;
+    }
+
+    /// <summary>Lookup metadata for an IP if it is active in the threat list.</summary>
+    public async Task<BadIpRow?> GetBadIpRowAsync(string ip, CancellationToken cancellationToken = default)
+    {
+        if (_db == null) return null;
+        var row = await _db.Table<BadIpRow>().Where(x => x.Ip == ip).FirstOrDefaultAsync().ConfigureAwait(false);
+        if (row == null) return null;
+        if (!string.IsNullOrEmpty(row.ExpiresAt) &&
+            DateTime.TryParse(row.ExpiresAt, out var exp) &&
+            exp <= DateTime.UtcNow)
+            return null;
+        return row;
     }
 
     public async Task AddBadIpAsync(string ip, CancellationToken cancellationToken = default)
     {
         if (_db == null) return;
-        await _db.InsertOrReplaceAsync(new BadIpRow { Ip = ip }).ConfigureAwait(false);
+        await _db.InsertOrReplaceAsync(new BadIpRow
+        {
+            Ip = ip,
+            Source = "manual",
+            Category = "blocklist",
+            AddedAt = DateTime.UtcNow.ToString("O"),
+            ExpiresAt = ""
+        }).ConfigureAwait(false);
+    }
+
+    public async Task UpsertThreatIntelIpAsync(string ip, string source, string category, string? expiresAtIso, CancellationToken cancellationToken = default)
+    {
+        if (_db == null || string.IsNullOrWhiteSpace(ip)) return;
+        await _db.InsertOrReplaceAsync(new BadIpRow
+        {
+            Ip = ip.Trim(),
+            Source = source,
+            Category = string.IsNullOrWhiteSpace(category) ? "malicious" : category,
+            AddedAt = DateTime.UtcNow.ToString("O"),
+            ExpiresAt = expiresAtIso ?? ""
+        }).ConfigureAwait(false);
+    }
+
+    public async Task<int> DeleteExpiredBadIpsAsync(CancellationToken cancellationToken = default)
+    {
+        if (_db == null) return 0;
+        var now = DateTime.UtcNow;
+        var all = await _db.Table<BadIpRow>().ToListAsync().ConfigureAwait(false);
+        var n = 0;
+        foreach (var r in all)
+        {
+            if (string.IsNullOrEmpty(r.ExpiresAt)) continue;
+            if (!DateTime.TryParse(r.ExpiresAt, out var exp) || exp > now) continue;
+            await _db.DeleteAsync(r).ConfigureAwait(false);
+            n++;
+        }
+        return n;
+    }
+
+    public async Task<IReadOnlyList<BadIpRow>> GetActiveBadIpsAsync(CancellationToken cancellationToken = default)
+    {
+        if (_db == null) return [];
+        var now = DateTime.UtcNow;
+        var list = await _db.Table<BadIpRow>().ToListAsync().ConfigureAwait(false);
+        return list.Where(r =>
+        {
+            if (string.IsNullOrEmpty(r.ExpiresAt)) return true;
+            return DateTime.TryParse(r.ExpiresAt, out var exp) && exp > now;
+        }).ToList();
+    }
+
+    private async Task TryMigrateBadIpColumnsAsync()
+    {
+        if (_db == null) return;
+        foreach (var sql in new[]
+                 {
+                     "ALTER TABLE BadIpList ADD COLUMN Source TEXT NOT NULL DEFAULT ''",
+                     "ALTER TABLE BadIpList ADD COLUMN AddedAt TEXT NOT NULL DEFAULT ''",
+                     "ALTER TABLE BadIpList ADD COLUMN ExpiresAt TEXT NOT NULL DEFAULT ''",
+                     "ALTER TABLE BadIpList ADD COLUMN Category TEXT NOT NULL DEFAULT ''"
+                 })
+        {
+            try
+            {
+                await _db.ExecuteAsync(sql).ConfigureAwait(false);
+            }
+            catch
+            {
+                // column exists
+            }
+        }
+
+        var rows = await _db.Table<BadIpRow>().ToListAsync().ConfigureAwait(false);
+        foreach (var r in rows)
+        {
+            if (string.IsNullOrEmpty(r.AddedAt))
+            {
+                r.AddedAt = DateTime.UtcNow.ToString("O");
+                r.Category = string.IsNullOrEmpty(r.Category) ? "legacy" : r.Category;
+                await _db.UpdateAsync(r).ConfigureAwait(false);
+            }
+        }
+    }
+
+    public async Task AppendAlertHistoryAsync(string type, string occurredAtIso, CancellationToken cancellationToken = default)
+    {
+        if (_db == null) return;
+        await _db.InsertAsync(new AlertHistoryRow
+        {
+            OccurredAt = occurredAtIso,
+            Type = type
+        }).ConfigureAwait(false);
+    }
+
+    public async Task PruneAlertHistoryAsync(TimeSpan retain, CancellationToken cancellationToken = default)
+    {
+        if (_db == null) return;
+        var cutoff = DateTime.UtcNow - retain;
+        var rows = await _db.Table<AlertHistoryRow>().ToListAsync().ConfigureAwait(false);
+        foreach (var r in rows)
+        {
+            if (DateTime.TryParse(r.OccurredAt, out var t) && t < cutoff)
+                await _db.DeleteAsync(r).ConfigureAwait(false);
+        }
+    }
+
+    public async Task<IReadOnlyList<TimelineHourDto>> GetTimelineAsync(int hours, CancellationToken cancellationToken = default)
+    {
+        if (_db == null) return [];
+        hours = Math.Clamp(hours, 1, 168);
+        var now = DateTime.UtcNow;
+        var floor = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, DateTimeKind.Utc);
+        var bucketStarts = new List<DateTime>();
+        for (var i = hours - 1; i >= 0; i--)
+            bucketStarts.Add(floor.AddHours(-i));
+
+        static DateTime FloorHour(DateTime t) =>
+            new(t.Year, t.Month, t.Day, t.Hour, 0, 0, DateTimeKind.Utc);
+
+        var minTime = bucketStarts[0];
+        var dict = bucketStarts.ToDictionary(
+            x => x.ToString("O"),
+            x => new TimelineHourDto { HourStart = x.ToString("O") });
+
+        var evs = await _db.Table<SysmonEventRow>().ToListAsync().ConfigureAwait(false);
+        foreach (var e in evs)
+        {
+            if (!DateTime.TryParse(e.Timestamp, null, System.Globalization.DateTimeStyles.RoundtripKind, out var t))
+                continue;
+            var utc = t.Kind == DateTimeKind.Utc ? t : t.ToUniversalTime();
+            if (utc < minTime) continue;
+            var fh = FloorHour(utc);
+            var k = fh.ToString("O");
+            if (!dict.TryGetValue(k, out var dto)) continue;
+            switch (e.Type)
+            {
+                case "ProcessCreate":
+                    dto.ProcessCreate++;
+                    break;
+                case "NetworkConnect":
+                    dto.NetworkConnect++;
+                    break;
+                case "DnsQuery":
+                    dto.DnsQuery++;
+                    break;
+            }
+        }
+
+        var ah = await _db.Table<AlertHistoryRow>().ToListAsync().ConfigureAwait(false);
+        foreach (var a in ah)
+        {
+            if (!DateTime.TryParse(a.OccurredAt, null, System.Globalization.DateTimeStyles.RoundtripKind, out var t))
+                continue;
+            var utc = t.Kind == DateTimeKind.Utc ? t : t.ToUniversalTime();
+            if (utc < minTime) continue;
+            var k = FloorHour(utc).ToString("O");
+            if (dict.TryGetValue(k, out var dto))
+                dto.Alerts++;
+        }
+
+        return dict.Values.OrderBy(x => x.HourStart).ToList();
     }
 
     public async Task<int> CountEventsSinceAsync(DateTime utcFrom, CancellationToken cancellationToken = default)

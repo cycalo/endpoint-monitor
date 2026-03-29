@@ -47,6 +47,19 @@ public sealed class NetworkCollector(ILogger<NetworkCollector> logger, GeoIpLook
     private static string BuildConnectionKey(NetworkConnection c)
         => $"{c.Pid}|{c.LocalAddress}|{c.LocalPort}|{c.RemoteAddress}|{c.RemotePort}|{c.Protocol}";
 
+    /// <summary>
+    /// <see cref="MSFT_NetTCPConnection.OwningProcess"/> can be 0; Win32_Process then resolves PID 0
+    /// to "System Idle Process", which is misleading — idle does not own sockets. Show a neutral label.
+    /// </summary>
+    private static string FormatOwningProcess(int pid, string? nameFromWmi)
+    {
+        if (pid <= 0)
+            return "Unattributed";
+        if (string.IsNullOrWhiteSpace(nameFromWmi))
+            return $"PID {pid}";
+        return nameFromWmi;
+    }
+
     private static Dictionary<int, string> GetProcessNames()
     {
         var map = new Dictionary<int, string>();
@@ -92,7 +105,7 @@ public sealed class NetworkCollector(ILogger<NetworkCollector> logger, GeoIpLook
                     list.Add(new NetworkConnection
                     {
                         Pid = pid,
-                        ProcessName = pname ?? "",
+                        ProcessName = FormatOwningProcess(pid, pname),
                         LocalAddress = mo["LocalAddress"]?.ToString() ?? "",
                         LocalPort = mo["LocalPort"] != null ? Convert.ToInt32(mo["LocalPort"]) : 0,
                         RemoteAddress = mo["RemoteAddress"]?.ToString() ?? "",
@@ -130,7 +143,7 @@ public sealed class NetworkCollector(ILogger<NetworkCollector> logger, GeoIpLook
                     list.Add(new NetworkConnection
                     {
                         Pid = pid,
-                        ProcessName = pname ?? "",
+                        ProcessName = FormatOwningProcess(pid, pname),
                         LocalAddress = mo["LocalAddress"]?.ToString() ?? "",
                         LocalPort = mo["LocalPort"] != null ? Convert.ToInt32(mo["LocalPort"]) : 0,
                         RemoteAddress = "",

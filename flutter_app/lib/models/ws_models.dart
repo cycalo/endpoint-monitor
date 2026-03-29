@@ -81,6 +81,78 @@ class NetworkConnection {
         city: j['city'] as String? ?? '',
         org: j['org'] as String? ?? '',
       );
+
+  /// Synthetic row when the IP is blocked but no live socket appears in the snapshot.
+  /// [meta] is captured when the user tapped Block (process name, PID, ports).
+  factory NetworkConnection.firewallBlockedPlaceholder(
+    String normalizedRemoteIp,
+    BlockedRemoteMeta meta,
+  ) {
+    final name = meta.processName.trim().isNotEmpty
+        ? meta.processName.trim()
+        : 'Unknown process';
+    return NetworkConnection(
+      pid: meta.pid,
+      processName: name,
+      localAddress: meta.localAddress,
+      localPort: meta.localPort,
+      remoteAddress: normalizedRemoteIp,
+      remotePort: meta.remotePort,
+      protocol: meta.protocol,
+      state: 'BLOCKED',
+      durationSeconds: 0,
+      countryCode: '',
+      countryName: '',
+      city: '',
+      org: '',
+    );
+  }
+}
+
+/// Last-known connection fields when the user blocked a remote IP (socket may disappear).
+class BlockedRemoteMeta {
+  const BlockedRemoteMeta({
+    this.processName = '',
+    this.pid = 0,
+    this.remotePort = 0,
+    this.protocol = '',
+    this.localAddress = '',
+    this.localPort = 0,
+  });
+
+  final String processName;
+  final int pid;
+  final int remotePort;
+  final String protocol;
+  final String localAddress;
+  final int localPort;
+
+  factory BlockedRemoteMeta.fromConnection(NetworkConnection n) => BlockedRemoteMeta(
+        processName: n.processName,
+        pid: n.pid,
+        remotePort: n.remotePort,
+        protocol: n.protocol,
+        localAddress: n.localAddress,
+        localPort: n.localPort,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'processName': processName,
+        'pid': pid,
+        'remotePort': remotePort,
+        'protocol': protocol,
+        'localAddress': localAddress,
+        'localPort': localPort,
+      };
+
+  factory BlockedRemoteMeta.fromJson(Map<String, dynamic> j) => BlockedRemoteMeta(
+        processName: j['processName'] as String? ?? '',
+        pid: (j['pid'] as num?)?.toInt() ?? 0,
+        remotePort: (j['remotePort'] as num?)?.toInt() ?? 0,
+        protocol: j['protocol'] as String? ?? '',
+        localAddress: j['localAddress'] as String? ?? '',
+        localPort: (j['localPort'] as num?)?.toInt() ?? 0,
+      );
 }
 
 class SysmonEvent {

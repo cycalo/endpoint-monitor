@@ -18,6 +18,8 @@ builder.Host.UseWindowsService();
 
 builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection("Auth"));
 builder.Services.Configure<ServerOptions>(builder.Configuration.GetSection("Server"));
+builder.Services.Configure<VirusTotalOptions>(builder.Configuration.GetSection("VirusTotal"));
+builder.Services.Configure<ThreatIntelOptions>(builder.Configuration.GetSection("ThreatIntel"));
 
 builder.Services.AddMemoryCache();
 builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection("IpRateLimiting"));
@@ -42,12 +44,22 @@ builder.Services.AddHttpClient(nameof(SysmonInstaller), client =>
 {
     client.Timeout = TimeSpan.FromMinutes(5);
 });
+builder.Services.AddHttpClient("virustotal", client =>
+{
+    client.BaseAddress = new Uri("https://www.virustotal.com/api/v3/");
+    client.Timeout = TimeSpan.FromSeconds(45);
+});
+builder.Services.AddHttpClient("threat_intel", client => { client.Timeout = TimeSpan.FromMinutes(2); });
 builder.Services.AddSingleton<SysmonInstaller>();
+builder.Services.AddSingleton<VirusTotalReputationService>();
+builder.Services.AddSingleton<ThreatIntelUpdater>();
 
 builder.Services.AddHostedService<MonitorBroadcastHostedService>();
 builder.Services.AddHostedService<SystemInfoHostedService>();
 builder.Services.AddHostedService<SysmonHostedService>();
 builder.Services.AddHostedService<TrayIconHostedService>();
+builder.Services.AddHostedService<FirewallBlockExpiryHostedService>();
+builder.Services.AddHostedService<ThreatIntelHostedService>();
 
 var serverOptions = builder.Configuration.GetSection("Server").Get<ServerOptions>() ?? new ServerOptions();
 builder.WebHost.ConfigureKestrel(k =>
@@ -158,7 +170,15 @@ app.Map("/ws", async context =>
             var type = typeEl.GetString() ?? "";
             if (type == "ping")
             {
-                var pong = JsonSerializer.Serialize(new { type = "pong", data = (object?)null }, AppJson.Options);
+                long? clientTs = null;
+                if (root.TryGetProperty("clientTs", out var tsEl) && tsEl.TryGetInt64(out var cts))
+                    clientTs = cts;
+                // Avoid ternary with two anonymous types — .NET 10 overload resolution picks the wrong Serialize overload.
+                string pong;
+                if (clientTs.HasValue)
+                    pong = JsonSerializer.Serialize(new { type = "pong", clientTs = clientTs.Value }, AppJson.Options);
+                else
+                    pong = JsonSerializer.Serialize(new { type = "pong", data = (object?)null }, AppJson.Options);
                 var bytes = Encoding.UTF8.GetBytes(pong);
                 await ws.SendAsync(bytes, WebSocketMessageType.Text, true, context.RequestAborted);
                 continue;
@@ -186,6 +206,16 @@ static string BuildOutboundJson(string originalType, CommandResult r)
         return JsonSerializer.Serialize(new { type = "browser_history", data = r.Data }, AppJson.Options);
     if (originalType == "get_installed_software" && r is { Success: true, Data: not null })
         return JsonSerializer.Serialize(new { type = "installed_software", data = r.Data }, AppJson.Options);
+    if (originalType == "get_firewall_snapshot" && r is { Success: true, Data: not null })
+        return JsonSerializer.Serialize(new { type = "firewall", data = r.Data }, AppJson.Options);
+    if (originalType == "get_flagged_processes" && r is { Success: true, Data: not null })
+        return JsonSerializer.Serialize(new { type = "flagged_processes", data = r.Data }, AppJson.Options);
+    if (originalType == "get_timeline" && r is { Success: true, Data: not null })
+        return JsonSerializer.Serialize(new { type = "timeline", data = r.Data }, AppJson.Options);
+    if (originalType is "get_threat_intel_status" or "refresh_threat_intel" && r is { Success: true, Data: not null })
+        return JsonSerializer.Serialize(new { type = "threat_intel_status", data = r.Data }, AppJson.Options);
+    if (originalType == "get_threat_intel_entries" && r is { Success: true, Data: not null })
+        return JsonSerializer.Serialize(new { type = "threat_intel_entries", data = r.Data }, AppJson.Options);
     return JsonSerializer.Serialize(new
     {
         type = "command_result",

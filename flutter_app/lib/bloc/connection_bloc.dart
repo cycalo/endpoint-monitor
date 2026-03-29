@@ -14,27 +14,46 @@ class EmConnectionState extends Equatable {
     required this.status,
     this.message,
     this.host,
+    this.connectedAt,
+    this.lastTestPingMs,
+    this.lastTestPingError,
   });
 
   final ConnectionStatus status;
   final String? message;
   final String? host;
 
+  /// When the foreground task reported `connected` (WebSocket open).
+  final DateTime? connectedAt;
+
+  /// Result of last Settings "Test connection" latency probe.
+  final int? lastTestPingMs;
+  final String? lastTestPingError;
+
   EmConnectionState copyWith({
     ConnectionStatus? status,
     String? message,
     String? host,
+    DateTime? connectedAt,
+    bool clearConnectedAt = false,
+    int? lastTestPingMs,
+    String? lastTestPingError,
+    bool clearPingTest = false,
   }) =>
       EmConnectionState(
         status: status ?? this.status,
         message: message ?? this.message,
         host: host ?? this.host,
+        connectedAt: clearConnectedAt ? null : connectedAt ?? this.connectedAt,
+        lastTestPingMs: clearPingTest ? null : lastTestPingMs ?? this.lastTestPingMs,
+        lastTestPingError: clearPingTest ? null : lastTestPingError ?? this.lastTestPingError,
       );
 
   bool get isConnected => status == ConnectionStatus.connected;
 
   @override
-  List<Object?> get props => [status, message, host];
+  List<Object?> get props =>
+      [status, message, host, connectedAt, lastTestPingMs, lastTestPingError];
 }
 
 abstract class ConnectionEvent extends Equatable {
@@ -61,6 +80,10 @@ class ConnectionDisconnectRequested extends ConnectionEvent {
   const ConnectionDisconnectRequested();
 }
 
+class ConnectionPingMeasureRequested extends ConnectionEvent {
+  const ConnectionPingMeasureRequested();
+}
+
 class ConnectionTaskMessage extends ConnectionEvent {
   const ConnectionTaskMessage(this.raw);
 
@@ -75,6 +98,7 @@ class ConnectionBloc extends Bloc<ConnectionEvent, EmConnectionState> {
     on<ConnectionStarted>(_onStarted);
     on<ConnectionConnectRequested>(_onConnect);
     on<ConnectionDisconnectRequested>(_onDisconnect);
+    on<ConnectionPingMeasureRequested>(_onPingMeasure);
     on<ConnectionTaskMessage>(_onTaskMessage);
     FlutterForegroundTask.addTaskDataCallback(_taskCallback);
   }
@@ -140,21 +164,48 @@ class ConnectionBloc extends Bloc<ConnectionEvent, EmConnectionState> {
     emit(const EmConnectionState(status: ConnectionStatus.disconnected));
   }
 
+  void _onPingMeasure(ConnectionPingMeasureRequested event, Emitter<EmConnectionState> emit) {
+    emit(state.copyWith(clearPingTest: true));
+    FlutterForegroundTask.sendDataToTask(<String, Object?>{'action': 'em_measure_ping'});
+  }
+
   void _onTaskMessage(ConnectionTaskMessage event, Emitter<EmConnectionState> emit) {
     final t = event.raw['type']?.toString();
+    if (t == 'ping_rtt') {
+      final ok = event.raw['ok'] == true;
+      final ms = event.raw['ms'];
+      final parsedMs = ms is int ? ms : int.tryParse(ms?.toString() ?? '');
+      if (ok && parsedMs != null) {
+        emit(state.copyWith(lastTestPingMs: parsedMs, lastTestPingError: null));
+      } else {
+        emit(state.copyWith(
+          lastTestPingMs: null,
+          lastTestPingError: event.raw['message']?.toString() ?? 'Ping failed',
+        ));
+      }
+      return;
+    }
     if (t == 'connection') {
       final s = event.raw['state']?.toString() ?? '';
       final msg = event.raw['message']?.toString();
       switch (s) {
         case 'connected':
-          emit(state.copyWith(status: ConnectionStatus.connected, message: null));
+          emit(state.copyWith(
+            status: ConnectionStatus.connected,
+            message: null,
+            connectedAt: DateTime.now(),
+          ));
           break;
         case 'connecting':
           emit(state.copyWith(status: ConnectionStatus.connecting));
           break;
         case 'disconnected':
         case 'error':
-          emit(state.copyWith(status: s == 'error' ? ConnectionStatus.error : ConnectionStatus.disconnected, message: msg));
+          emit(state.copyWith(
+            status: s == 'error' ? ConnectionStatus.error : ConnectionStatus.disconnected,
+            message: msg,
+            clearConnectedAt: true,
+          ));
           break;
         default:
           break;

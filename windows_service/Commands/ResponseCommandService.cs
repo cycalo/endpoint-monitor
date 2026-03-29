@@ -1,6 +1,9 @@
 using System.Diagnostics;
+using System.Management;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using EndpointMonitorService.Database;
 using EndpointMonitorService.Options;
 using EndpointMonitorService.Services;
@@ -13,9 +16,34 @@ public sealed class ResponseCommandService(
     ILogger<ResponseCommandService> logger,
     AppDatabase database,
     IOptions<ServerOptions> serverOptions,
+    WebSocketConnectionManager webSockets,
     Browser.BrowserHistoryReader browserHistoryReader,
-    Collectors.InstalledSoftwareCollector installedSoftwareCollector)
+    Collectors.InstalledSoftwareCollector installedSoftwareCollector,
+    VirusTotalReputationService virusTotal,
+    ThreatIntelUpdater threatIntel)
 {
+    /// <summary>
+    /// Firewall snapshots must always include <c>sourceProcessName</c> on each block (string or JSON null).
+    /// <see cref="AppJson.Options"/> uses <see cref="JsonIgnoreCondition.WhenWritingNull"/>, which would omit
+    /// nulls if we used the global options here.
+    /// </summary>
+    private static readonly JsonSerializerOptions FirewallSnapshotJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.Never
+    };
+
+    private sealed record FirewallBlockJson(
+        string blockKind,
+        string? ip,
+        string direction,
+        string createdAt,
+        string? sourceProcessName,
+        int? remotePort,
+        string? expiresAt,
+        string? processName,
+        string? executablePath);
+
     private static readonly HashSet<string> ProtectedNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "System", "Registry", "csrss.exe", "lsass.exe", "smss.exe", "wininit.exe", "services.exe",
@@ -42,6 +70,16 @@ public sealed class ResponseCommandService(
                 "uninstall_software" => await UninstallSoftwareAsync(root, clientIp, cancellationToken).ConfigureAwait(false),
                 "get_recent_events" => await GetRecentEventsAsync(root, cancellationToken).ConfigureAwait(false),
                 "ack_alert" => await AckAlertAsync(root, cancellationToken).ConfigureAwait(false),
+                "get_firewall_snapshot" => await GetFirewallSnapshotAsync(cancellationToken).ConfigureAwait(false),
+                "get_flagged_processes" => await GetFlaggedProcessesAsync(cancellationToken).ConfigureAwait(false),
+                "block_outbound_port" => await BlockOutboundPortAsync(root, clientIp, cancellationToken).ConfigureAwait(false),
+                "block_process" => await BlockProcessAsync(root, clientIp, cancellationToken).ConfigureAwait(false),
+                "unblock_process" => await UnblockProcessAsync(root, clientIp, cancellationToken).ConfigureAwait(false),
+                "get_timeline" => await GetTimelineAsync(root, cancellationToken).ConfigureAwait(false),
+                "check_reputation" => await CheckReputationAsync(root, cancellationToken).ConfigureAwait(false),
+                "get_threat_intel_status" => await GetThreatIntelStatusAsync(cancellationToken).ConfigureAwait(false),
+                "get_threat_intel_entries" => await GetThreatIntelEntriesAsync(cancellationToken).ConfigureAwait(false),
+                "refresh_threat_intel" => await RefreshThreatIntelAsync(clientIp, cancellationToken).ConfigureAwait(false),
                 _ => new CommandResult(false, type, "unknown_command")
             };
         }
@@ -87,30 +125,191 @@ public sealed class ResponseCommandService(
         }
     }
 
+    private static string NormalizeFirewallDirection(string? dir)
+    {
+        var d = (dir ?? "outbound").Trim().ToLowerInvariant();
+        return d switch
+        {
+            "inbound" => "inbound",
+            "both" => "both",
+            _ => "outbound"
+        };
+    }
+
+    private static string SanitizeIpForRuleName(string ip) =>
+        ip.Replace(".", "_", StringComparison.Ordinal)
+            .Replace(":", "_", StringComparison.Ordinal)
+            .Replace("%", "_", StringComparison.Ordinal);
+
+    private static string? ParseExpiresAtUtc(JsonElement root)
+    {
+        if (!root.TryGetProperty("expiresInHours", out var el)) return null;
+        if (el.ValueKind == JsonValueKind.Null) return null;
+        if (el.ValueKind == JsonValueKind.String)
+        {
+            var s = el.GetString();
+            if (string.IsNullOrEmpty(s) || s.Equals("permanent", StringComparison.OrdinalIgnoreCase))
+                return null;
+            if (int.TryParse(s, out var hs) && hs > 0) return DateTime.UtcNow.AddHours(hs).ToString("O");
+            return null;
+        }
+        if (el.TryGetInt32(out var h) && h > 0) return DateTime.UtcNow.AddHours(h).ToString("O");
+        return null;
+    }
+
     private async Task<CommandResult> BlockIpAsync(JsonElement root, string? clientIp, CancellationToken cancellationToken)
     {
         var ip = root.GetProperty("ip").GetString() ?? "";
-        var dir = root.TryGetProperty("direction", out var d) ? d.GetString() ?? "outbound" : "outbound";
-        var ruleName = $"EM_BLOCK_{ip.Replace('.', '_')}";
-        var args = $"advfirewall firewall add rule name=\"{ruleName}\" dir=out action=block remoteip={ip}";
-        if (dir.Equals("inbound", StringComparison.OrdinalIgnoreCase))
-            args = $"advfirewall firewall add rule name=\"{ruleName}_in\" dir=in action=block remoteip={ip}";
+        var dirRaw = root.TryGetProperty("direction", out var d) ? d.GetString() : null;
+        var dir = NormalizeFirewallDirection(dirRaw);
+        var sourceProcess = root.TryGetProperty("sourceProcess", out var sp) ? sp.GetString() : null;
+        var remotePort = 0;
+        if (root.TryGetProperty("port", out var portEl) && portEl.TryGetInt32(out var rp) && rp is >= 1 and <= 65535)
+            remotePort = rp;
+        var expiresAt = ParseExpiresAtUtc(root);
+        var portArgs = remotePort > 0 ? $" remoteport={remotePort}" : "";
 
-        RunNetsh(args);
-        await database.AddFirewallBlockAsync(ip, dir, cancellationToken).ConfigureAwait(false);
+        var ruleSan = SanitizeIpForRuleName(ip);
+        var outRule = $"EM_BLOCK_{ruleSan}";
+        var inRule = $"{outRule}_in";
+
+        if (dir is "outbound" or "both")
+            RunNetsh($"advfirewall firewall add rule name=\"{outRule}\" dir=out action=block remoteip={ip}{portArgs}");
+        if (dir is "inbound" or "both")
+            RunNetsh($"advfirewall firewall add rule name=\"{inRule}\" dir=in action=block remoteip={ip}{portArgs}");
+
+        await database.AddFirewallBlockAsync(ip, dir, sourceProcess, remotePort, expiresAt, cancellationToken).ConfigureAwait(false);
         await database.AppendAuditAsync("block_ip", ip, clientIp, cancellationToken).ConfigureAwait(false);
+        await BroadcastFirewallAsync(cancellationToken).ConfigureAwait(false);
         return new CommandResult(true, "block_ip", "ok");
+    }
+
+    private async Task<CommandResult> BlockOutboundPortAsync(JsonElement root, string? clientIp, CancellationToken cancellationToken)
+    {
+        if (!root.TryGetProperty("port", out var pEl) || !pEl.TryGetInt32(out var port) || port is < 1 or > 65535)
+            return new CommandResult(false, "block_outbound_port", "invalid_port");
+        var key = $"port:{port}";
+        var expiresAt = ParseExpiresAtUtc(root);
+        RunNetsh($"advfirewall firewall delete rule name=\"EM_BLOCK_PORT_{port}_out\"");
+        RunNetsh($"advfirewall firewall add rule name=\"EM_BLOCK_PORT_{port}_out\" dir=out action=block protocol=tcp remoteport={port}");
+        await database.AddFirewallBlockAsync(key, "outbound", null, port, expiresAt, cancellationToken).ConfigureAwait(false);
+        await database.AppendAuditAsync("block_outbound_port", key, clientIp, cancellationToken).ConfigureAwait(false);
+        await BroadcastFirewallAsync(cancellationToken).ConfigureAwait(false);
+        return new CommandResult(true, "block_outbound_port", "ok");
+    }
+
+    private static string? TryGetExecutablePathForProcessName(string processName)
+    {
+        try
+        {
+            var n = processName.Replace("'", "''", StringComparison.Ordinal);
+            using var searcher = new ManagementObjectSearcher($"SELECT ExecutablePath FROM Win32_Process WHERE Name = '{n}'");
+            foreach (var o in searcher.Get())
+            {
+                if (o is ManagementObject mo)
+                {
+                    var path = mo["ExecutablePath"]?.ToString();
+                    if (!string.IsNullOrWhiteSpace(path)) return path;
+                }
+            }
+        }
+        catch
+        {
+            // ignore
+        }
+        return null;
+    }
+
+    private static string ProcessFirewallRuleKey(string processName, string dir) =>
+        $"EM_PROC_{SanitizeIpForRuleName(processName)}_{dir}";
+
+    private async Task<CommandResult> BlockProcessAsync(JsonElement root, string? clientIp, CancellationToken cancellationToken)
+    {
+        var name = root.GetProperty("name").GetString() ?? "";
+        if (string.IsNullOrWhiteSpace(name))
+            return new CommandResult(false, "block_process", "invalid_name");
+        if (!name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            name += ".exe";
+        var dir = NormalizeFirewallDirection(root.TryGetProperty("direction", out var d) ? d.GetString() : null);
+        var path = TryGetExecutablePathForProcessName(name);
+        if (string.IsNullOrWhiteSpace(path))
+            return new CommandResult(false, "block_process", "process_not_running_or_path_unavailable");
+        var ruleKey = ProcessFirewallRuleKey(name, dir);
+        var escaped = path.Replace("\"", "\\\"", StringComparison.Ordinal);
+        if (dir is "outbound" or "both")
+        {
+            RunNetsh($"advfirewall firewall delete rule name=\"{ruleKey}_out\"");
+            RunNetsh($"advfirewall firewall add rule name=\"{ruleKey}_out\" dir=out action=block program=\"{escaped}\"");
+        }
+        if (dir is "inbound" or "both")
+        {
+            RunNetsh($"advfirewall firewall delete rule name=\"{ruleKey}_in\"");
+            RunNetsh($"advfirewall firewall add rule name=\"{ruleKey}_in\" dir=in action=block program=\"{escaped}\"");
+        }
+        var expiresAt = ParseExpiresAtUtc(root);
+        await database.AddFirewallProcessBlockAsync(ruleKey, name, dir, path, expiresAt, cancellationToken).ConfigureAwait(false);
+        await database.AppendAuditAsync("block_process", name, clientIp, cancellationToken).ConfigureAwait(false);
+        await BroadcastFirewallAsync(cancellationToken).ConfigureAwait(false);
+        return new CommandResult(true, "block_process", "ok");
+    }
+
+    private async Task<CommandResult> UnblockProcessAsync(JsonElement root, string? clientIp, CancellationToken cancellationToken)
+    {
+        var name = root.GetProperty("name").GetString() ?? "";
+        if (!name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            name += ".exe";
+        var dir = NormalizeFirewallDirection(root.TryGetProperty("direction", out var d) ? d.GetString() : null);
+        var ruleKey = ProcessFirewallRuleKey(name, dir);
+        RunNetsh($"advfirewall firewall delete rule name=\"{ruleKey}_out\"");
+        RunNetsh($"advfirewall firewall delete rule name=\"{ruleKey}_in\"");
+        await database.RemoveFirewallProcessBlockAsync(ruleKey, cancellationToken).ConfigureAwait(false);
+        await database.AppendAuditAsync("unblock_process", name, clientIp, cancellationToken).ConfigureAwait(false);
+        await BroadcastFirewallAsync(cancellationToken).ConfigureAwait(false);
+        return new CommandResult(true, "unblock_process", "ok");
     }
 
     private async Task<CommandResult> UnblockIpAsync(JsonElement root, string? clientIp, CancellationToken cancellationToken)
     {
         var ip = root.GetProperty("ip").GetString() ?? "";
-        var ruleName = $"EM_BLOCK_{ip.Replace('.', '_')}";
-        RunNetsh($"advfirewall firewall delete rule name=\"{ruleName}\"");
-        RunNetsh($"advfirewall firewall delete rule name=\"{ruleName}_in\"");
+        if (ip.StartsWith("port:", StringComparison.OrdinalIgnoreCase) &&
+            int.TryParse(ip.AsSpan(5), out var p) && p is >= 1 and <= 65535)
+        {
+            RunNetsh($"advfirewall firewall delete rule name=\"EM_BLOCK_PORT_{p}_out\"");
+            await database.RemoveFirewallBlockAsync(ip, cancellationToken).ConfigureAwait(false);
+            await database.AppendAuditAsync("unblock_ip", ip, clientIp, cancellationToken).ConfigureAwait(false);
+            await BroadcastFirewallAsync(cancellationToken).ConfigureAwait(false);
+            return new CommandResult(true, "unblock_ip", "ok");
+        }
+        var ruleSan = SanitizeIpForRuleName(ip);
+        var outRule = $"EM_BLOCK_{ruleSan}";
+        var inRule = $"{outRule}_in";
+        RunNetsh($"advfirewall firewall delete rule name=\"{outRule}\"");
+        RunNetsh($"advfirewall firewall delete rule name=\"{inRule}\"");
         await database.RemoveFirewallBlockAsync(ip, cancellationToken).ConfigureAwait(false);
         await database.AppendAuditAsync("unblock_ip", ip, clientIp, cancellationToken).ConfigureAwait(false);
+        await BroadcastFirewallAsync(cancellationToken).ConfigureAwait(false);
         return new CommandResult(true, "unblock_ip", "ok");
+    }
+
+    public async Task PurgeExpiredFirewallBlocksAsync(CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        var ipRows = await database.GetFirewallBlocksAsync(cancellationToken).ConfigureAwait(false);
+        foreach (var row in ipRows)
+        {
+            if (string.IsNullOrEmpty(row.ExpiresAt)) continue;
+            if (!DateTime.TryParse(row.ExpiresAt, out var exp) || exp > now) continue;
+            var json = JsonSerializer.SerializeToElement(new Dictionary<string, string> { ["ip"] = row.Ip });
+            await UnblockIpAsync(json, null, cancellationToken).ConfigureAwait(false);
+        }
+        var procRows = await database.GetFirewallProcessBlocksAsync(cancellationToken).ConfigureAwait(false);
+        foreach (var row in procRows)
+        {
+            if (string.IsNullOrEmpty(row.ExpiresAt)) continue;
+            if (!DateTime.TryParse(row.ExpiresAt, out var exp) || exp > now) continue;
+            var json = JsonSerializer.SerializeToElement(new Dictionary<string, string> { ["name"] = row.ProcessName, ["direction"] = row.Direction });
+            await UnblockProcessAsync(json, null, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private async Task<CommandResult> IsolateAsync(string? clientIp, CancellationToken cancellationToken)
@@ -122,6 +321,7 @@ public sealed class ResponseCommandService(
         RunNetsh($"advfirewall firewall add rule name=\"EM_ISOLATE_ALLOW_MONITOR_OUT\" dir=out action=allow protocol=TCP localport={port}");
         await database.SetIsolationAsync(true, cancellationToken).ConfigureAwait(false);
         await database.AppendAuditAsync("isolate_machine", "on", clientIp, cancellationToken).ConfigureAwait(false);
+        await BroadcastFirewallAsync(cancellationToken).ConfigureAwait(false);
         return new CommandResult(true, "isolate_machine", "ok");
     }
 
@@ -133,7 +333,63 @@ public sealed class ResponseCommandService(
         RunNetsh("advfirewall firewall delete rule name=\"EM_ISOLATE_ALLOW_MONITOR_OUT\"");
         await database.SetIsolationAsync(false, cancellationToken).ConfigureAwait(false);
         await database.AppendAuditAsync("unisolate_machine", "off", clientIp, cancellationToken).ConfigureAwait(false);
+        await BroadcastFirewallAsync(cancellationToken).ConfigureAwait(false);
         return new CommandResult(true, "unisolate_machine", "ok");
+    }
+
+    private async Task<JsonElement> BuildFirewallDataElementAsync(CancellationToken cancellationToken)
+    {
+        var isolated = await database.GetIsolationAsync(cancellationToken).ConfigureAwait(false);
+        var rows = await database.GetFirewallBlocksAsync(cancellationToken).ConfigureAwait(false);
+        var blocks = new List<FirewallBlockJson>();
+        foreach (var b in rows)
+        {
+            var kind = b.Ip.StartsWith("port:", StringComparison.OrdinalIgnoreCase) ? "port" : "ip";
+            blocks.Add(new FirewallBlockJson(
+                kind,
+                b.Ip,
+                b.Direction,
+                b.CreatedAt,
+                string.IsNullOrEmpty(b.SourceProcessName) ? null : b.SourceProcessName,
+                b.RemotePort == 0 ? null : b.RemotePort,
+                string.IsNullOrEmpty(b.ExpiresAt) ? null : b.ExpiresAt,
+                null,
+                null));
+        }
+        foreach (var p in await database.GetFirewallProcessBlocksAsync(cancellationToken).ConfigureAwait(false))
+        {
+            blocks.Add(new FirewallBlockJson(
+                "process",
+                null,
+                p.Direction,
+                p.CreatedAt,
+                null,
+                null,
+                string.IsNullOrEmpty(p.ExpiresAt) ? null : p.ExpiresAt,
+                p.ProcessName,
+                string.IsNullOrEmpty(p.ExecutablePath) ? null : p.ExecutablePath));
+        }
+        return JsonSerializer.SerializeToElement(new { isolated, blocks }, FirewallSnapshotJsonOptions);
+    }
+
+    private async Task<CommandResult> GetFirewallSnapshotAsync(CancellationToken cancellationToken)
+    {
+        var data = await BuildFirewallDataElementAsync(cancellationToken).ConfigureAwait(false);
+        return new CommandResult(true, "get_firewall_snapshot", "ok", data);
+    }
+
+    private async Task BroadcastFirewallAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var data = await BuildFirewallDataElementAsync(cancellationToken).ConfigureAwait(false);
+            var json = JsonSerializer.Serialize(new { type = "firewall", data }, AppJson.Options);
+            await webSockets.BroadcastAsync(Encoding.UTF8.GetBytes(json), cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Firewall broadcast failed");
+        }
     }
 
     private async Task<CommandResult> SuspendAsync(JsonElement root, string? clientIp, CancellationToken cancellationToken)
@@ -267,16 +523,34 @@ public sealed class ResponseCommandService(
         return null;
     }
 
+    private async Task<CommandResult> GetFlaggedProcessesAsync(CancellationToken cancellationToken)
+    {
+        var rows = await database.GetFlaggedProcessesAsync(cancellationToken).ConfigureAwait(false);
+        var list = rows.Select(r => new { name = r.Name, addedAt = r.AddedAt }).ToList();
+        var data = JsonSerializer.SerializeToElement(list, AppJson.Options);
+        return new CommandResult(true, "get_flagged_processes", "ok", data);
+    }
+
     private async Task<CommandResult> GetRecentEventsAsync(JsonElement root, CancellationToken cancellationToken)
     {
         var limit = root.TryGetProperty("limit", out var limitEl) && limitEl.TryGetInt32(out var v)
             ? Math.Clamp(v, 1, 5000)
             : 500;
+        var processFilter = root.TryGetProperty("processFilter", out var pf) ? pf.GetString() : null;
+        var typeFilter = root.TryGetProperty("typeFilter", out var tf) ? tf.GetString() : null;
+        DateTime? from = null;
+        DateTime? to = null;
+        if (root.TryGetProperty("from", out var fromEl) && fromEl.ValueKind == JsonValueKind.String &&
+            DateTime.TryParse(fromEl.GetString(), out var f))
+            from = f.ToUniversalTime();
+        if (root.TryGetProperty("to", out var toEl) && toEl.ValueKind == JsonValueKind.String &&
+            DateTime.TryParse(toEl.GetString(), out var t))
+            to = t.ToUniversalTime();
         var rows = await database.QuerySysmonAsync(
-            from: null,
-            to: null,
-            typeFilter: null,
-            processFilter: null,
+            from: from,
+            to: to,
+            typeFilter: typeFilter,
+            processFilter: processFilter,
             limit: limit,
             cancellationToken: cancellationToken).ConfigureAwait(false);
         var items = rows.Select(r => new Models.SysmonEvent
@@ -302,6 +576,58 @@ public sealed class ResponseCommandService(
         var id = root.GetProperty("id").GetString() ?? "";
         await database.AckAlertAsync(id, cancellationToken).ConfigureAwait(false);
         return new CommandResult(true, "ack_alert", "ok");
+    }
+
+    private async Task<CommandResult> GetTimelineAsync(JsonElement root, CancellationToken cancellationToken)
+    {
+        var hours = root.TryGetProperty("hours", out var h) && h.TryGetInt32(out var hv) ? Math.Clamp(hv, 1, 168) : 24;
+        var buckets = await database.GetTimelineAsync(hours, cancellationToken).ConfigureAwait(false);
+        var data = JsonSerializer.SerializeToElement(new { buckets }, AppJson.Options);
+        return new CommandResult(true, "get_timeline", "ok", data);
+    }
+
+    private async Task<CommandResult> CheckReputationAsync(JsonElement root, CancellationToken cancellationToken)
+    {
+        if (!root.TryGetProperty("pid", out var pidEl) || !pidEl.TryGetInt32(out var pid))
+            return new CommandResult(false, "check_reputation", "invalid_pid");
+        var data = await virusTotal.CheckProcessExecutableAsync(pid, cancellationToken).ConfigureAwait(false);
+        return new CommandResult(true, "check_reputation", "ok", data);
+    }
+
+    private async Task<CommandResult> GetThreatIntelStatusAsync(CancellationToken cancellationToken)
+    {
+        var active = await database.GetActiveBadIpsAsync(cancellationToken).ConfigureAwait(false);
+        var data = JsonSerializer.SerializeToElement(new
+        {
+            entryCount = active.Count,
+            lastRunUtc = threatIntel.LastSuccessfulRunUtc?.UtcDateTime.ToString("O"),
+            lastEntriesWritten = threatIntel.LastEntriesWritten,
+            lastError = threatIntel.LastError
+        }, AppJson.Options);
+        return new CommandResult(true, "get_threat_intel_status", "ok", data);
+    }
+
+    private async Task<CommandResult> GetThreatIntelEntriesAsync(CancellationToken cancellationToken)
+    {
+        var active = await database.GetActiveBadIpsAsync(cancellationToken).ConfigureAwait(false);
+        var items = active.Select(r => new { r.Ip, r.Category, r.Source }).ToList();
+        var data = JsonSerializer.SerializeToElement(new { items }, AppJson.Options);
+        return new CommandResult(true, "get_threat_intel_entries", "ok", data);
+    }
+
+    private async Task<CommandResult> RefreshThreatIntelAsync(string? clientIp, CancellationToken cancellationToken)
+    {
+        await threatIntel.RunUpdateAsync(cancellationToken).ConfigureAwait(false);
+        await database.AppendAuditAsync("refresh_threat_intel", "ok", clientIp, cancellationToken).ConfigureAwait(false);
+        var active = await database.GetActiveBadIpsAsync(cancellationToken).ConfigureAwait(false);
+        var data = JsonSerializer.SerializeToElement(new
+        {
+            entryCount = active.Count,
+            lastRunUtc = threatIntel.LastSuccessfulRunUtc?.UtcDateTime.ToString("O"),
+            lastEntriesWritten = threatIntel.LastEntriesWritten,
+            lastError = threatIntel.LastError
+        }, AppJson.Options);
+        return new CommandResult(true, "refresh_threat_intel", "ok", data);
     }
 
     private static void RunNetsh(string arguments)

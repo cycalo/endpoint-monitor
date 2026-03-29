@@ -8,14 +8,19 @@ import 'app_router.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_cubit.dart';
 import 'bloc/alerts_bloc.dart';
+import 'bloc/blocked_remote_ips_cubit.dart';
 import 'bloc/browser_bloc.dart';
 import 'bloc/connection_bloc.dart';
 import 'bloc/events_bloc.dart';
+import 'bloc/firewall_bloc.dart';
 import 'bloc/network_bloc.dart';
 import 'bloc/process_bloc.dart';
 import 'bloc/software_bloc.dart';
 import 'bloc/system_info_bloc.dart';
+import 'bloc/threat_intel_bloc.dart';
+import 'bloc/timeline_bloc.dart';
 import 'bloc/watchlist_bloc.dart';
+import 'widgets/pin_unlock_gate.dart';
 
 class EndpointMonitorApp extends StatefulWidget {
   const EndpointMonitorApp({super.key});
@@ -52,12 +57,16 @@ class _EndpointMonitorAppState extends State<EndpointMonitorApp> {
         BlocProvider.value(value: _connectionBloc),
         BlocProvider(create: (_) => ProcessBloc()),
         BlocProvider(create: (_) => NetworkBloc()),
+        BlocProvider(create: (_) => FirewallBloc()),
+        BlocProvider(create: (_) => BlockedRemoteIpsCubit()),
         BlocProvider(create: (_) => EventsBloc()),
         BlocProvider(create: (_) => SystemInfoBloc()),
         BlocProvider(create: (_) => AlertsBloc()),
         BlocProvider(create: (_) => BrowserBloc()),
         BlocProvider(create: (_) => SoftwareBloc()),
         BlocProvider(create: (_) => WatchlistBloc()),
+        BlocProvider(create: (_) => TimelineBloc()),
+        BlocProvider(create: (_) => ThreatIntelBloc()),
       ],
       child: BlocProvider(
         create: (_) {
@@ -73,8 +82,11 @@ class _EndpointMonitorAppState extends State<EndpointMonitorApp> {
               darkTheme: buildEndpointMonitorDarkTheme(),
               themeMode: themeMode,
               routerConfig: _router,
-              builder: (context, child) =>
-                  WithForegroundTask(child: child ?? const SizedBox.shrink()),
+              builder: (context, child) => PinUnlockGate(
+                child: WithForegroundTask(
+                  child: child ?? const SizedBox.shrink(),
+                ),
+              ),
             );
           },
         ),

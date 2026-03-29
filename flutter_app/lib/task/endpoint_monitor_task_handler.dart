@@ -12,6 +12,7 @@ class EndpointMonitorTaskHandler extends TaskHandler {
 
   static const _kConnect = 'em_connect';
   static const _kDisconnect = 'em_disconnect';
+  static const _kMeasurePing = 'em_measure_ping';
 
   Map<String, Object?> _connectionPayload(String state, {String? message}) => {
         'type': 'connection',
@@ -69,6 +70,9 @@ class EndpointMonitorTaskHandler extends TaskHandler {
           _stopping = false;
           unawaited(_connectLoop(host, token));
         }
+      }
+      if (action == _kMeasurePing) {
+        _sendLatencyPing();
       }
       return;
     }
@@ -130,10 +134,37 @@ class EndpointMonitorTaskHandler extends TaskHandler {
     });
   }
 
+  void _sendLatencyPing() {
+    try {
+      final t = DateTime.now().millisecondsSinceEpoch;
+      _channel?.sink.add(jsonEncode({'type': 'ping', 'clientTs': t}));
+    } catch (_) {
+      FlutterForegroundTask.sendDataToMain({
+        'type': 'ping_rtt',
+        'ok': false,
+        'message': 'WebSocket not connected',
+      });
+    }
+  }
+
   void _forwardMessage(String message) {
     try {
       final map = jsonDecode(message);
       if (map is Map<String, dynamic>) {
+        if (map['type'] == 'pong' && map['clientTs'] != null) {
+          final raw = map['clientTs'];
+          final sent = raw is int
+              ? raw
+              : int.tryParse(raw.toString()) ?? 0;
+          if (sent > 0) {
+            final ms = DateTime.now().millisecondsSinceEpoch - sent;
+            FlutterForegroundTask.sendDataToMain({
+              'type': 'ping_rtt',
+              'ok': true,
+              'ms': ms < 0 ? 0 : ms,
+            });
+          }
+        }
         FlutterForegroundTask.sendDataToMain(map);
       }
     } catch (_) {

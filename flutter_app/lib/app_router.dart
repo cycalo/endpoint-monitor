@@ -19,6 +19,7 @@ import 'screens/settings_screen.dart';
 import 'screens/software_detail_screen.dart';
 import 'screens/software_screen.dart';
 import 'screens/watchlist_screen.dart';
+import 'utils/pop_transient_overlay_routes.dart';
 
 GoRouter createAppRouter(ConnectionBloc connectionBloc) {
   final refresh = GoRouterRefreshStream(connectionBloc.stream);
@@ -58,13 +59,16 @@ GoRouter createAppRouter(ConnectionBloc connectionBloc) {
               GoRoute(
                 name: 'processes',
                 path: '/processes',
-                builder: (context, state) => const ProcessesScreen(),
+                builder: (context, state) => ProcessesScreen(
+                  initialWatchFilter: state.uri.queryParameters['watch'],
+                ),
                 routes: [
                   GoRoute(
                     name: 'processDetail',
                     path: ':pid',
                     builder: (context, state) {
-                      final pid = int.tryParse(state.pathParameters['pid'] ?? '') ?? 0;
+                      final pid =
+                          int.tryParse(state.pathParameters['pid'] ?? '') ?? 0;
                       return ProcessDetailScreen(pid: pid);
                     },
                   ),
@@ -77,7 +81,9 @@ GoRouter createAppRouter(ConnectionBloc connectionBloc) {
               GoRoute(
                 name: 'network',
                 path: '/network',
-                builder: (context, state) => const NetworkScreen(),
+                builder: (context, state) => NetworkScreen(
+                  highlightThreats: state.uri.queryParameters['threats'] == '1',
+                ),
                 routes: [
                   GoRoute(
                     name: 'networkConnectionDetail',
@@ -101,7 +107,9 @@ GoRouter createAppRouter(ConnectionBloc connectionBloc) {
               GoRoute(
                 name: 'events',
                 path: '/events',
-                builder: (context, state) => const EventsScreen(),
+                builder: (context, state) => EventsScreen(
+                  focusHourUtc: state.uri.queryParameters['hour'],
+                ),
               ),
             ],
           ),
@@ -144,7 +152,9 @@ GoRouter createAppRouter(ConnectionBloc connectionBloc) {
       GoRoute(
         name: 'alerts',
         path: '/alerts',
-        builder: (context, state) => const AlertsScreen(),
+        builder: (context, state) => AlertsScreen(
+          typeFilter: state.uri.queryParameters['type'],
+        ),
       ),
       GoRoute(
         name: 'firewall',
@@ -179,7 +189,8 @@ class ScaffoldWithNavBar extends StatelessWidget {
         decoration: BoxDecoration(
           color: scheme.surfaceContainerHighest,
           border: Border(
-            top: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.15)),
+            top: BorderSide(
+                color: scheme.outlineVariant.withValues(alpha: 0.15)),
           ),
           boxShadow: [
             BoxShadow(
@@ -218,7 +229,12 @@ class ScaffoldWithNavBar extends StatelessWidget {
               label: 'More',
             ),
           ],
-          onDestinationSelected: shell.goBranch,
+          onDestinationSelected: (index) {
+            if (index != shell.currentIndex) {
+              popTransientOverlayRoutes(context);
+            }
+            shell.goBranch(index);
+          },
         ),
       ),
     );

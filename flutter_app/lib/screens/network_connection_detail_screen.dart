@@ -3,10 +3,17 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../bloc/blocked_remote_ips_cubit.dart';
 import '../bloc/network_bloc.dart';
+import '../bloc/process_bloc.dart';
 import '../models/ws_models.dart';
 import '../theme/em_design_system.dart';
 import '../utils/country_flag_emoji.dart';
+import '../utils/network_endpoint_display.dart'
+    show
+        formatNetworkEndpoint,
+        hasBlockableRemoteEndpoint,
+        isListeningStyleSocket;
 import '../widgets/em_brand_app_bar.dart';
 
 class NetworkConnectionDetailScreen extends StatelessWidget {
@@ -21,110 +28,276 @@ class NetworkConnectionDetailScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: scheme.surface,
       appBar: const EmBrandAppBar(),
-      body: BlocBuilder<NetworkBloc, NetworkState>(
-        builder: (context, netState) {
-          final current = _resolveCurrentConnection(netState.items, connection);
-          final related = netState.items
-              .where((n) => n.pid == current.pid && !_isListeningSocket(n))
-              .toList()
-            ..sort((a, b) {
-              final c = a.remoteAddress.compareTo(b.remoteAddress);
-              if (c != 0) return c;
-              return a.remotePort.compareTo(b.remotePort);
-            });
+      body: BlocBuilder<BlockedRemoteIpsCubit, Map<String, BlockedRemoteMeta>>(
+        builder: (context, _) {
+          return BlocBuilder<NetworkBloc, NetworkState>(
+            builder: (context, netState) {
+              final current =
+                  _resolveCurrentConnection(netState.items, connection);
+              final ipBlocked = context
+                      .read<BlockedRemoteIpsCubit>()
+                      .isBlocked(current.remoteAddress) ||
+                  current.state.trim().toUpperCase() == 'BLOCKED';
+              final related = netState.items
+                  .where((n) =>
+                      current.pid != 0 &&
+                      n.pid == current.pid &&
+                      !_isListeningSocket(n))
+                  .toList()
+                ..sort((a, b) {
+                  final c = a.remoteAddress.compareTo(b.remoteAddress);
+                  if (c != 0) return c;
+                  return a.remotePort.compareTo(b.remotePort);
+                });
 
-          return CustomScrollView(
-            slivers: [
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    _Header(connection: current),
-                    const SizedBox(height: 16),
-                    _SectionCard(
-                      title: 'CONNECTION DETAILS',
-                      icon: Icons.cable_rounded,
-                      child: Column(
-                        children: [
-                          _kvRow('Remote endpoint', _endpoint(current.remoteAddress, current.remotePort)),
-                          _kvRow('Local endpoint', _endpoint(current.localAddress, current.localPort)),
-                          _kvRow('Protocol / State', _protocolState(current.protocol, current.state)),
-                          _kvRow('Duration', _connectionDuration(current)),
+              return CustomScrollView(
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        _Header(connection: current),
+                        if (ipBlocked) ...[
+                          const SizedBox(height: 12),
+                          _BlockedBanner(),
                         ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    _SectionCard(
-                      title: 'OWNERSHIP',
-                      icon: Icons.public_rounded,
-                      child: _buildOwnershipContent(context, current),
-                    ),
-                    const SizedBox(height: 14),
-                    _SectionCard(
-                      title: 'ALL CONNECTIONS (THIS PROCESS)',
-                      icon: Icons.hub_rounded,
-                      child: related.isEmpty
-                          ? Text(
-                              'No active remote connections for this process in the latest snapshot.',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: scheme.onSurfaceVariant,
+                        const SizedBox(height: 16),
+                        _SectionCard(
+                          title: 'CONNECTION DETAILS',
+                          icon: Icons.cable_rounded,
+                          child: Column(
+                            children: [
+                              _kvRow(
+                                'PID',
+                                current.pid > 0 ? '${current.pid}' : '—',
                               ),
-                            )
-                          : Column(
-                              children: [
-                                for (var i = 0; i < related.length; i++) ...[
-                                  _RelatedConnectionRow(item: related[i]),
-                                  if (i != related.length - 1)
-                                    Divider(
-                                      height: 16,
-                                      color: scheme.outlineVariant.withValues(alpha: 0.3),
+                              _kvRow(
+                                'Remote endpoint',
+                                formatNetworkEndpoint(
+                                  current.remoteAddress,
+                                  current.remotePort,
+                                ),
+                              ),
+                              _kvRow(
+                                'Local endpoint',
+                                formatNetworkEndpoint(
+                                  current.localAddress,
+                                  current.localPort,
+                                ),
+                              ),
+                              _kvRow(
+                                  'Protocol / State',
+                                  _protocolState(
+                                      current.protocol, current.state)),
+                              _kvRow('Duration', _connectionDuration(current)),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        _SectionCard(
+                          title: 'OWNERSHIP',
+                          icon: Icons.public_rounded,
+                          child: _buildOwnershipContent(context, current),
+                        ),
+                        const SizedBox(height: 14),
+                        _SectionCard(
+                          title: 'ALL CONNECTIONS (THIS PROCESS)',
+                          icon: Icons.hub_rounded,
+                          child: related.isEmpty
+                              ? Text(
+                                  'No active remote connections for this process in the latest snapshot.',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: scheme.onSurfaceVariant,
+                                  ),
+                                )
+                              : Column(
+                                  children: [
+                                    for (var i = 0;
+                                        i < related.length;
+                                        i++) ...[
+                                      _RelatedConnectionRow(item: related[i]),
+                                      if (i != related.length - 1)
+                                        Divider(
+                                          height: 16,
+                                          color: scheme.outlineVariant
+                                              .withValues(alpha: 0.3),
+                                        ),
+                                    ],
+                                  ],
+                                ),
+                        ),
+                        const SizedBox(height: 14),
+                        _SectionCard(
+                          title: 'ACTIONS',
+                          icon: Icons.shield_rounded,
+                          child: Builder(
+                            builder: (context) {
+                              final canBlock = hasBlockableRemoteEndpoint(
+                                  current.remoteAddress);
+                              final listenOnly =
+                                  !canBlock && isListeningStyleSocket(current);
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: FilledButton(
+                                          onPressed: canBlock && !ipBlocked
+                                              ? () => _confirmNetworkBlock(
+                                                    context,
+                                                    current,
+                                                  )
+                                              : null,
+                                          child: Text(
+                                            !canBlock
+                                                ? (listenOnly
+                                                    ? 'Listen only'
+                                                    : 'No remote endpoint')
+                                                : ipBlocked
+                                                    ? 'Blocked'
+                                                    : 'Block IP',
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: FilledButton.tonal(
+                                          onPressed: canBlock && ipBlocked
+                                              ? () async {
+                                                  context
+                                                      .read<NetworkBloc>()
+                                                      .sendCommand({
+                                                    'type': 'unblock_ip',
+                                                    'ip': current.remoteAddress,
+                                                  });
+                                                  await context
+                                                      .read<
+                                                          BlockedRemoteIpsCubit>()
+                                                      .remove(current
+                                                          .remoteAddress);
+                                                }
+                                              : null,
+                                          child: const Text('Unblock IP'),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (!canBlock) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      listenOnly
+                                          ? 'This is a listening socket (no remote peer). IP blocking applies to outbound traffic. Go back to the Network list and open a row with TCP Established and a real remote address (for example the HTTPS connection to your test site).'
+                                          : 'Blocking requires a specific remote address (not a wildcard or “any” endpoint).',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: scheme.onSurfaceVariant,
+                                      ),
                                     ),
+                                  ],
+                                  const SizedBox(height: 12),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: OutlinedButton.icon(
+                                      onPressed: current.pid > 0
+                                          ? () => _confirmKillProcess(
+                                                context,
+                                                current,
+                                              )
+                                          : null,
+                                      icon: Icon(
+                                        Icons.highlight_off_rounded,
+                                        size: 20,
+                                        color: current.pid > 0
+                                            ? scheme.error
+                                            : scheme.onSurfaceVariant
+                                                .withValues(alpha: 0.4),
+                                      ),
+                                      label: Text(
+                                        current.pid > 0
+                                            ? 'Kill process'
+                                            : 'Kill process (PID unknown)',
+                                        style: GoogleFonts.manrope(
+                                          fontWeight: FontWeight.w800,
+                                          color: current.pid > 0
+                                              ? scheme.error
+                                              : scheme.onSurfaceVariant
+                                                  .withValues(alpha: 0.45),
+                                        ),
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        side: BorderSide(
+                                          color: current.pid > 0
+                                              ? scheme.error
+                                                  .withValues(alpha: 0.55)
+                                              : scheme.outlineVariant
+                                                  .withValues(alpha: 0.35),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  if (current.pid > 0) ...[
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'Terminates the whole process (${current.pid}), not only this socket.',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: scheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
                                 ],
-                              ],
-                            ),
+                              );
+                            },
+                          ),
+                        ),
+                      ]),
                     ),
-                    const SizedBox(height: 14),
-                    _SectionCard(
-                      title: 'ACTIONS',
-                      icon: Icons.shield_rounded,
-                      child: current.remoteAddress.isEmpty
-                          ? Text(
-                              'No remote IP available for this connection.',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: scheme.onSurfaceVariant,
-                              ),
-                            )
-                          : Row(
-                              children: [
-                                Expanded(
-                                  child: FilledButton(
-                                    onPressed: () => _confirmNetworkBlock(context, current),
-                                    child: const Text('Block IP'),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: FilledButton.tonal(
-                                    onPressed: () => context.read<NetworkBloc>().sendCommand({
-                                      'type': 'unblock_ip',
-                                      'ip': current.remoteAddress,
-                                    }),
-                                    child: const Text('Unblock IP'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                    ),
-                  ]),
-                ),
-              ),
-            ],
+                  ),
+                ],
+              );
+            },
           );
         },
+      ),
+    );
+  }
+}
+
+class _BlockedBanner extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.errorContainer.withValues(alpha: 0.35),
+      borderRadius: BorderRadius.circular(EmDesign.radiusLg),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.shield_outlined, color: scheme.error, size: 22),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Outbound traffic to this remote IP is blocked by a firewall rule from Endpoint Monitor. The connection may no longer appear in the live snapshot.',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
+                  color: scheme.onErrorContainer,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -164,7 +337,10 @@ class _Header extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                _endpoint(connection.remoteAddress, connection.remotePort),
+                formatNetworkEndpoint(
+                  connection.remoteAddress,
+                  connection.remotePort,
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.jetBrainsMono(
@@ -237,12 +413,15 @@ class _RelatedConnectionRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          _endpoint(item.remoteAddress, item.remotePort),
-          style: GoogleFonts.manrope(fontSize: 13, fontWeight: FontWeight.w800, color: scheme.onSurface),
+          formatNetworkEndpoint(item.remoteAddress, item.remotePort),
+          style: GoogleFonts.manrope(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: scheme.onSurface),
         ),
         const SizedBox(height: 4),
         Text(
-          'Local ${_endpoint(item.localAddress, item.localPort)}',
+          'Local ${formatNetworkEndpoint(item.localAddress, item.localPort)}',
           style: GoogleFonts.jetBrainsMono(
             fontSize: 11,
             fontWeight: FontWeight.w600,
@@ -265,7 +444,8 @@ class _RelatedConnectionRow extends StatelessWidget {
 
 Widget _buildOwnershipContent(BuildContext context, NetworkConnection c) {
   final hasOrg = c.org.trim().isNotEmpty;
-  final hasCountry = c.countryName.trim().isNotEmpty || c.countryCode.trim().isNotEmpty;
+  final hasCountry =
+      c.countryName.trim().isNotEmpty || c.countryCode.trim().isNotEmpty;
   final hasCity = c.city.trim().isNotEmpty;
   final hasAny = hasOrg || hasCountry || hasCity;
   if (!hasAny) {
@@ -302,7 +482,8 @@ Widget _kvRow(String label, String value) {
               flex: 2,
               child: Text(
                 label,
-                style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: scheme.onSurfaceVariant),
               ),
             ),
             const SizedBox(width: 10),
@@ -325,12 +506,6 @@ Widget _kvRow(String label, String value) {
   );
 }
 
-String _endpoint(String address, int port) {
-  if (address.trim().isEmpty) return '—';
-  if (port <= 0) return address;
-  return '$address:$port';
-}
-
 NetworkConnection _resolveCurrentConnection(
   List<NetworkConnection> items,
   NetworkConnection fallback,
@@ -351,7 +526,8 @@ String _connectionDuration(NetworkConnection c) {
   if (c.durationSeconds > 0) {
     return _formatDurationSeconds(c.durationSeconds);
   }
-  if (c.protocol.toUpperCase() == 'TCP' && _readableState(c.state).toUpperCase() == 'ESTABLISHED') {
+  if (c.protocol.toUpperCase() == 'TCP' &&
+      _readableState(c.state).toUpperCase() == 'ESTABLISHED') {
     return '< 1s';
   }
   return 'Unavailable in current snapshot';
@@ -428,15 +604,59 @@ String _countryLine(NetworkConnection c) {
   return flag.isEmpty ? text : '$flag $text';
 }
 
-Future<void> _confirmNetworkBlock(BuildContext context, NetworkConnection n) async {
+Future<void> _confirmKillProcess(
+  BuildContext context,
+  NetworkConnection n,
+) async {
+  if (n.pid <= 0) return;
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (c) => AlertDialog(
+      title: const Text('Kill process?'),
+      content: Text(
+        '${n.processName.isNotEmpty ? n.processName : 'Process'} (PID ${n.pid})\n\n'
+        'This stops the entire process. Open connections will close.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(c, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: Theme.of(c).colorScheme.error,
+            foregroundColor: Theme.of(c).colorScheme.onError,
+          ),
+          onPressed: () => Navigator.pop(c, true),
+          child: const Text('Kill'),
+        ),
+      ],
+    ),
+  );
+  if (ok == true && context.mounted) {
+    context.read<ProcessBloc>().sendCommand({
+      'type': 'kill_process',
+      'pid': n.pid,
+    });
+  }
+}
+
+Future<void> _confirmNetworkBlock(
+    BuildContext context, NetworkConnection n) async {
   final ok = await showDialog<bool>(
     context: context,
     builder: (c) => AlertDialog(
       title: const Text('Block remote IP?'),
-      content: Text(n.remoteAddress),
+      content: Text(
+        formatNetworkEndpoint(n.remoteAddress, n.remotePort),
+      ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-        FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Block')),
+        TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancel')),
+        FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Block')),
       ],
     ),
   );
@@ -445,6 +665,11 @@ Future<void> _confirmNetworkBlock(BuildContext context, NetworkConnection n) asy
       'type': 'block_ip',
       'ip': n.remoteAddress,
       'direction': 'outbound',
+      if (n.processName.isNotEmpty) 'sourceProcess': n.processName,
     });
+    await context.read<BlockedRemoteIpsCubit>().add(
+          n.remoteAddress,
+          snapshot: n,
+        );
   }
 }

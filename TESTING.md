@@ -75,6 +75,61 @@ dotnet run
 - Send: `{"type":"ping"}`  
   Expect: `{"type":"pong","data":null}` (JSON field names are camelCase).
 
+**NetworkTestProbe** (`tools/NetworkTestProbe/`)
+
+**Minimal block test (recommended): one process, one IP, one port — no HTTPS/DNS, no local listener**
+
+1. Pick a **literal** remote IP and port that accept TCP (e.g. resolve a host once: `nslookup example.com`, then use one IPv4 like `104.18.27.120` and port `443`).
+2. Run:
+
+```bash
+dotnet run --project tools/NetworkTestProbe -- --simple-block-test --tcp-host 104.18.27.120 --tcp-port 443
+```
+
+3. In the app → **Network**, find **`NetworkTestProbe`** (or **`NetworkTestProbe.exe`**) and the row with **Remote** `104.18.27.120:443` (TCP **Established**), open details → **Block IP**.
+4. The console should show **`[TCP] NOT_REACHABLE`** on the next cycle; **Unblock** in the app to recover **`OK`**.
+
+This mode avoids CDN/HTTP pooling confusion: each cycle is only a **new raw TCP connect** to exactly that address.
+
+---
+
+A .NET 8 console helper for manual checks (Network tab, Sysmon, firewall block rules):
+
+- Prints **PID** and **process name** so you can match **Processes → process detail** (`/processes/<pid>`) and rows on the **Network** tab.
+- Binds a **TCP listener** on `127.0.0.1:<ephemeral port>` so you should see a **LISTEN** row for this PID.
+- **Loops** (default **every 5 seconds** until you stop it): each cycle runs **HTTPS GET** (default `https://example.com/`), optional **raw TCP** to `--tcp-host` / `--tcp-port`, and **DNS** for `--dns-host` (default `example.com`). Good for Sysmon DNS/network noise if Sysmon is installed.
+- **HTTPS connection pooling is off by default** (`PooledConnectionLifetime` / idle = zero) so each cycle opens a **new** TCP connection — otherwise `HttpClient` could **reuse** a socket created **before** you added a firewall rule and wrongly show **OK** after a block. Pass **`--http-pooling`** only if you intentionally want long-lived pooled connections (not for validating blocks).
+- **`example.com` is a poor block test**: Cloudflare exposes many IPv4/IPv6 addresses; blocking **one** IP may not block HTTPS to the hostname. Prefer **`--tcp-host` / `--tcp-port`** to a **single** known IP, or a small host you control.
+
+From the **repository root**:
+
+```bash
+dotnet run --project tools/NetworkTestProbe/NetworkTestProbe.csproj
+```
+
+Useful flags:
+
+```bash
+# Loop (default interval 5s); watch OK vs NOT_REACHABLE after you add/remove block rules
+dotnet run --project tools/NetworkTestProbe -- --https-url "https://example.com/"
+
+# Optional extra TCP probe (e.g. align with outbound TCP 443 to a host)
+dotnet run --project tools/NetworkTestProbe -- --tcp-host example.com --tcp-port 443
+
+# Optional: DNS target, interval, connect timeout
+dotnet run --project tools/NetworkTestProbe -- --dns-host example.com --interval-seconds 10 --connect-timeout-seconds 8
+
+# Old behavior: enable HTTP connection pooling (can hide firewall blocks — not for block validation)
+dotnet run --project tools/NetworkTestProbe -- --http-pooling --https-url "https://example.com/"
+```
+
+Or run the built executable (path after `dotnet publish` / Release build):
+
+```
+tools/NetworkTestProbe/bin/Release/net8.0/NetworkTestProbe.exe
+```
+
+On the **Network** tab, if you **block** this probe’s remote IP, the live socket may disappear; the app keeps a **blocked** row with the **process name and PID captured at block time** so you can still tell which executable was affected.
 ---
 
 ## 3. Prepare the Android app

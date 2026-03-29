@@ -45,8 +45,15 @@ class EventsBloc extends Cubit<EventsState> {
     }
   }
 
-  void loadRecent({int limit = 500}) {
-    FlutterForegroundTask.sendDataToTask(jsonEncode({'type': 'get_recent_events', 'limit': limit}));
+  void loadRecent({int limit = 500, String? fromIso, String? toIso}) {
+    final payload = <String, dynamic>{'type': 'get_recent_events', 'limit': limit};
+    if (fromIso != null && fromIso.isNotEmpty) payload['from'] = fromIso;
+    if (toIso != null && toIso.isNotEmpty) payload['to'] = toIso;
+    FlutterForegroundTask.sendDataToTask(jsonEncode(payload));
+  }
+
+  void clearAll() {
+    emit(const EventsState());
   }
 
   @override

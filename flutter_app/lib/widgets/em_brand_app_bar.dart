@@ -100,10 +100,14 @@ class _EmConnectionStatus extends StatelessWidget {
 class EmBrandAppBar extends StatelessWidget implements PreferredSizeWidget {
   const EmBrandAppBar({
     super.key,
+    this.leading,
     this.title,
     this.actions,
     this.bottom,
   });
+
+  /// Optional leading control (e.g. back on pushed routes).
+  final Widget? leading;
 
   /// Shown after the monitor icon (e.g. "Endpoint Monitor" on tab screens).
   final Widget? title;
@@ -130,6 +134,7 @@ class EmBrandAppBar extends StatelessWidget implements PreferredSizeWidget {
 
     return AppBar(
       bottom: bottom,
+      leading: leading,
       automaticallyImplyLeading: false,
       centerTitle: false,
       titleSpacing: 12,

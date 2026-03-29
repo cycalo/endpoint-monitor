@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 import '../models/ws_models.dart';
+import '../services/alert_notification_service.dart';
 
 class AlertsState extends Equatable {
   const AlertsState({this.items = const [], this.acked = const {}});
@@ -33,12 +34,16 @@ class AlertsBloc extends Cubit<AlertsState> {
     if (raw is! Map) return;
     final a = Alert.fromJson(Map<String, dynamic>.from(raw));
     emit(state.copyWith(items: [a, ...state.items].take(500).toList()));
-    // Keep alerts in-app only; Android push notifications are disabled.
+    unawaited(AlertNotificationService.maybeShowForAlert(a));
   }
 
   void acknowledge(String id) {
     emit(state.copyWith(acked: {...state.acked, id}));
     FlutterForegroundTask.sendDataToTask(jsonEncode({'type': 'ack_alert', 'id': id}));
+  }
+
+  void clearAcknowledged() {
+    emit(AlertsState(items: state.items, acked: const {}));
   }
 
   @override

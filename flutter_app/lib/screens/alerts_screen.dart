@@ -6,7 +6,10 @@ import '../theme/em_design_system.dart';
 import '../widgets/em_brand_app_bar.dart';
 
 class AlertsScreen extends StatelessWidget {
-  const AlertsScreen({super.key});
+  const AlertsScreen({super.key, this.typeFilter});
+
+  /// When set, only alerts matching this type are listed (e.g. `flagged_process`).
+  final String? typeFilter;
 
   Color _sev(String s, ColorScheme scheme) {
     return switch (s) {
@@ -24,20 +27,23 @@ class AlertsScreen extends StatelessWidget {
       appBar: const EmBrandAppBar(),
       body: BlocBuilder<AlertsBloc, AlertsState>(
         builder: (context, state) {
-          if (state.items.isEmpty) {
+          final items = typeFilter == null || typeFilter!.isEmpty
+              ? state.items
+              : state.items.where((a) => a.type == typeFilter).toList();
+          if (items.isEmpty) {
             return Center(
               child: Text(
-                'No alerts yet',
+                typeFilter != null ? 'No matching alerts' : 'No alerts yet',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
               ),
             );
           }
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-            itemCount: state.items.length,
+            itemCount: items.length,
             separatorBuilder: (_, __) => const SizedBox(height: 4),
             itemBuilder: (context, i) {
-              final a = state.items[i];
+              final a = items[i];
               final acked = state.acked.contains(a.id);
               return Material(
                 color: scheme.surfaceContainer,

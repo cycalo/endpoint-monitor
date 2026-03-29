@@ -22,9 +22,14 @@ public sealed class AlertEngine(
 
             if (ev.Type == "NetworkConnect" && !string.IsNullOrEmpty(ev.RemoteAddress))
             {
-                if (await database.IsBadIpAsync(ev.RemoteAddress, cancellationToken).ConfigureAwait(false))
+                var badMeta = await database.GetBadIpRowAsync(ev.RemoteAddress, cancellationToken).ConfigureAwait(false);
+                if (badMeta != null)
                 {
-                    alerts.Add(MakeAlert("high", "suspicious_connection", $"Connection to blocklisted IP {ev.RemoteAddress}", ev.Pid));
+                    var cat = string.IsNullOrEmpty(badMeta.Category) ? "listed" : badMeta.Category;
+                    var src = string.IsNullOrEmpty(badMeta.Source) ? "intel" : badMeta.Source;
+                    alerts.Add(MakeAlert("high", "threat_intel_connection",
+                        $"Threat-listed IP {ev.RemoteAddress} ({cat} · {src}). Consider blocking outbound traffic to this host.",
+                        ev.Pid));
                 }
 
                 if (IsBrowserProcess(ev.ProcessName) && ev.RemotePort is > 0 and not (80 or 443 or 8080 or 8443))
@@ -55,6 +60,7 @@ public sealed class AlertEngine(
 
             foreach (var a in alerts)
             {
+                await database.AppendAlertHistoryAsync(a.Type, a.Timestamp, cancellationToken).ConfigureAwait(false);
                 var payload = JsonSerializer.Serialize(new { type = "alert", data = a }, Json);
                 await ws.BroadcastAsync(System.Text.Encoding.UTF8.GetBytes(payload), cancellationToken).ConfigureAwait(false);
             }

@@ -28,6 +28,8 @@ class ProcessState extends Equatable {
     this.loading = true,
     this.suspendedPids = const {},
     this.killedGhosts = const [],
+    this.vtByPid = const {},
+    this.vtLoadingPid,
   });
 
   final List<ProcessInfo> items;
@@ -40,21 +42,43 @@ class ProcessState extends Equatable {
   /// again on the host (new process) or after [ProcessBloc._ghostTtl].
   final List<KilledProcessGhost> killedGhosts;
 
+  /// Latest VirusTotal `check_reputation` payload per PID (service-side hash cache).
+  final Map<int, Map<String, dynamic>> vtByPid;
+  final int? vtLoadingPid;
+
   ProcessState copyWith({
     List<ProcessInfo>? items,
     bool? loading,
     Set<int>? suspendedPids,
     List<KilledProcessGhost>? killedGhosts,
+    Map<int, Map<String, dynamic>>? vtByPid,
+    int? vtLoadingPid,
+    bool clearVtLoadingPid = false,
   }) =>
       ProcessState(
         items: items ?? this.items,
         loading: loading ?? this.loading,
         suspendedPids: suspendedPids ?? this.suspendedPids,
         killedGhosts: killedGhosts ?? this.killedGhosts,
+        vtByPid: vtByPid ?? this.vtByPid,
+        vtLoadingPid:
+            clearVtLoadingPid ? null : (vtLoadingPid ?? this.vtLoadingPid),
       );
 
   @override
-  List<Object?> get props => [items, loading, _sorted(suspendedPids), _ghostKey(killedGhosts)];
+  List<Object?> get props => [
+        items,
+        loading,
+        _sorted(suspendedPids),
+        _ghostKey(killedGhosts),
+        _vtKey(vtByPid),
+        vtLoadingPid,
+      ];
+
+  static String _vtKey(Map<int, Map<String, dynamic>> m) {
+    final keys = m.keys.toList()..sort();
+    return keys.map((k) => '$k:${m[k]!.toString()}').join('|');
+  }
 
   static List<int> _sorted(Set<int> s) => List<int>.from(s)..sort();
 
@@ -79,6 +103,19 @@ class ProcessBloc extends Cubit<ProcessState> {
       final cmd = m['command']?.toString();
       final ok = m['success'] == true;
       final pid = m['pid'];
+      if (cmd == 'check_reputation') {
+        final pending = state.vtLoadingPid;
+        final data = m['data'];
+        final nextVt = Map<int, Map<String, dynamic>>.from(state.vtByPid);
+        if (pending != null && data is Map) {
+          nextVt[pending] = Map<String, dynamic>.from(data);
+        }
+        emit(state.copyWith(
+          vtByPid: nextVt,
+          clearVtLoadingPid: true,
+        ));
+        return;
+      }
       if (pid is int) {
         if (cmd == 'suspend_process' && !ok) {
           emit(state.copyWith(suspendedPids: {...state.suspendedPids}..remove(pid)));
@@ -163,6 +200,11 @@ class ProcessBloc extends Cubit<ProcessState> {
       emit(state.copyWith(suspendedPids: {...state.suspendedPids, pid}));
     }
     FlutterForegroundTask.sendDataToTask(jsonEncode(cmd));
+  }
+
+  void requestVirusTotalCheck(int pid) {
+    emit(state.copyWith(vtLoadingPid: pid));
+    sendCommand({'type': 'check_reputation', 'pid': pid});
   }
 
   @override

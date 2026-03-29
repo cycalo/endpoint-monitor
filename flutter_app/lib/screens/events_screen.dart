@@ -7,7 +7,9 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../bloc/events_bloc.dart';
+import '../mixins/auto_close_transient_routes_on_leave_mixin.dart';
 import '../models/ws_models.dart';
+import '../settings/app_settings_keys.dart';
 import '../theme/em_design_system.dart';
 import '../widgets/em_brand_app_bar.dart';
 
@@ -18,22 +20,23 @@ const _kTypeProcess = 'ProcessCreate';
 const _kTypeDns = 'DnsQuery';
 
 class EventsScreen extends StatefulWidget {
-  const EventsScreen({super.key});
+  const EventsScreen({super.key, this.focusHourUtc});
+
+  /// When set, loads events in `[hour, hour+1)` UTC from the service.
+  final String? focusHourUtc;
 
   @override
   State<EventsScreen> createState() => _EventsScreenState();
 }
 
-class _EventsScreenState extends State<EventsScreen> {
+class _EventsScreenState extends State<EventsScreen>
+    with AutoCloseTransientRoutesOnLeaveMixin {
+  @override
+  String get tabPathPrefix => '/events';
+
   final _search = TextEditingController();
 
-  static const Set<String> _noiseProcessNames = {
-    'svchost.exe',
-    'msmpeng.exe',
-    'wmiprvse.exe',
-    'runtimebroker.exe',
-    'searchindexer.exe',
-  };
+  Set<String> _noiseProcessNames = {};
 
   /// Empty set = show all types (no type filter).
   final Set<String> _typeFilter = {};
@@ -51,9 +54,48 @@ class _EventsScreenState extends State<EventsScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      context.read<EventsBloc>().loadRecent(limit: 100);
+      final p = await SharedPreferences.getInstance();
+      await AppSettingsKeys.ensureDefaults(p);
+      final noiseCsv = p.getString(AppSettingsKeys.noiseProcesses) ?? AppSettingsKeys.defaultNoiseCsv;
+      final noise = noiseCsv.split(',').map((e) => e.trim().toLowerCase()).where((e) => e.isNotEmpty).toSet();
+      final range = p.getString(AppSettingsKeys.eventsDefaultRange) ?? AppSettingsKeys.defaultEventsRange;
+      final maxLoad = p.getInt(AppSettingsKeys.eventsMaxLoad) ?? AppSettingsKeys.defaultEventsMaxLoad;
+      int minutes = 0;
+      switch (range) {
+        case '15m':
+          minutes = 15;
+          break;
+        case '1h':
+          minutes = 60;
+          break;
+        case '6h':
+          minutes = 360;
+          break;
+        default:
+          minutes = 0;
+      }
+      if (!mounted) return;
+      setState(() {
+        _noiseProcessNames = noise;
+        _timeRangeMinutes = minutes;
+      });
+      if (!mounted) return;
+      final hour = widget.focusHourUtc;
+      if (hour != null && hour.isNotEmpty) {
+        final start = DateTime.tryParse(hour)?.toUtc();
+        if (start != null) {
+          final end = start.add(const Duration(hours: 1));
+          context.read<EventsBloc>().loadRecent(
+                limit: maxLoad.clamp(50, 500),
+                fromIso: start.toIso8601String(),
+                toIso: end.toIso8601String(),
+              );
+          return;
+        }
+      }
+      context.read<EventsBloc>().loadRecent(limit: maxLoad.clamp(50, 500));
     });
   }
 
@@ -114,6 +156,7 @@ class _EventsScreenState extends State<EventsScreen> {
 
     final result = await showModalBottomSheet<_EventsFilterResult>(
       context: context,
+      useRootNavigator: true,
       showDragHandle: true,
       backgroundColor: scheme.surfaceContainerHigh,
       isScrollControlled: true,
@@ -184,7 +227,6 @@ class _EventsScreenState extends State<EventsScreen> {
                           ],
                         ),
                       ),
-
                       Expanded(
                         child: ListView(
                           padding: const EdgeInsets.only(bottom: 12),
@@ -194,7 +236,8 @@ class _EventsScreenState extends State<EventsScreen> {
                                 children: [
                                   _SheetCheckRow(
                                     label: 'Terminate',
-                                    checked: tempTypes.contains(_kTypeTerminate),
+                                    checked:
+                                        tempTypes.contains(_kTypeTerminate),
                                     onTap: () => toggleType(
                                       setModalState,
                                       _kTypeTerminate,
@@ -232,21 +275,24 @@ class _EventsScreenState extends State<EventsScreen> {
                               child: OutlinedButton.icon(
                                 onPressed: tempTypes.isEmpty
                                     ? null
-                                    : () => setModalState(() => tempTypes.clear()),
-                                icon: const Icon(Icons.restart_alt_rounded, size: 18),
+                                    : () =>
+                                        setModalState(() => tempTypes.clear()),
+                                icon: const Icon(Icons.restart_alt_rounded,
+                                    size: 18),
                                 label: const Text('Show all types'),
                                 style: OutlinedButton.styleFrom(
                                   minimumSize: const Size.fromHeight(44),
                                   side: BorderSide(
-                                    color: scheme.outlineVariant.withValues(alpha: 0.25),
+                                    color: scheme.outlineVariant
+                                        .withValues(alpha: 0.25),
                                   ),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(EmDesign.radiusLg),
+                                    borderRadius: BorderRadius.circular(
+                                        EmDesign.radiusLg),
                                   ),
                                 ),
                               ),
                             ),
-
                             const SizedBox(height: 12),
                             cardChild(
                               Column(
@@ -260,8 +306,7 @@ class _EventsScreenState extends State<EventsScreen> {
                                       children: [
                                         SwitchListTile.adaptive(
                                           dense: true,
-                                          visualDensity:
-                                              VisualDensity.compact,
+                                          visualDensity: VisualDensity.compact,
                                           contentPadding:
                                               const EdgeInsets.symmetric(
                                             horizontal: 16,
@@ -275,8 +320,7 @@ class _EventsScreenState extends State<EventsScreen> {
                                         ),
                                         SwitchListTile.adaptive(
                                           dense: true,
-                                          visualDensity:
-                                              VisualDensity.compact,
+                                          visualDensity: VisualDensity.compact,
                                           contentPadding:
                                               const EdgeInsets.symmetric(
                                             horizontal: 16,
@@ -292,8 +336,7 @@ class _EventsScreenState extends State<EventsScreen> {
                                         ),
                                         SwitchListTile.adaptive(
                                           dense: true,
-                                          visualDensity:
-                                              VisualDensity.compact,
+                                          visualDensity: VisualDensity.compact,
                                           contentPadding:
                                               const EdgeInsets.symmetric(
                                             horizontal: 16,
@@ -309,17 +352,18 @@ class _EventsScreenState extends State<EventsScreen> {
                                     ),
                                   ),
                                   Padding(
-                                    padding:
-                                        const EdgeInsets.fromLTRB(16, 6, 16, 14),
+                                    padding: const EdgeInsets.fromLTRB(
+                                        16, 6, 16, 14),
                                     child: TextField(
-                                      controller:
-                                          TextEditingController(text: tempProcess)
-                                            ..selection = TextSelection.collapsed(
-                                              offset: tempProcess.length,
-                                            ),
+                                      controller: TextEditingController(
+                                          text: tempProcess)
+                                        ..selection = TextSelection.collapsed(
+                                          offset: tempProcess.length,
+                                        ),
                                       onChanged: (v) =>
                                           setModalState(() => tempProcess = v),
-                                      style: theme.textTheme.bodySmall?.copyWith(
+                                      style:
+                                          theme.textTheme.bodySmall?.copyWith(
                                         color: scheme.onSurface,
                                       ),
                                       decoration: InputDecoration(
@@ -327,7 +371,8 @@ class _EventsScreenState extends State<EventsScreen> {
                                         hintText: 'e.g. chrome.exe',
                                         isDense: true,
                                         filled: true,
-                                        fillColor: scheme.surfaceContainerLowest,
+                                        fillColor:
+                                            scheme.surfaceContainerLowest,
                                         border: OutlineInputBorder(
                                           borderRadius: BorderRadius.circular(
                                             EmDesign.radiusLg,
@@ -361,7 +406,6 @@ class _EventsScreenState extends State<EventsScreen> {
                                 ],
                               ),
                             ),
-
                             const SizedBox(height: 12),
                             cardChild(
                               Padding(
@@ -406,7 +450,6 @@ class _EventsScreenState extends State<EventsScreen> {
                           ],
                         ),
                       ),
-
                       Padding(
                         padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                         child: Row(
@@ -685,6 +728,27 @@ class _EventsScreenState extends State<EventsScreen> {
                     onChanged: (_) => setState(() {}),
                   ),
                   const SizedBox(height: 10),
+                  if (widget.focusHourUtc != null &&
+                      widget.focusHourUtc!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.schedule_rounded,
+                              size: 18, color: scheme.tertiary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'One-hour window from timeline (UTC).',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   if (_hasActiveFilters)
                     Padding(
                       padding: const EdgeInsets.only(left: 2),
@@ -696,7 +760,8 @@ class _EventsScreenState extends State<EventsScreen> {
                         ),
                       ),
                     )
-                  else
+                  else if (widget.focusHourUtc == null ||
+                      widget.focusHourUtc!.isEmpty)
                     const SizedBox.shrink(),
                 ],
               ),
@@ -724,12 +789,15 @@ class _EventsScreenState extends State<EventsScreen> {
                     if (ts.toUtc().isBefore(cutoff)) return false;
                   }
                   if (_onlyRemoteEndpoint) {
-                    final hasRemote = (e.remoteAddress?.trim().isNotEmpty ?? false) &&
-                        (e.remotePort ?? 0) > 0;
+                    final hasRemote =
+                        (e.remoteAddress?.trim().isNotEmpty ?? false) &&
+                            (e.remotePort ?? 0) > 0;
                     if (!hasRemote) return false;
                   }
                   if (_onlyCommandLine) {
-                    if (!(e.commandLine?.trim().isNotEmpty ?? false)) return false;
+                    if (!(e.commandLine?.trim().isNotEmpty ?? false)) {
+                      return false;
+                    }
                   }
                   if (q.isEmpty) return true;
                   return e.processName.toLowerCase().contains(q) ||
@@ -751,203 +819,200 @@ class _EventsScreenState extends State<EventsScreen> {
                   );
                 }
 
-                return ListView.builder(
+                return CustomScrollView(
                   primary: true,
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
-                  itemCount: list.length + 1,
-                  itemBuilder: (context, i) {
-                    if (i == 0) {
-                      return Padding(
-                        padding: const EdgeInsets.fromLTRB(0, 4, 0, 10),
-                        child: Row(
-                          children: [
-                            Text(
-                              'Live feed',
-                              style: GoogleFonts.manrope(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: scheme.onSurface,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Icon(
-                              Icons.bolt_rounded,
-                              size: 18,
-                              color: scheme.tertiary,
-                            ),
-                            const Spacer(),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: scheme.tertiary.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                '${list.length} / ${state.items.length} shown',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: scheme.tertiary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-                    final e = list[i - 1];
-                    final ts = DateTime.tryParse(e.timestamp);
-                    final tsText = ts != null
-                        ? DateFormat('HH:mm:ss.SSS').format(ts.toLocal())
-                        : e.timestamp;
-                    final vis = _styleFor(e, scheme);
-                    final title =
-                        e.processName.isEmpty ? e.type : e.processName;
+                  slivers: [
+                    SliverPersistentHeader(
+                      pinned: true,
+                      delegate: _LiveFeedBarDelegate(
+                        scheme: scheme,
+                        shown: list.length,
+                        total: state.items.length,
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final e = list[index];
+                            final ts = DateTime.tryParse(e.timestamp);
+                            final tsText = ts != null
+                                ? DateFormat('HH:mm:ss.SSS')
+                                    .format(ts.toLocal())
+                                : e.timestamp;
+                            final vis = _styleFor(e, scheme);
+                            final title = e.processName.isEmpty
+                                ? e.type
+                                : e.processName;
 
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Material(
-                        color: scheme.surfaceContainer,
-                        borderRadius: BorderRadius.circular(EmDesign.radiusLg),
-                        clipBehavior: Clip.antiAlias,
-                        child: InkWell(
-                          onTap: () {
-                            showModalBottomSheet<void>(
-                              context: context,
-                              showDragHandle: true,
-                              backgroundColor: scheme.surfaceContainerHigh,
-                              builder: (c) => Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: ListView(
-                                  children: [
-                                    Text(
-                                      'PID ${e.pid}',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleMedium,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    SelectableText(e.rawXml),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                          child: IntrinsicHeight(
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Container(
-                                  width: 4,
-                                  color: vis.accent.withValues(alpha: 0.65),
-                                ),
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Material(
+                                color: scheme.surfaceContainer,
+                                borderRadius:
+                                    BorderRadius.circular(EmDesign.radiusLg),
+                                clipBehavior: Clip.antiAlias,
+                                child: InkWell(
+                                  onTap: () {
+                                    showModalBottomSheet<void>(
+                                      context: context,
+                                      useRootNavigator: true,
+                                      showDragHandle: true,
+                                      backgroundColor:
+                                          scheme.surfaceContainerHigh,
+                                      builder: (c) => Padding(
+                                        padding: const EdgeInsets.all(16),
+                                        child: ListView(
                                           children: [
-                                            Container(
-                                              width: 36,
-                                              height: 36,
-                                              decoration: BoxDecoration(
-                                                color: vis.iconBg,
-                                                borderRadius:
-                                                    BorderRadius.circular(10),
-                                              ),
-                                              child: Icon(
-                                                vis.icon,
-                                                size: 22,
-                                                color: vis.accent,
-                                              ),
+                                            Text(
+                                              'PID ${e.pid}',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .titleMedium,
                                             ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    title,
-                                                    style: theme
-                                                        .textTheme.bodySmall
-                                                        ?.copyWith(
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      color: scheme.onSurface,
-                                                      height: 1.2,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 2),
-                                                  Text(
-                                                    'Event ID: ${e.eventId}',
-                                                    style: theme
-                                                        .textTheme.labelSmall
-                                                        ?.copyWith(
-                                                      fontSize: 10,
-                                                      color: scheme
-                                                          .onSurfaceVariant,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                horizontal: 8,
-                                                vertical: 4,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: vis.accent
-                                                    .withValues(alpha: 0.12),
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                tsText,
-                                                style: theme
-                                                    .textTheme.labelSmall
-                                                    ?.copyWith(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: vis.accent,
-                                                ),
-                                              ),
-                                            ),
+                                            const SizedBox(height: 8),
+                                            SelectableText(e.rawXml),
                                           ],
                                         ),
-                                        const SizedBox(height: 10),
-                                        Text(
-                                          _descriptionPreview(e),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: theme.textTheme.bodySmall
-                                              ?.copyWith(
-                                            color: scheme.onSecondaryContainer,
-                                            height: 1.45,
-                                            fontSize: 12,
+                                      ),
+                                    );
+                                  },
+                                  child: IntrinsicHeight(
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        Container(
+                                          width: 4,
+                                          color: vis.accent
+                                              .withValues(alpha: 0.65),
+                                        ),
+                                        Expanded(
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(16),
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Container(
+                                                      width: 36,
+                                                      height: 36,
+                                                      decoration:
+                                                          BoxDecoration(
+                                                        color: vis.iconBg,
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(10),
+                                                      ),
+                                                      child: Icon(
+                                                        vis.icon,
+                                                        size: 22,
+                                                        color: vis.accent,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        children: [
+                                                          Text(
+                                                            title,
+                                                            style: theme
+                                                                .textTheme
+                                                                .bodySmall
+                                                                ?.copyWith(
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w700,
+                                                              color: scheme
+                                                                  .onSurface,
+                                                              height: 1.2,
+                                                            ),
+                                                          ),
+                                                          const SizedBox(
+                                                              height: 2),
+                                                          Text(
+                                                            'Event ID: ${e.eventId}',
+                                                            style: theme
+                                                                .textTheme
+                                                                .labelSmall
+                                                                ?.copyWith(
+                                                              fontSize: 10,
+                                                              color: scheme
+                                                                  .onSurfaceVariant,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    Container(
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                        horizontal: 8,
+                                                        vertical: 4,
+                                                      ),
+                                                      decoration:
+                                                          BoxDecoration(
+                                                        color: vis.accent
+                                                            .withValues(
+                                                                alpha: 0.12),
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(6),
+                                                      ),
+                                                      child: Text(
+                                                        tsText,
+                                                        style: theme
+                                                            .textTheme
+                                                            .labelSmall
+                                                            ?.copyWith(
+                                                          fontSize: 10,
+                                                          fontWeight:
+                                                              FontWeight.w500,
+                                                          color: vis.accent,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 10),
+                                                Text(
+                                                  _descriptionPreview(e),
+                                                  maxLines: 2,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: theme
+                                                      .textTheme.bodySmall
+                                                      ?.copyWith(
+                                                    color: scheme
+                                                        .onSecondaryContainer,
+                                                    height: 1.45,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
                                 ),
-                              ],
-                            ),
-                          ),
+                              ),
+                            );
+                          },
+                          childCount: list.length,
                         ),
                       ),
-                    );
-                  },
+                    ),
+                  ],
                 );
               },
             ),
@@ -955,6 +1020,95 @@ class _EventsScreenState extends State<EventsScreen> {
         ],
       ),
     );
+  }
+}
+
+class _LiveFeedBarDelegate extends SliverPersistentHeaderDelegate {
+  _LiveFeedBarDelegate({
+    required this.scheme,
+    required this.shown,
+    required this.total,
+  });
+
+  final ColorScheme scheme;
+  final int shown;
+  final int total;
+
+  static const double _height = 56;
+
+  @override
+  double get minExtent => _height;
+
+  @override
+  double get maxExtent => _height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return Material(
+      color: scheme.surface,
+      elevation: overlapsContent ? 2 : 0,
+      shadowColor: Colors.black.withValues(alpha: 0.15),
+      child: Container(
+        height: _height,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: scheme.outlineVariant.withValues(alpha: 0.15),
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            Text(
+              'Live feed',
+              style: GoogleFonts.manrope(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: scheme.onSurface,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.bolt_rounded,
+              size: 18,
+              color: scheme.tertiary,
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 5,
+              ),
+              decoration: BoxDecoration(
+                color: scheme.tertiary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                '$shown / $total shown',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: scheme.tertiary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _LiveFeedBarDelegate oldDelegate) {
+    return oldDelegate.scheme != scheme ||
+        oldDelegate.shown != shown ||
+        oldDelegate.total != total;
   }
 }
 
@@ -1058,7 +1212,9 @@ class _TimeRangeChip extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
     return Material(
-      color: selected ? scheme.primary.withValues(alpha: 0.16) : scheme.surfaceContainerHigh,
+      color: selected
+          ? scheme.primary.withValues(alpha: 0.16)
+          : scheme.surfaceContainerHigh,
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         onTap: onTap,

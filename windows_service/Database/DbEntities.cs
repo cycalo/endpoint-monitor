@@ -26,6 +26,8 @@ public sealed class FlaggedProcessRow
 {
     [PrimaryKey]
     public string Name { get; set; } = "";
+
+    public string AddedAt { get; set; } = "";
 }
 
 [Table("FirewallBlocks")]
@@ -35,6 +37,26 @@ public sealed class FirewallBlockRow
     public string Ip { get; set; } = "";
     public string Direction { get; set; } = "";
     public string CreatedAt { get; set; } = "";
+    public string SourceProcessName { get; set; } = "";
+
+    /// <summary>0 = not scoped to a remote port.</summary>
+    public int RemotePort { get; set; }
+
+    /// <summary>UTC ISO-8601 expiry, or empty for permanent.</summary>
+    public string ExpiresAt { get; set; } = "";
+}
+
+[Table("FirewallProcessBlocks")]
+public sealed class FirewallProcessBlockRow
+{
+    [PrimaryKey]
+    public string RuleKey { get; set; } = "";
+
+    public string ProcessName { get; set; } = "";
+    public string Direction { get; set; } = "";
+    public string ExecutablePath { get; set; } = "";
+    public string CreatedAt { get; set; } = "";
+    public string ExpiresAt { get; set; } = "";
 }
 
 [Table("AuditLog")]
@@ -63,6 +85,21 @@ public sealed class BadIpRow
 {
     [PrimaryKey]
     public string Ip { get; set; } = "";
+
+    public string Source { get; set; } = "";
+    public string AddedAt { get; set; } = "";
+    public string ExpiresAt { get; set; } = "";
+    public string Category { get; set; } = "";
+}
+
+[Table("AlertHistory")]
+public sealed class AlertHistoryRow
+{
+    [PrimaryKey, AutoIncrement]
+    public int Id { get; set; }
+
+    public string OccurredAt { get; set; } = "";
+    public string Type { get; set; } = "";
 }
 
 [Table("AlertAck")]

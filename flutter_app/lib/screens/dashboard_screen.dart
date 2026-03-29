@@ -1,11 +1,15 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../bloc/alerts_bloc.dart';
 import '../bloc/connection_bloc.dart';
 import '../bloc/process_bloc.dart';
 import '../bloc/system_info_bloc.dart';
+import '../bloc/threat_intel_bloc.dart';
+import '../bloc/timeline_bloc.dart';
 import '../models/ws_models.dart';
 import '../theme/em_design_system.dart';
 import '../widgets/em_brand_app_bar.dart';
@@ -47,8 +51,13 @@ class DashboardScreen extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
+            children: [
+                        const _DashboardDataBootstrap(),
                         const _DashboardConnectionHero(),
+                        const SizedBox(height: 20),
+                        const _DashboardTimelineChart(),
+                        const SizedBox(height: 16),
+                        const _DashboardThreatIntelCard(),
                         const SizedBox(height: 24),
                         if (i == null)
                           Padding(
@@ -213,8 +222,8 @@ class _DashboardConnectionHero extends StatelessWidget {
             children: [
               Expanded(
                 flex: 2,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text('STATUS', style: EmDesign.labelCaps(context, scheme)),
@@ -587,7 +596,7 @@ class _RamDiskCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+              const SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(999),
             child: LinearProgressIndicator(
@@ -882,9 +891,9 @@ class _SummaryMetricsPair extends StatelessWidget {
                 ],
               ),
             ),
-          ],
-        ),
-      );
+                      ],
+                    ),
+                  );
     }
 
     return Row(
@@ -952,9 +961,9 @@ class _AlertsStrip extends StatelessWidget {
               ),
             ),
           ),
-        ],
-      ),
-    );
+                        ],
+                      ),
+                    );
   }
 }
 
@@ -1030,6 +1039,351 @@ class _DangerZoneSection extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _DashboardDataBootstrap extends StatefulWidget {
+  const _DashboardDataBootstrap();
+
+  @override
+  State<_DashboardDataBootstrap> createState() => _DashboardDataBootstrapState();
+}
+
+class _DashboardDataBootstrapState extends State<_DashboardDataBootstrap> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final tl = context.read<TimelineBloc>();
+      tl.refresh();
+      tl.startAutoRefresh();
+      context.read<ThreatIntelBloc>()
+        ..refreshStatus()
+        ..refreshEntries();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
+}
+
+class _DashboardTimelineChart extends StatelessWidget {
+  const _DashboardTimelineChart();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    return BlocBuilder<TimelineBloc, TimelineState>(
+      builder: (context, st) {
+        if (st.loading && st.buckets.isEmpty) {
+          return SizedBox(
+            height: 200,
+            child: Center(
+              child: Text(
+                'Loading activity timeline…',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          );
+        }
+        if (st.buckets.isEmpty) return const SizedBox.shrink();
+
+        var maxY = 4.0;
+        for (final b in st.buckets) {
+          final t = b.processCreate +
+              b.networkConnect +
+              b.dnsQuery +
+              b.alerts;
+          if (t > maxY) maxY = t.toDouble();
+        }
+
+        final groups = <BarChartGroupData>[];
+        for (var i = 0; i < st.buckets.length; i++) {
+          final b = st.buckets[i];
+          final p = b.processCreate.toDouble();
+          final n = b.networkConnect.toDouble();
+          final d = b.dnsQuery.toDouble();
+          final a = b.alerts.toDouble();
+          final total = p + n + d + a;
+          if (total < 0.5) {
+            groups.add(
+              BarChartGroupData(
+                x: i,
+                barRods: [
+                  BarChartRodData(
+                    toY: 0.4,
+                    width: 8,
+                    color: scheme.outlineVariant.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ],
+              ),
+            );
+            continue;
+          }
+          groups.add(
+            BarChartGroupData(
+              x: i,
+              barRods: [
+                BarChartRodData(
+                  toY: total,
+                  width: 10,
+                  borderRadius: BorderRadius.circular(2),
+                  rodStackItems: [
+                    BarChartRodStackItem(0, p, scheme.primary),
+                    BarChartRodStackItem(p, p + n, scheme.tertiary),
+                    BarChartRodStackItem(p + n, p + n + d, scheme.secondary),
+                    BarChartRodStackItem(
+                        p + n + d, p + n + d + a, scheme.error),
+                  ],
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(EmDesign.radiusLg),
+            border: EmDesign.ghostBorder(scheme),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'ACTIVITY (24H, UTC HOURS)',
+                      style: EmDesign.labelCaps(context, scheme),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Refresh',
+                    onPressed: () =>
+                        context.read<TimelineBloc>().refresh(hours: 24),
+                    icon: Icon(Icons.refresh_rounded, color: scheme.primary),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  _LegendDot(color: scheme.primary, label: 'Process'),
+                  const SizedBox(width: 12),
+                  _LegendDot(color: scheme.tertiary, label: 'Network'),
+                  const SizedBox(width: 12),
+                  _LegendDot(color: scheme.secondary, label: 'DNS'),
+                  const SizedBox(width: 12),
+                  _LegendDot(color: scheme.error, label: 'Alerts'),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 200,
+                child: BarChart(
+                  BarChartData(
+                    maxY: maxY,
+                    alignment: BarChartAlignment.spaceAround,
+                    gridData: FlGridData(
+                      show: true,
+                      drawVerticalLine: false,
+                      horizontalInterval: maxY > 20 ? 5 : 1,
+                      getDrawingHorizontalLine: (v) => FlLine(
+                        color: scheme.outlineVariant.withValues(alpha: 0.2),
+                        strokeWidth: 1,
+                      ),
+                    ),
+                    borderData: FlBorderData(show: false),
+                    titlesData: FlTitlesData(
+                      topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false)),
+                      rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false)),
+                      leftTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 28,
+                          getTitlesWidget: (v, m) => Text(
+                            v.toInt().toString(),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: scheme.outline,
+                              fontSize: 9,
+                            ),
+                          ),
+                        ),
+                      ),
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          getTitlesWidget: (v, m) {
+                            final i = v.toInt();
+                            if (i < 0 || i >= st.buckets.length) {
+                              return const SizedBox.shrink();
+                            }
+                            final iso = st.buckets[i].hourStartIso;
+                            final t = DateTime.tryParse(iso)?.toUtc();
+                            final label = t == null
+                                ? '$i'
+                                : '${t.hour.toString().padLeft(2, '0')}h';
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Text(
+                                label,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  fontSize: 8,
+                                  color: scheme.outline,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                    barTouchData: BarTouchData(
+                      enabled: true,
+                      touchTooltipData: BarTouchTooltipData(
+                        getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                          if (groupIndex < 0 ||
+                              groupIndex >= st.buckets.length) {
+                            return null;
+                          }
+                          final b = st.buckets[groupIndex];
+                          return BarTooltipItem(
+                            'P ${b.processCreate} · N ${b.networkConnect} · D ${b.dnsQuery} · A ${b.alerts}',
+                            TextStyle(
+                              color: scheme.onInverseSurface,
+                              fontSize: 11,
+                            ),
+                          );
+                        },
+                      ),
+                      handleBuiltInTouches: true,
+                      touchCallback: (event, resp) {
+                        if (!event.isInterestedForInteractions) return;
+                        final spot = resp?.spot;
+                        if (spot == null) return;
+                        final i = spot.touchedBarGroupIndex;
+                        if (i < 0 || i >= st.buckets.length) return;
+                        final seg = spot.touchedRodDataIndex;
+                        if (seg != 3) return;
+                        final hour = st.buckets[i].hourStartIso;
+                        context.go(
+                          '/events?hour=${Uri.encodeComponent(hour)}',
+                        );
+                      },
+                    ),
+                    barGroups: groups,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Tap the red (alerts) segment to open Events for that hour.',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _LegendDot extends StatelessWidget {
+  const _LegendDot({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 10),
+        ),
+      ],
+    );
+  }
+}
+
+class _DashboardThreatIntelCard extends StatelessWidget {
+  const _DashboardThreatIntelCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    return BlocBuilder<ThreatIntelBloc, ThreatIntelState>(
+      builder: (context, ti) {
+        if (ti.entryCount == 0 && (ti.lastError == null || ti.lastError!.isEmpty)) {
+          return const SizedBox.shrink();
+        }
+        return Material(
+          color: scheme.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(EmDesign.radiusLg),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(EmDesign.radiusLg),
+            onTap: () => context.go('/network?threats=1'),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(Icons.gpp_maybe_outlined, color: scheme.error, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'THREAT INTEL',
+                          style: EmDesign.labelCaps(context, scheme),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${ti.entryCount} blocklisted IPs loaded',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (ti.lastError != null && ti.lastError!.isNotEmpty)
+                          Text(
+                            ti.lastError!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: scheme.error,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded, color: scheme.outline),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
