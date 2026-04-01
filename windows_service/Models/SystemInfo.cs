@@ -10,6 +10,10 @@ public sealed class SystemInfo
     public double RamTotalGb { get; set; }
     public double DiskUsedGb { get; set; }
     public double DiskTotalGb { get; set; }
+
+    /// <summary>Per local fixed disk volume (ready drives only).</summary>
+    public List<DiskVolumeInfo> Disks { get; set; } = [];
+
     public string Uptime { get; set; } = "";
 
     /// <summary>Friendly OS title from WMI when available (e.g. Microsoft Windows 11 Pro).</summary>

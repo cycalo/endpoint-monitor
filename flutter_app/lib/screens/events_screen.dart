@@ -740,7 +740,7 @@ class _EventsScreenState extends State<EventsScreen>
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'One-hour window from timeline (UTC).',
+                              'One-hour window from activity heatmap (UTC).',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: scheme.onSurfaceVariant,
                               ),

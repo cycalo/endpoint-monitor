@@ -197,6 +197,28 @@ class SysmonEvent {
       );
 }
 
+/// One local fixed disk from the agent (e.g. C:\) with usage in GiB.
+class DiskVolumeInfo {
+  const DiskVolumeInfo({
+    required this.name,
+    required this.label,
+    required this.usedGb,
+    required this.totalGb,
+  });
+
+  final String name;
+  final String label;
+  final double usedGb;
+  final double totalGb;
+
+  factory DiskVolumeInfo.fromJson(Map<String, dynamic> j) => DiskVolumeInfo(
+        name: j['name'] as String? ?? '',
+        label: j['label'] as String? ?? '',
+        usedGb: (j['usedGb'] as num?)?.toDouble() ?? 0,
+        totalGb: (j['totalGb'] as num?)?.toDouble() ?? 0,
+      );
+}
+
 class SystemInfo {
   SystemInfo({
     required this.systemName,
@@ -205,6 +227,7 @@ class SystemInfo {
     required this.ramTotalGb,
     required this.diskUsedGb,
     required this.diskTotalGb,
+    this.disks = const [],
     required this.uptime,
     required this.osCaption,
     required this.osVersion,
@@ -231,6 +254,10 @@ class SystemInfo {
   final double ramTotalGb;
   final double diskUsedGb;
   final double diskTotalGb;
+
+  /// Per-volume breakdown when the agent provides it (else empty).
+  final List<DiskVolumeInfo> disks;
+
   final String uptime;
 
   /// Friendly OS title when provided (e.g. Microsoft Windows 11 Pro).
@@ -281,6 +308,11 @@ class SystemInfo {
         ramTotalGb: (j['ramTotalGb'] as num?)?.toDouble() ?? 0,
         diskUsedGb: (j['diskUsedGb'] as num?)?.toDouble() ?? 0,
         diskTotalGb: (j['diskTotalGb'] as num?)?.toDouble() ?? 0,
+        disks: (j['disks'] as List<dynamic>?)
+                ?.whereType<Map>()
+                .map((e) => DiskVolumeInfo.fromJson(Map<String, dynamic>.from(e)))
+                .toList() ??
+            const [],
         uptime: j['uptime'] as String? ?? '',
         osCaption: j['osCaption'] as String? ?? '',
         osVersion: j['osVersion'] as String? ?? '',

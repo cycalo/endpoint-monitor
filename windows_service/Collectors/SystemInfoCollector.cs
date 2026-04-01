@@ -102,14 +102,37 @@ public sealed class SystemInfoCollector(
         try
         {
             double used = 0, total = 0;
-            foreach (var d in DriveInfo.GetDrives().Where(d => d.IsReady && d.DriveType == DriveType.Fixed))
+            var disks = new List<DiskVolumeInfo>();
+            foreach (var d in DriveInfo.GetDrives()
+                         .Where(x => x.IsReady && x.DriveType == DriveType.Fixed)
+                         .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase))
             {
-                used += (d.TotalSize - d.TotalFreeSpace) / (1024.0 * 1024 * 1024);
-                total += d.TotalSize / (1024.0 * 1024 * 1024);
+                var volUsed = (d.TotalSize - d.TotalFreeSpace) / (1024.0 * 1024 * 1024);
+                var volTotal = d.TotalSize / (1024.0 * 1024 * 1024);
+                used += volUsed;
+                total += volTotal;
+                var label = "";
+                try
+                {
+                    label = d.VolumeLabel?.Trim() ?? "";
+                }
+                catch
+                {
+                    // Some volumes throw on label access
+                }
+
+                disks.Add(new DiskVolumeInfo
+                {
+                    Name = d.Name,
+                    Label = label,
+                    UsedGb = Math.Round(volUsed, 2),
+                    TotalGb = Math.Round(volTotal, 2)
+                });
             }
 
             info.DiskUsedGb = Math.Round(used, 2);
             info.DiskTotalGb = Math.Round(total, 2);
+            info.Disks = disks;
         }
         catch (Exception ex)
         {

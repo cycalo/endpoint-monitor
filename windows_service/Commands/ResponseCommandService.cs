@@ -589,8 +589,35 @@ public sealed class ResponseCommandService(
     private async Task<CommandResult> GetTimelineAsync(JsonElement root, CancellationToken cancellationToken)
     {
         var hours = root.TryGetProperty("hours", out var h) && h.TryGetInt32(out var hv) ? Math.Clamp(hv, 1, 168) : 24;
-        var buckets = await database.GetTimelineAsync(hours, cancellationToken).ConfigureAwait(false);
-        var data = JsonSerializer.SerializeToElement(new { buckets }, AppJson.Options);
+        var raw = await database.GetTimelineAsync(hours, cancellationToken).ConfigureAwait(false);
+        var ordered = raw.OrderBy(x => x.HourStart, StringComparer.Ordinal).ToList();
+        var sums = ordered
+            .Select(d => d.ProcessCreate + d.NetworkConnect + d.DnsQuery)
+            .ToList();
+        var maxSum = sums.Count == 0 ? 0 : sums.Max();
+        var heatmap = new List<object>(ordered.Count);
+        for (var i = 0; i < ordered.Count; i++)
+        {
+            var d = ordered[i];
+            var sum = sums[i];
+            var activityLevel = maxSum <= 0
+                ? 0
+                : (int)Math.Round(10.0 * sum / maxSum, MidpointRounding.AwayFromZero);
+            activityLevel = Math.Clamp(activityLevel, 0, 10);
+            heatmap.Add(new
+            {
+                hour = i,
+                hourStartUtc = d.HourStart,
+                activityLevel,
+                hasAlert = d.Alerts > 0
+            });
+        }
+
+        var data = JsonSerializer.SerializeToElement(new
+        {
+            buckets = heatmap,
+            generatedAt = DateTime.UtcNow.ToString("O")
+        }, AppJson.Options);
         return new CommandResult(true, "get_timeline", "ok", data);
     }
 

@@ -1,6 +1,3 @@
-import 'dart:math' show min;
-
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -11,25 +8,11 @@ import '../bloc/connection_bloc.dart';
 import '../bloc/process_bloc.dart';
 import '../bloc/system_info_bloc.dart';
 import '../bloc/threat_intel_bloc.dart';
-import '../bloc/timeline_bloc.dart';
+import '../bloc/activity_heatmap_bloc.dart';
 import '../models/ws_models.dart';
 import '../theme/em_design_system.dart';
+import '../widgets/activity_heatmap_card.dart';
 import '../widgets/em_brand_app_bar.dart';
-
-double _medianOfUnsorted(List<double> values) {
-  if (values.isEmpty) return 1;
-  final s = List<double>.from(values)..sort();
-  final n = s.length;
-  if (n.isOdd) return s[n ~/ 2];
-  return (s[n ~/ 2 - 1] + s[n ~/ 2]) / 2;
-}
-
-double _percentile95Unsorted(List<double> values) {
-  if (values.isEmpty) return 4;
-  final s = List<double>.from(values)..sort();
-  final idx = ((s.length - 1) * 0.95).round().clamp(0, s.length - 1);
-  return s[idx];
-}
 
 /// Dashboard aligned with [flutter_design/dashboard_with_system_identity/code.html].
 class DashboardScreen extends StatelessWidget {
@@ -68,11 +51,11 @@ class DashboardScreen extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+                      children: [
                         const _DashboardDataBootstrap(),
                         const _DashboardConnectionHero(),
                         const SizedBox(height: 20),
-                        const _DashboardTimelineChart(),
+                        const _DashboardActivityHeatmap(),
                         const SizedBox(height: 16),
                         const _DashboardThreatIntelCard(),
                         const SizedBox(height: 24),
@@ -239,8 +222,8 @@ class _DashboardConnectionHero extends StatelessWidget {
             children: [
               Expanded(
                 flex: 2,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text('STATUS', style: EmDesign.labelCaps(context, scheme)),
@@ -544,7 +527,7 @@ class _CpuLoadCard extends StatelessWidget {
   }
 }
 
-class _RamDiskCard extends StatelessWidget {
+class _RamDiskCard extends StatefulWidget {
   const _RamDiskCard({
     required this.info,
     required this.scheme,
@@ -558,12 +541,21 @@ class _RamDiskCard extends StatelessWidget {
   final double radiusCard;
 
   @override
+  State<_RamDiskCard> createState() => _RamDiskCardState();
+}
+
+class _RamDiskCardState extends State<_RamDiskCard> {
+  bool _diskVolumesExpanded = false;
+
+  @override
   Widget build(BuildContext context) {
+    final info = widget.info;
+    final scheme = widget.scheme;
+    final theme = widget.theme;
+    final radiusCard = widget.radiusCard;
+
     final ramFrac = info.ramTotalGb > 0
         ? (info.ramUsedGb / info.ramTotalGb).clamp(0.0, 1.0)
-        : 0.0;
-    final diskFrac = info.diskTotalGb > 0
-        ? (info.diskUsedGb / info.diskTotalGb).clamp(0.0, 1.0)
         : 0.0;
     final body = theme.textTheme.bodySmall?.copyWith(
       fontSize: 14,
@@ -603,29 +595,190 @@ class _RamDiskCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Disk (C:)', style: body?.copyWith(color: scheme.onSurface)),
-              Text(
-                _diskLine(info),
-                style: body?.copyWith(color: scheme.tertiary),
+          if (info.disks.isNotEmpty) ...[
+            Tooltip(
+              message: _diskVolumesExpanded
+                  ? 'Hide per-disk breakdown'
+                  : 'Show per-disk breakdown',
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => setState(
+                      () => _diskVolumesExpanded = !_diskVolumesExpanded),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Total Disk Space',
+                                style: body?.copyWith(color: scheme.onSurface),
+                              ),
+                            ),
+                            Text(
+                              _aggregateDiskLine(info),
+                              style: body?.copyWith(color: scheme.tertiary),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              _diskVolumesExpanded
+                                  ? Icons.expand_less_rounded
+                                  : Icons.expand_more_rounded,
+                              size: 22,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(999),
+                          child: LinearProgressIndicator(
+                            value: info.diskTotalGb > 0
+                                ? (info.diskUsedGb / info.diskTotalGb)
+                                    .clamp(0.0, 1.0)
+                                : 0.0,
+                            minHeight: 8,
+                            backgroundColor: scheme.surfaceContainerLow,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(scheme.tertiary),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-            ],
-          ),
-              const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: diskFrac,
-              minHeight: 8,
-              backgroundColor: scheme.surfaceContainerLow,
-              valueColor: AlwaysStoppedAnimation<Color>(scheme.tertiary),
             ),
-          ),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 240),
+              curve: Curves.easeInOutCubic,
+              alignment: Alignment.topCenter,
+              child: _diskVolumesExpanded
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: 14),
+                        ..._diskVolumeWidgets(
+                          info,
+                          scheme,
+                          theme,
+                          body,
+                          firstVolumeTopGap: 0,
+                        ),
+                      ],
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ] else ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Total Disk Space',
+                  style: body?.copyWith(color: scheme.onSurface),
+                ),
+                Text(
+                  _aggregateDiskLine(info),
+                  style: body?.copyWith(color: scheme.tertiary),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: info.diskTotalGb > 0
+                    ? (info.diskUsedGb / info.diskTotalGb).clamp(0.0, 1.0)
+                    : 0.0,
+                minHeight: 8,
+                backgroundColor: scheme.surfaceContainerLow,
+                valueColor: AlwaysStoppedAnimation<Color>(scheme.tertiary),
+              ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  static List<Widget> _diskVolumeWidgets(
+    SystemInfo info,
+    ColorScheme scheme,
+    ThemeData theme,
+    TextStyle? body, {
+    double firstVolumeTopGap = 10,
+  }) {
+    final out = <Widget>[];
+    for (var i = 0; i < info.disks.length; i++) {
+      final d = info.disks[i];
+      final frac = d.totalGb > 0 ? (d.usedGb / d.totalGb).clamp(0.0, 1.0) : 0.0;
+      if (i > 0) {
+        out.add(const SizedBox(height: 14));
+      } else if (firstVolumeTopGap > 0) {
+        out.add(SizedBox(height: firstVolumeTopGap));
+      }
+      out.add(
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _driveTitle(d.name),
+                    style: body?.copyWith(color: scheme.onSurface),
+                  ),
+                  if (d.label.trim().isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        d.label.trim(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontSize: 11,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              _storageLine(d.usedGb, d.totalGb),
+              style: body?.copyWith(color: scheme.tertiary),
+            ),
+          ],
+        ),
+      );
+      out.add(const SizedBox(height: 6));
+      out.add(
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            value: frac,
+            minHeight: 6,
+            backgroundColor: scheme.surfaceContainerLow,
+            valueColor: AlwaysStoppedAnimation<Color>(scheme.tertiary),
+          ),
+        ),
+      );
+    }
+    return out;
+  }
+
+  static String _driveTitle(String path) {
+    final t = path.trim();
+    if (t.isEmpty) return '—';
+    final letter = t.replaceAll(r'\', '').replaceAll('/', '');
+    if (letter.isEmpty) return t;
+    return '$letter:';
   }
 
   static String _ramLine(SystemInfo i) {
@@ -633,14 +786,16 @@ class _RamDiskCard extends StatelessWidget {
     return '${i.ramUsedGb.toStringAsFixed(1)} GB / ${i.ramTotalGb.toStringAsFixed(0)} GB';
   }
 
-  static String _diskLine(SystemInfo i) {
-    final u = i.diskUsedGb;
-    final t = i.diskTotalGb;
+  static String _aggregateDiskLine(SystemInfo i) {
+    return _storageLine(i.diskUsedGb, i.diskTotalGb);
+  }
+
+  static String _storageLine(double u, double t) {
     if (t <= 0) return '—';
     if (t >= 1024) {
       return '${(u / 1024).toStringAsFixed(1)} TB / ${(t / 1024).toStringAsFixed(1)} TB';
     }
-    return '${u.toStringAsFixed(0)} GB / ${t.toStringAsFixed(0)} GB';
+    return '${u.toStringAsFixed(1)} GB / ${t.toStringAsFixed(0)} GB';
   }
 }
 
@@ -908,9 +1063,9 @@ class _SummaryMetricsPair extends StatelessWidget {
                 ],
               ),
             ),
-                      ],
-                    ),
-                  );
+          ],
+        ),
+      );
     }
 
     return Row(
@@ -978,9 +1133,9 @@ class _AlertsStrip extends StatelessWidget {
               ),
             ),
           ),
-                        ],
-                      ),
-                    );
+        ],
+      ),
+    );
   }
 }
 
@@ -1064,7 +1219,8 @@ class _DashboardDataBootstrap extends StatefulWidget {
   const _DashboardDataBootstrap();
 
   @override
-  State<_DashboardDataBootstrap> createState() => _DashboardDataBootstrapState();
+  State<_DashboardDataBootstrap> createState() =>
+      _DashboardDataBootstrapState();
 }
 
 class _DashboardDataBootstrapState extends State<_DashboardDataBootstrap> {
@@ -1073,9 +1229,9 @@ class _DashboardDataBootstrapState extends State<_DashboardDataBootstrap> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final tl = context.read<TimelineBloc>();
-      tl.refresh();
-      tl.startAutoRefresh();
+      final hm = context.read<ActivityHeatmapBloc>();
+      hm.refresh();
+      hm.startAutoRefresh();
       context.read<ThreatIntelBloc>()
         ..refreshStatus()
         ..refreshEntries();
@@ -1086,343 +1242,20 @@ class _DashboardDataBootstrapState extends State<_DashboardDataBootstrap> {
   Widget build(BuildContext context) => const SizedBox.shrink();
 }
 
-class _DashboardTimelineChart extends StatelessWidget {
-  const _DashboardTimelineChart();
+class _DashboardActivityHeatmap extends StatelessWidget {
+  const _DashboardActivityHeatmap();
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final theme = Theme.of(context);
-    return BlocBuilder<TimelineBloc, TimelineState>(
+    return BlocBuilder<ActivityHeatmapBloc, ActivityHeatmapState>(
       builder: (context, st) {
-        if (st.loading && st.buckets.isEmpty) {
-          return SizedBox(
-            height: 160,
-            child: Center(
-              child: Text(
-                'Loading activity timeline…',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          );
-        }
-        if (st.buckets.isEmpty) {
-          return Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: scheme.surfaceContainer,
-              borderRadius: BorderRadius.circular(EmDesign.radiusLg),
-              border: EmDesign.ghostBorder(scheme),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'ACTIVITY (24H, UTC HOURS)',
-                        style: EmDesign.labelCaps(context, scheme),
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Refresh',
-                      onPressed: () =>
-                          context.read<TimelineBloc>().refresh(hours: 24),
-                      icon:
-                          Icon(Icons.refresh_rounded, color: scheme.primary),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'No timeline data yet. Connect to the endpoint and wait for activity, then refresh.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-
-        final allSeg = <double>[];
-        for (final b in st.buckets) {
-          allSeg.add(b.processCreate.toDouble());
-          allSeg.add(b.networkConnect.toDouble());
-          allSeg.add(b.dnsQuery.toDouble());
-          allSeg.add(b.alerts.toDouble());
-        }
-        var median = _medianOfUnsorted(allSeg);
-        if (median <= 0) median = 1;
-        final p95 = _percentile95Unsorted(allSeg);
-        var anyCapped = false;
-        double capSeg(double v) {
-          final lim = 3 * median;
-          final c = min(v, lim);
-          if (c < v - 1e-9) anyCapped = true;
-          return c;
-        }
-
-        var maxStack = 4.0;
-        final groups = <BarChartGroupData>[];
-        for (var i = 0; i < st.buckets.length; i++) {
-          final b = st.buckets[i];
-          final p = b.processCreate.toDouble();
-          final n = b.networkConnect.toDouble();
-          final d = b.dnsQuery.toDouble();
-          final a = b.alerts.toDouble();
-          final total = p + n + d + a;
-          if (total < 0.5) {
-            groups.add(
-              BarChartGroupData(
-                x: i,
-                barRods: [
-                  BarChartRodData(
-                    toY: 0.4,
-                    width: 8,
-                    color: scheme.outlineVariant.withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ],
-              ),
-            );
-            continue;
-          }
-          final pc = capSeg(p);
-          final nc = capSeg(n);
-          final dc = capSeg(d);
-          final ac = capSeg(a);
-          final totalC = pc + nc + dc + ac;
-          if (totalC > maxStack) maxStack = totalC;
-          groups.add(
-            BarChartGroupData(
-              x: i,
-              barRods: [
-                BarChartRodData(
-                  toY: totalC,
-                  width: 10,
-                  borderRadius: BorderRadius.circular(2),
-                  rodStackItems: [
-                    BarChartRodStackItem(0, pc, scheme.primary),
-                    BarChartRodStackItem(pc, pc + nc, scheme.tertiary),
-                    BarChartRodStackItem(pc + nc, pc + nc + dc, scheme.secondary),
-                    BarChartRodStackItem(
-                        pc + nc + dc, pc + nc + dc + ac, scheme.error),
-                  ],
-                ),
-              ],
-            ),
-          );
-        }
-        final rawMaxY = (maxStack < p95 ? p95 : maxStack) * 1.05;
-        final chartMaxY = rawMaxY < 4 ? 4.0 : rawMaxY;
-
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainer,
-            borderRadius: BorderRadius.circular(EmDesign.radiusLg),
-            border: EmDesign.ghostBorder(scheme),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'ACTIVITY (24H, UTC HOURS)',
-                      style: EmDesign.labelCaps(context, scheme),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'How to use this chart',
-                    onPressed: () {
-                      showDialog<void>(
-                        context: context,
-                        builder: (c) => AlertDialog(
-                          title: const Text('Activity timeline'),
-                          content: const Text(
-                            'Tap the red (alerts) segment on a bar to open the Events screen for that UTC hour.',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(c),
-                              child: const Text('OK'),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                    icon: Icon(Icons.info_outline_rounded, color: scheme.outline),
-                  ),
-                  IconButton(
-                    tooltip: 'Refresh',
-                    onPressed: () =>
-                        context.read<TimelineBloc>().refresh(hours: 24),
-                    icon: Icon(Icons.refresh_rounded, color: scheme.primary),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  _LegendDot(color: scheme.primary, label: 'Process'),
-                  const SizedBox(width: 12),
-                  _LegendDot(color: scheme.tertiary, label: 'Network'),
-                  const SizedBox(width: 12),
-                  _LegendDot(color: scheme.secondary, label: 'DNS'),
-                  const SizedBox(width: 12),
-                  _LegendDot(color: scheme.error, label: 'Alerts'),
-                ],
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 160,
-                child: BarChart(
-                  BarChartData(
-                    maxY: chartMaxY,
-                    alignment: BarChartAlignment.spaceAround,
-                    gridData: FlGridData(
-                      show: true,
-                      drawVerticalLine: false,
-                      horizontalInterval: chartMaxY > 20 ? 5 : 1,
-                      getDrawingHorizontalLine: (v) => FlLine(
-                        color: scheme.outlineVariant.withValues(alpha: 0.2),
-                        strokeWidth: 1,
-                      ),
-                    ),
-                    borderData: FlBorderData(show: false),
-                    titlesData: FlTitlesData(
-                      topTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false)),
-                      rightTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false)),
-                      leftTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 28,
-                          getTitlesWidget: (v, m) => Text(
-                            v.toInt().toString(),
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: scheme.outline,
-                              fontSize: 9,
-                            ),
-                          ),
-                        ),
-                      ),
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          getTitlesWidget: (v, m) {
-                            final i = v.toInt();
-                            if (i < 0 || i >= st.buckets.length) {
-                              return const SizedBox.shrink();
-                            }
-                            if (i % 4 != 0) {
-                              return const SizedBox.shrink();
-                            }
-                            final iso = st.buckets[i].hourStartIso;
-                            final t = DateTime.tryParse(iso)?.toUtc();
-                            final label = t == null
-                                ? '$i'
-                                : '${t.hour.toString().padLeft(2, '0')}h';
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 6),
-                              child: Text(
-                                label,
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  fontSize: 8,
-                                  color: scheme.outline,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                    barTouchData: BarTouchData(
-                      enabled: true,
-                      touchTooltipData: BarTouchTooltipData(
-                        getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                          if (groupIndex < 0 ||
-                              groupIndex >= st.buckets.length) {
-                            return null;
-                          }
-                          final b = st.buckets[groupIndex];
-                          return BarTooltipItem(
-                            'P ${b.processCreate} · N ${b.networkConnect} · D ${b.dnsQuery} · A ${b.alerts}',
-                            TextStyle(
-                              color: scheme.onInverseSurface,
-                              fontSize: 11,
-                            ),
-                          );
-                        },
-                      ),
-                      handleBuiltInTouches: true,
-                      touchCallback: (event, resp) {
-                        if (!event.isInterestedForInteractions) return;
-                        final spot = resp?.spot;
-                        if (spot == null) return;
-                        final i = spot.touchedBarGroupIndex;
-                        if (i < 0 || i >= st.buckets.length) return;
-                        final seg = spot.touchedRodDataIndex;
-                        if (seg != 3) return;
-                        final hour = st.buckets[i].hourStartIso;
-                        context.go(
-                          '/events?hour=${Uri.encodeComponent(hour)}',
-                        );
-                      },
-                    ),
-                    barGroups: groups,
-                  ),
-                ),
-              ),
-              if (anyCapped) ...[
-                const SizedBox(height: 6),
-                Text(
-                  'Some values capped for readability',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ],
-          ),
+        return ActivityHeatmapCard(
+          loading: st.loading,
+          buckets: st.buckets,
+          onRefresh: () =>
+              context.read<ActivityHeatmapBloc>().refresh(hours: 24),
         );
       },
-    );
-  }
-}
-
-class _LegendDot extends StatelessWidget {
-  const _LegendDot({required this.color, required this.label});
-
-  final Color color;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 10),
-        ),
-      ],
     );
   }
 }
@@ -1436,7 +1269,8 @@ class _DashboardThreatIntelCard extends StatelessWidget {
     final theme = Theme.of(context);
     return BlocBuilder<ThreatIntelBloc, ThreatIntelState>(
       builder: (context, ti) {
-        if (ti.entryCount == 0 && (ti.lastError == null || ti.lastError!.isEmpty)) {
+        if (ti.entryCount == 0 &&
+            (ti.lastError == null || ti.lastError!.isEmpty)) {
           return const SizedBox.shrink();
         }
         return Material(
@@ -1461,7 +1295,7 @@ class _DashboardThreatIntelCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${ti.entryCount} blocklisted IPs loaded',
+                          '${ti.entryCount} blocklisted IPs loaded\nComparing against network traffic',
                           style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
