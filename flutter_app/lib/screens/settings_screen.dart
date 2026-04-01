@@ -21,6 +21,7 @@ import '../theme/em_design_system.dart';
 import '../theme/theme_cubit.dart';
 import '../utils/export_http_base.dart';
 import '../utils/jwt_expiry.dart';
+import '../utils/relative_time.dart';
 import '../widgets/em_brand_app_bar.dart';
 import '../widgets/pin_unlock_gate.dart';
 
@@ -641,20 +642,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
               scheme,
               BlocBuilder<ThreatIntelBloc, ThreatIntelState>(
                 builder: (context, ti) {
+                  final rel = formatRelativeSinceUtcIso(ti.lastRunUtc);
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'Blocklist entries: ${ti.entryCount}',
+                        '${ti.entryCount} known threat IPs monitored',
                         style: theme.textTheme.bodyMedium,
                       ),
-                      if (ti.lastRunUtc != null && ti.lastRunUtc!.isNotEmpty)
+                      const SizedBox(height: 6),
+                      Text(
+                        'Connections to these IPs trigger high severity alerts',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          height: 1.35,
+                        ),
+                      ),
+                      if (rel.isNotEmpty) ...[
+                        const SizedBox(height: 8),
                         Text(
-                          'Last feed update: ${ti.lastRunUtc}',
+                          'Last updated: $rel',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: scheme.onSurfaceVariant,
                           ),
                         ),
+                      ],
+                      if (ti.feeds.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        for (final f in ti.feeds)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Text(
+                              '${f.name} · ${f.count} IPs',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                      ],
                       if (ti.lastError != null && ti.lastError!.isNotEmpty)
                         Text(
                           ti.lastError!,

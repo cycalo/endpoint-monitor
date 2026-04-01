@@ -77,6 +77,14 @@ class MoreScreen extends StatelessWidget {
                 onTap: () => context.pushNamed('firewall'),
               ),
               _MoreMenuRow(
+                icon: Icons.computer_rounded,
+                iconColor: scheme.primary,
+                title: 'Controls',
+                subtitle: 'Remote system controls',
+                showDivider: true,
+                onTap: () => context.pushNamed('controls'),
+              ),
+              _MoreMenuRow(
                 icon: Icons.visibility_outlined,
                 iconColor: scheme.primary,
                 title: 'Watchlist',

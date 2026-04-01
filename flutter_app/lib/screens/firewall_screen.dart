@@ -8,6 +8,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../bloc/connection_bloc.dart';
 import '../bloc/firewall_bloc.dart';
+import '../bloc/process_bloc.dart';
+import '../models/ws_models.dart';
 import '../theme/em_design_system.dart';
 import '../widgets/em_brand_app_bar.dart';
 
@@ -1318,6 +1320,177 @@ class _ManualBlockCard extends StatelessWidget {
   }
 }
 
+/// Option row for process autocomplete (RawAutocomplete needs non-nullable [Object] subtype).
+class _ProcSuggest {
+  const _ProcSuggest._(this.process, this.isNoMatch);
+  const _ProcSuggest.pick(ProcessInfo p) : this._(p, false);
+  const _ProcSuggest.noMatch() : this._(null, true);
+
+  final ProcessInfo? process;
+  final bool isNoMatch;
+}
+
+/// Process name field with live suggestions from [ProcessBloc] (max 5, min 2 chars).
+class _ProcessBlockNameAutocomplete extends StatefulWidget {
+  const _ProcessBlockNameAutocomplete({
+    required this.items,
+    required this.controller,
+    required this.enabled,
+    required this.scheme,
+    required this.theme,
+    required this.nameError,
+    required this.onNameChanged,
+  });
+
+  final List<ProcessInfo> items;
+  final TextEditingController controller;
+  final bool enabled;
+  final ColorScheme scheme;
+  final ThemeData theme;
+  final String? nameError;
+  final VoidCallback onNameChanged;
+
+  @override
+  State<_ProcessBlockNameAutocomplete> createState() =>
+      _ProcessBlockNameAutocompleteState();
+}
+
+class _ProcessBlockNameAutocompleteState
+    extends State<_ProcessBlockNameAutocomplete> {
+  final FocusNode _focus = FocusNode();
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = widget.theme.textTheme.bodySmall?.copyWith(
+      color: widget.scheme.onSurfaceVariant,
+      fontWeight: FontWeight.w500,
+    );
+    return RawAutocomplete<_ProcSuggest>(
+      textEditingController: widget.controller,
+      focusNode: _focus,
+      displayStringForOption: (s) => s.process?.name ?? '',
+      optionsBuilder: (textEditingValue) {
+        final q = textEditingValue.text.trim();
+        if (q.length < 2) return const Iterable<_ProcSuggest>.empty();
+        final matches = widget.items
+            .where(
+              (p) => p.name.toLowerCase().contains(q.toLowerCase()),
+            )
+            .take(5)
+            .map(_ProcSuggest.pick)
+            .toList();
+        if (matches.isEmpty) return const [_ProcSuggest.noMatch()];
+        return matches;
+      },
+      onSelected: (s) {
+        if (!s.isNoMatch && s.process != null) {
+          widget.controller.text = s.process!.name;
+          widget.onNameChanged();
+        }
+      },
+      fieldViewBuilder: (context, c, fn, onFieldSubmitted) {
+        return TextField(
+          controller: c,
+          focusNode: fn,
+          enabled: widget.enabled,
+          onChanged: (_) => widget.onNameChanged(),
+          decoration: InputDecoration(
+            labelText: 'Process name',
+            hintText: 'notepad.exe',
+            errorText: widget.nameError,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+            ),
+          ),
+        );
+      },
+      optionsViewBuilder: (context, onSelected, options) {
+        final kb = MediaQuery.viewInsetsOf(context).bottom;
+        final opts = options.toList();
+        return Padding(
+          padding: EdgeInsets.only(bottom: kb),
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: Material(
+              elevation: 8,
+              color: widget.scheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+              clipBehavior: Clip.antiAlias,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 220),
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  itemCount: opts.length,
+                  itemBuilder: (context, i) {
+                    final opt = opts[i];
+                    if (opt.isNoMatch) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        child: Text(
+                          'No running processes match — process must be running for path lookup',
+                          style: muted,
+                        ),
+                      );
+                    }
+                    final p = opt.process!;
+                    return InkWell(
+                      onTap: () => onSelected(opt),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.settings_suggest_outlined,
+                              size: 20,
+                              color: widget.scheme.primary,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                p.name,
+                                style: GoogleFonts.manrope(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: widget.scheme.onSurface,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              '${p.pid}',
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: widget.scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _ProcessBlockCard extends StatelessWidget {
   const _ProcessBlockCard({
     required this.scheme,
@@ -1366,18 +1539,19 @@ class _ProcessBlockCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          TextField(
-            controller: controller,
-            enabled: enabled,
-            onChanged: (_) => onNameChanged(),
-            decoration: InputDecoration(
-              labelText: 'Process name',
-              hintText: 'notepad.exe',
-              errorText: nameError,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(EmDesign.radiusMd),
-              ),
-            ),
+          BlocBuilder<ProcessBloc, ProcessState>(
+            buildWhen: (a, b) => a.items != b.items,
+            builder: (context, proc) {
+              return _ProcessBlockNameAutocomplete(
+                items: proc.items,
+                controller: controller,
+                enabled: enabled,
+                scheme: scheme,
+                theme: theme,
+                nameError: nameError,
+                onNameChanged: onNameChanged,
+              );
+            },
           ),
           const SizedBox(height: 12),
           Text(

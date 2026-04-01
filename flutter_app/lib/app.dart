@@ -11,6 +11,7 @@ import 'bloc/alerts_bloc.dart';
 import 'bloc/blocked_remote_ips_cubit.dart';
 import 'bloc/browser_bloc.dart';
 import 'bloc/connection_bloc.dart';
+import 'bloc/controls_bloc.dart';
 import 'bloc/events_bloc.dart';
 import 'bloc/firewall_bloc.dart';
 import 'bloc/network_bloc.dart';
@@ -67,6 +68,7 @@ class _EndpointMonitorAppState extends State<EndpointMonitorApp> {
         BlocProvider(create: (_) => WatchlistBloc()),
         BlocProvider(create: (_) => TimelineBloc()),
         BlocProvider(create: (_) => ThreatIntelBloc()),
+        BlocProvider(create: (_) => ControlsBloc()),
       ],
       child: BlocProvider(
         create: (_) {

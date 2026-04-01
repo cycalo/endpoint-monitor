@@ -59,6 +59,53 @@ class WatchlistBloc extends Cubit<WatchlistState> {
 
   static final _exeLike = RegExp(r'\.(exe|com|bat|cmd|msi)$', caseSensitive: false);
 
+  /// Normalizes a running-process name for watchlist / flag_process (adds `.exe` when needed).
+  static String? normalizeExecutableName(String raw) {
+    final name = raw.trim();
+    if (name.isEmpty) return null;
+    final lower = name.toLowerCase();
+    final normalized = lower.endsWith('.exe') ||
+            lower.endsWith('.com') ||
+            lower.endsWith('.bat') ||
+            lower.endsWith('.cmd') ||
+            lower.endsWith('.msi')
+        ? name
+        : '$name.exe';
+    if (!_exeLike.hasMatch(normalized)) return null;
+    return normalized;
+  }
+
+  /// Optimistically flags from Processes screen; sends a single `flag_process`. No-op if already flagged or invalid name.
+  void flagFromProcessesScreen(String rawName) {
+    final normalized = normalizeExecutableName(rawName);
+    if (normalized == null) return;
+    if (state.entries.any((e) => e.name.toLowerCase() == normalized.toLowerCase())) {
+      return;
+    }
+    emit(state.copyWith(clearAddError: true));
+    final now = DateTime.now().toUtc();
+    final next = [
+      ...state.entries,
+      WatchlistEntry(name: normalized, addedAt: now),
+    ]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    emit(state.copyWith(
+      entries: next,
+      lastSeenByName: {...state.lastSeenByName, normalized: null},
+    ));
+    FlutterForegroundTask.sendDataToTask(jsonEncode({'type': 'flag_process', 'name': normalized}));
+    _enqueueLastSeenFetch(normalized);
+  }
+
+  /// Stored watchlist name matching [rawName] (for `remove`).
+  String? watchlistNameForExecutable(String rawName) {
+    final want = normalizeExecutableName(rawName)?.toLowerCase();
+    if (want == null) return null;
+    for (final e in state.entries) {
+      if (e.name.toLowerCase() == want) return e.name;
+    }
+    return null;
+  }
+
   void refreshFromServer() {
     emit(state.copyWith(serverListLoading: true));
     FlutterForegroundTask.sendDataToTask(jsonEncode({'type': 'get_flagged_processes'}));
@@ -170,6 +217,9 @@ class WatchlistBloc extends Cubit<WatchlistState> {
     if (type == 'command_result') {
       final cmd = m['command'] as String?;
       final ok = m['success'] == true;
+      if ((cmd == 'flag_process' || cmd == 'unflag_process') && !ok) {
+        refreshFromServer();
+      }
       if (cmd == 'get_recent_events' && _lastSeenQueue.isNotEmpty) {
         final name = _lastSeenQueue.removeAt(0);
         DateTime? latest;

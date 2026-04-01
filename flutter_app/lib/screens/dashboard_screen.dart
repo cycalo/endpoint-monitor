@@ -1,3 +1,5 @@
+import 'dart:math' show min;
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -13,6 +15,21 @@ import '../bloc/timeline_bloc.dart';
 import '../models/ws_models.dart';
 import '../theme/em_design_system.dart';
 import '../widgets/em_brand_app_bar.dart';
+
+double _medianOfUnsorted(List<double> values) {
+  if (values.isEmpty) return 1;
+  final s = List<double>.from(values)..sort();
+  final n = s.length;
+  if (n.isOdd) return s[n ~/ 2];
+  return (s[n ~/ 2 - 1] + s[n ~/ 2]) / 2;
+}
+
+double _percentile95Unsorted(List<double> values) {
+  if (values.isEmpty) return 4;
+  final s = List<double>.from(values)..sort();
+  final idx = ((s.length - 1) * 0.95).round().clamp(0, s.length - 1);
+  return s[idx];
+}
 
 /// Dashboard aligned with [flutter_design/dashboard_with_system_identity/code.html].
 class DashboardScreen extends StatelessWidget {
@@ -1080,7 +1097,7 @@ class _DashboardTimelineChart extends StatelessWidget {
       builder: (context, st) {
         if (st.loading && st.buckets.isEmpty) {
           return SizedBox(
-            height: 200,
+            height: 160,
             child: Center(
               child: Text(
                 'Loading activity timeline…',
@@ -1091,17 +1108,65 @@ class _DashboardTimelineChart extends StatelessWidget {
             ),
           );
         }
-        if (st.buckets.isEmpty) return const SizedBox.shrink();
-
-        var maxY = 4.0;
-        for (final b in st.buckets) {
-          final t = b.processCreate +
-              b.networkConnect +
-              b.dnsQuery +
-              b.alerts;
-          if (t > maxY) maxY = t.toDouble();
+        if (st.buckets.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainer,
+              borderRadius: BorderRadius.circular(EmDesign.radiusLg),
+              border: EmDesign.ghostBorder(scheme),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'ACTIVITY (24H, UTC HOURS)',
+                        style: EmDesign.labelCaps(context, scheme),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Refresh',
+                      onPressed: () =>
+                          context.read<TimelineBloc>().refresh(hours: 24),
+                      icon:
+                          Icon(Icons.refresh_rounded, color: scheme.primary),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'No timeline data yet. Connect to the endpoint and wait for activity, then refresh.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          );
         }
 
+        final allSeg = <double>[];
+        for (final b in st.buckets) {
+          allSeg.add(b.processCreate.toDouble());
+          allSeg.add(b.networkConnect.toDouble());
+          allSeg.add(b.dnsQuery.toDouble());
+          allSeg.add(b.alerts.toDouble());
+        }
+        var median = _medianOfUnsorted(allSeg);
+        if (median <= 0) median = 1;
+        final p95 = _percentile95Unsorted(allSeg);
+        var anyCapped = false;
+        double capSeg(double v) {
+          final lim = 3 * median;
+          final c = min(v, lim);
+          if (c < v - 1e-9) anyCapped = true;
+          return c;
+        }
+
+        var maxStack = 4.0;
         final groups = <BarChartGroupData>[];
         for (var i = 0; i < st.buckets.length; i++) {
           final b = st.buckets[i];
@@ -1126,26 +1191,34 @@ class _DashboardTimelineChart extends StatelessWidget {
             );
             continue;
           }
+          final pc = capSeg(p);
+          final nc = capSeg(n);
+          final dc = capSeg(d);
+          final ac = capSeg(a);
+          final totalC = pc + nc + dc + ac;
+          if (totalC > maxStack) maxStack = totalC;
           groups.add(
             BarChartGroupData(
               x: i,
               barRods: [
                 BarChartRodData(
-                  toY: total,
+                  toY: totalC,
                   width: 10,
                   borderRadius: BorderRadius.circular(2),
                   rodStackItems: [
-                    BarChartRodStackItem(0, p, scheme.primary),
-                    BarChartRodStackItem(p, p + n, scheme.tertiary),
-                    BarChartRodStackItem(p + n, p + n + d, scheme.secondary),
+                    BarChartRodStackItem(0, pc, scheme.primary),
+                    BarChartRodStackItem(pc, pc + nc, scheme.tertiary),
+                    BarChartRodStackItem(pc + nc, pc + nc + dc, scheme.secondary),
                     BarChartRodStackItem(
-                        p + n + d, p + n + d + a, scheme.error),
+                        pc + nc + dc, pc + nc + dc + ac, scheme.error),
                   ],
                 ),
               ],
             ),
           );
         }
+        final rawMaxY = (maxStack < p95 ? p95 : maxStack) * 1.05;
+        final chartMaxY = rawMaxY < 4 ? 4.0 : rawMaxY;
 
         return Container(
           padding: const EdgeInsets.all(16),
@@ -1164,6 +1237,27 @@ class _DashboardTimelineChart extends StatelessWidget {
                       'ACTIVITY (24H, UTC HOURS)',
                       style: EmDesign.labelCaps(context, scheme),
                     ),
+                  ),
+                  IconButton(
+                    tooltip: 'How to use this chart',
+                    onPressed: () {
+                      showDialog<void>(
+                        context: context,
+                        builder: (c) => AlertDialog(
+                          title: const Text('Activity timeline'),
+                          content: const Text(
+                            'Tap the red (alerts) segment on a bar to open the Events screen for that UTC hour.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(c),
+                              child: const Text('OK'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    icon: Icon(Icons.info_outline_rounded, color: scheme.outline),
                   ),
                   IconButton(
                     tooltip: 'Refresh',
@@ -1187,15 +1281,15 @@ class _DashboardTimelineChart extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               SizedBox(
-                height: 200,
+                height: 160,
                 child: BarChart(
                   BarChartData(
-                    maxY: maxY,
+                    maxY: chartMaxY,
                     alignment: BarChartAlignment.spaceAround,
                     gridData: FlGridData(
                       show: true,
                       drawVerticalLine: false,
-                      horizontalInterval: maxY > 20 ? 5 : 1,
+                      horizontalInterval: chartMaxY > 20 ? 5 : 1,
                       getDrawingHorizontalLine: (v) => FlLine(
                         color: scheme.outlineVariant.withValues(alpha: 0.2),
                         strokeWidth: 1,
@@ -1226,6 +1320,9 @@ class _DashboardTimelineChart extends StatelessWidget {
                           getTitlesWidget: (v, m) {
                             final i = v.toInt();
                             if (i < 0 || i >= st.buckets.length) {
+                              return const SizedBox.shrink();
+                            }
+                            if (i % 4 != 0) {
                               return const SizedBox.shrink();
                             }
                             final iso = st.buckets[i].hourStartIso;
@@ -1284,13 +1381,15 @@ class _DashboardTimelineChart extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 6),
-              Text(
-                'Tap the red (alerts) segment to open Events for that hour.',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
+              if (anyCapped) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'Some values capped for readability',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         );

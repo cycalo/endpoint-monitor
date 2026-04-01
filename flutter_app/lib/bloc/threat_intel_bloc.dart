@@ -4,6 +4,16 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
+class ThreatIntelFeedCount extends Equatable {
+  const ThreatIntelFeedCount({required this.name, required this.count});
+
+  final String name;
+  final int count;
+
+  @override
+  List<Object?> get props => [name, count];
+}
+
 class ThreatIntelEntry extends Equatable {
   const ThreatIntelEntry({
     required this.ip,
@@ -26,6 +36,7 @@ class ThreatIntelState extends Equatable {
     this.lastRunUtc,
     this.lastError,
     this.loading = false,
+    this.feeds = const [],
   });
 
   final Map<String, ThreatIntelEntry> entriesByIp;
@@ -33,6 +44,7 @@ class ThreatIntelState extends Equatable {
   final String? lastRunUtc;
   final String? lastError;
   final bool loading;
+  final List<ThreatIntelFeedCount> feeds;
 
   ThreatIntelEntry? lookupIp(String? remoteIp) {
     if (remoteIp == null || remoteIp.isEmpty) return null;
@@ -47,6 +59,7 @@ class ThreatIntelState extends Equatable {
     String? lastRunUtc,
     String? lastError,
     bool? loading,
+    List<ThreatIntelFeedCount>? feeds,
   }) =>
       ThreatIntelState(
         entriesByIp: entriesByIp ?? this.entriesByIp,
@@ -54,11 +67,12 @@ class ThreatIntelState extends Equatable {
         lastRunUtc: lastRunUtc ?? this.lastRunUtc,
         lastError: lastError ?? this.lastError,
         loading: loading ?? this.loading,
+        feeds: feeds ?? this.feeds,
       );
 
   @override
   List<Object?> get props =>
-      [entriesByIp, entryCount, lastRunUtc, lastError, loading];
+      [entriesByIp, entryCount, lastRunUtc, lastError, loading, feeds];
 }
 
 class ThreatIntelBloc extends Cubit<ThreatIntelState> {
@@ -97,11 +111,24 @@ class ThreatIntelBloc extends Cubit<ThreatIntelState> {
       if (raw is! Map) return;
       final row = Map<String, dynamic>.from(raw);
       final wasLoading = state.loading;
+      final feeds = <ThreatIntelFeedCount>[];
+      final fr = row['feeds'];
+      if (fr is List) {
+        for (final e in fr) {
+          if (e is! Map) continue;
+          final f = Map<String, dynamic>.from(e);
+          final n = f['name']?.toString() ?? '';
+          final c = (f['count'] as num?)?.toInt() ?? 0;
+          if (n.isEmpty) continue;
+          feeds.add(ThreatIntelFeedCount(name: n, count: c));
+        }
+      }
       emit(state.copyWith(
         entryCount: (row['entryCount'] as num?)?.toInt() ?? state.entryCount,
         lastRunUtc: row['lastRunUtc']?.toString(),
         lastError: row['lastError']?.toString(),
         loading: false,
+        feeds: feeds,
       ));
       if (wasLoading) {
         Future.microtask(() => refreshEntries());

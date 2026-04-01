@@ -6,10 +6,44 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../bloc/process_bloc.dart';
+import '../bloc/watchlist_bloc.dart';
 import '../models/ws_models.dart';
 import '../settings/app_settings_keys.dart';
 import '../theme/em_design_system.dart';
 import '../widgets/em_brand_app_bar.dart';
+
+/// Always-on red for destructive Kill control (light/dark themes).
+const _killButtonRed = Color(0xFFC62828);
+
+String _virusTotalHeadline(String verdict) {
+  switch (verdict) {
+    case 'malicious':
+      return 'Malicious';
+    case 'suspicious':
+      return 'Suspicious';
+    case 'clean_or_unknown':
+      return 'Clean';
+    case 'unknown':
+      return 'Unknown';
+    default:
+      return verdict.isEmpty ? 'Unknown' : verdict;
+  }
+}
+
+String _virusTotalExplanation(String verdict) {
+  switch (verdict) {
+    case 'malicious':
+      return 'At least one engine flagged this file as malicious.';
+    case 'suspicious':
+      return 'No malicious verdicts, but some engines reported suspicious.';
+    case 'clean_or_unknown':
+      return 'No malicious or suspicious engine hits for this hash.';
+    case 'unknown':
+      return 'VirusTotal has no result for this file, or scan stats are unavailable.';
+    default:
+      return 'See engine counts below.';
+  }
+}
 
 Future<void> _openVirusTotalSheet(BuildContext context, ProcessInfo p) async {
   final bloc = context.read<ProcessBloc>();
@@ -50,12 +84,24 @@ Future<void> _openVirusTotalSheet(BuildContext context, ProcessInfo p) async {
                   style: TextStyle(color: Theme.of(c).colorScheme.error),
                 );
               }
-              final verdict = data['verdict']?.toString() ?? '—';
+              final verdictRaw = data['verdict']?.toString() ?? 'unknown';
+              final headline = _virusTotalHeadline(verdictRaw);
+              final expl = _virusTotalExplanation(verdictRaw);
+              final mal = data['malicious'] is num ? (data['malicious'] as num).toInt() : 0;
+              final sus = data['suspicious'] is num ? (data['suspicious'] as num).toInt() : 0;
+              final harm = data['harmless'] is num ? (data['harmless'] as num).toInt() : 0;
+              final und = data['undetected'] is num ? (data['undetected'] as num).toInt() : 0;
+              final totalEngines = mal + sus + harm + und;
               final sha = data['sha256']?.toString() ?? '';
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Text(
+                    'VirusTotal',
+                    style: EmDesign.labelCaps(c, Theme.of(c).colorScheme),
+                  ),
+                  const SizedBox(height: 6),
                   Text(
                     p.name,
                     style: Theme.of(c).textTheme.titleMedium?.copyWith(
@@ -63,9 +109,25 @@ Future<void> _openVirusTotalSheet(BuildContext context, ProcessInfo p) async {
                         ),
                   ),
                   const SizedBox(height: 12),
-                  Text('Verdict: $verdict'),
                   Text(
-                    'Malicious: ${data['malicious']} · Suspicious: ${data['suspicious']}',
+                    headline,
+                    style: Theme.of(c).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    expl,
+                    style: Theme.of(c).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(c).colorScheme.onSurfaceVariant,
+                          height: 1.35,
+                        ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Engines: $mal malicious · $sus suspicious · $harm harmless · $und undetected'
+                    '${totalEngines > 0 ? ' ($totalEngines reporting)' : ''}',
+                    style: Theme.of(c).textTheme.bodySmall,
                   ),
                   if (sha.isNotEmpty) ...[
                     const SizedBox(height: 12),
@@ -74,10 +136,15 @@ Future<void> _openVirusTotalSheet(BuildContext context, ProcessInfo p) async {
                         final u = Uri.parse(
                           'https://www.virustotal.com/gui/file/$sha',
                         );
-                        if (await canLaunchUrl(u)) {
-                          await launchUrl(
-                            u,
-                            mode: LaunchMode.externalApplication,
+                        final launched = await launchUrl(
+                          u,
+                          mode: LaunchMode.externalApplication,
+                        );
+                        if (!launched && c.mounted) {
+                          ScaffoldMessenger.of(c).showSnackBar(
+                            const SnackBar(
+                              content: Text('Could not open VirusTotal link'),
+                            ),
                           );
                         }
                       },
@@ -401,16 +468,24 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
   }
 
   Future<void> _confirmKill(BuildContext context, ProcessInfo p) async {
+    final scheme = Theme.of(context).colorScheme;
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         title: const Text('Kill process?'),
-        content: Text('${p.name} (${p.pid})'),
+        content: Text(
+          'Kill ${p.name} (PID ${p.pid})? This will immediately terminate the process '
+          'and cannot be undone.',
+        ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(c, false),
               child: const Text('Cancel')),
           FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: scheme.error,
+                foregroundColor: scheme.onError,
+              ),
               onPressed: () => Navigator.pop(c, true),
               child: const Text('Kill')),
         ],
@@ -921,10 +996,10 @@ class _ProcessRow extends StatelessWidget {
                         dimIf(
                           isKilledGhost || onKill == null,
                           wrapDisabledTap(
-                            _GradientKillButton(
+                            _KillButton(
                               onPressed: onKill,
                               label: isKilledGhost ? 'Killed' : 'Kill',
-                              scheme: scheme,
+                              enabled: !isKilledGhost && onKill != null,
                             ),
                             disabled: onKill == null,
                           ),
@@ -969,22 +1044,46 @@ class _ProcessRow extends StatelessWidget {
                         dimIf(
                           isKilledGhost,
                           wrapDisabledTap(
-                            OutlinedButton.icon(
-                              onPressed: isKilledGhost
-                                  ? null
-                                  : () =>
-                                      context.read<ProcessBloc>().sendCommand({
-                                        'type': 'flag_process',
-                                        'name': p.name,
-                                      }),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: scheme.outline,
-                                side: BorderSide(
-                                    color: scheme.outlineVariant
-                                        .withValues(alpha: 0.3)),
-                              ),
-                              icon: const Icon(Icons.flag_outlined, size: 18),
-                              label: const Text('Flag'),
+                            BlocBuilder<WatchlistBloc, WatchlistState>(
+                              buildWhen: (prev, next) =>
+                                  prev.entries != next.entries,
+                              builder: (context, wl) {
+                                final normalized =
+                                    WatchlistBloc.normalizeExecutableName(
+                                        p.name);
+                                final flagged = normalized != null &&
+                                    wl.entries.any((e) =>
+                                        e.name.toLowerCase() ==
+                                        normalized.toLowerCase());
+                                final amber =
+                                    const Color(0xFFE65100); // orange-900
+                                return OutlinedButton.icon(
+                                  onPressed: isKilledGhost
+                                      ? null
+                                      : () => _onProcessFlagTap(
+                                            context,
+                                            p,
+                                            flagged,
+                                          ),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor:
+                                        flagged ? amber : scheme.outline,
+                                    side: BorderSide(
+                                      color: flagged
+                                          ? amber.withValues(alpha: 0.65)
+                                          : scheme.outlineVariant
+                                              .withValues(alpha: 0.3),
+                                    ),
+                                  ),
+                                  icon: Icon(
+                                    flagged
+                                        ? Icons.flag_rounded
+                                        : Icons.flag_outlined,
+                                    size: 18,
+                                  ),
+                                  label: Text(flagged ? 'Flagged' : 'Flag'),
+                                );
+                              },
                             ),
                             disabled: isKilledGhost,
                           ),
@@ -1003,9 +1102,8 @@ class _ProcessRow extends StatelessWidget {
                                       .withValues(alpha: 0.35),
                                 ),
                               ),
-                              icon: const Icon(Icons.verified_user_outlined,
-                                  size: 18),
-                              label: const Text('Reputation'),
+                              icon: const Icon(Icons.shield_outlined, size: 18),
+                              label: const Text('VirusTotal'),
                             ),
                             disabled: isKilledGhost,
                           ),
@@ -1042,19 +1140,70 @@ class _ProcessRow extends StatelessWidget {
   }
 }
 
-class _GradientKillButton extends StatelessWidget {
-  const _GradientKillButton({
+Future<void> _onProcessFlagTap(
+  BuildContext context,
+  ProcessInfo p,
+  bool flagged,
+) async {
+  final wl = context.read<WatchlistBloc>();
+  final normalized = WatchlistBloc.normalizeExecutableName(p.name);
+  if (normalized == null) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Could not resolve an executable name to flag')),
+    );
+    return;
+  }
+  if (!flagged) {
+    wl.flagFromProcessesScreen(p.name);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$normalized added to watchlist')),
+    );
+    return;
+  }
+  final stored = wl.watchlistNameForExecutable(p.name);
+  if (stored == null) return;
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (c) => AlertDialog(
+      title: const Text('Remove from watchlist?'),
+      content: Text('Remove $stored from watchlist?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(c, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(c, true),
+          child: const Text('Remove'),
+        ),
+      ],
+    ),
+  );
+  if (ok == true && context.mounted) {
+    wl.remove(stored);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$stored removed from watchlist')),
+    );
+  }
+}
+
+class _KillButton extends StatelessWidget {
+  const _KillButton({
     required this.onPressed,
     required this.label,
-    required this.scheme,
+    required this.enabled,
   });
 
   final VoidCallback? onPressed;
   final String label;
-  final ColorScheme scheme;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
+    final bg = enabled ? _killButtonRed : Colors.grey.shade600;
+    const fg = Colors.white;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1063,25 +1212,21 @@ class _GradientKillButton extends StatelessWidget {
         child: Ink(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(EmDesign.radiusMd),
-            gradient: LinearGradient(
-              colors: [scheme.primary, scheme.primaryContainer],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            color: bg,
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.cancel_rounded, size: 18, color: scheme.onPrimary),
+                Icon(Icons.cancel_rounded, size: 18, color: fg),
                 const SizedBox(width: 8),
                 Text(
                   label,
                   style: GoogleFonts.manrope(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
-                    color: scheme.onPrimary,
+                    color: fg,
                   ),
                 ),
               ],

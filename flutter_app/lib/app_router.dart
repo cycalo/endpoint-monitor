@@ -7,6 +7,7 @@ import 'router/go_router_refresh.dart';
 import 'screens/alerts_screen.dart';
 import 'screens/browser_screen.dart';
 import 'screens/connect_screen.dart';
+import 'screens/controls_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/events_screen.dart';
 import 'screens/firewall_screen.dart';
@@ -160,6 +161,11 @@ GoRouter createAppRouter(ConnectionBloc connectionBloc) {
         name: 'firewall',
         path: '/firewall',
         builder: (context, state) => const FirewallScreen(),
+      ),
+      GoRoute(
+        name: 'controls',
+        path: '/controls',
+        builder: (context, state) => const ControlsScreen(),
       ),
       GoRoute(
         name: 'watchlist',

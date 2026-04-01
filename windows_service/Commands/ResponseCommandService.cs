@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Diagnostics;
 using System.Management;
 using System.Runtime.InteropServices;
@@ -80,6 +81,13 @@ public sealed class ResponseCommandService(
                 "get_threat_intel_status" => await GetThreatIntelStatusAsync(cancellationToken).ConfigureAwait(false),
                 "get_threat_intel_entries" => await GetThreatIntelEntriesAsync(cancellationToken).ConfigureAwait(false),
                 "refresh_threat_intel" => await RefreshThreatIntelAsync(clientIp, cancellationToken).ConfigureAwait(false),
+                "lock_screen" => await LockScreenAsync(clientIp, cancellationToken).ConfigureAwait(false),
+                "logoff_user" => await LogoffUserAsync(clientIp, cancellationToken).ConfigureAwait(false),
+                "restart_machine" => await RestartMachineAsync(root, clientIp, cancellationToken).ConfigureAwait(false),
+                "shutdown_machine" => await ShutdownMachineAsync(root, clientIp, cancellationToken).ConfigureAwait(false),
+                "sleep_machine" => await SleepMachineAsync(clientIp, cancellationToken).ConfigureAwait(false),
+                "cancel_shutdown" => await CancelShutdownAsync(clientIp, cancellationToken).ConfigureAwait(false),
+                "turn_off_display" => await TurnOffDisplayAsync(clientIp, cancellationToken).ConfigureAwait(false),
                 _ => new CommandResult(false, type, "unknown_command")
             };
         }
@@ -594,16 +602,30 @@ public sealed class ResponseCommandService(
         return new CommandResult(true, "check_reputation", "ok", data);
     }
 
+    private static JsonElement BuildThreatIntelStatusData(
+        IReadOnlyList<BadIpRow> active,
+        ThreatIntelUpdater intel)
+    {
+        var feeds = active
+            .GroupBy(r => string.IsNullOrWhiteSpace(r.Source) ? "Other" : r.Source, StringComparer.OrdinalIgnoreCase)
+            .Select(g => new { name = g.Key, count = g.Count() })
+            .OrderByDescending(x => x.count)
+            .ThenBy(x => x.name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return JsonSerializer.SerializeToElement(new
+        {
+            entryCount = active.Count,
+            lastRunUtc = intel.LastSuccessfulRunUtc?.UtcDateTime.ToString("O"),
+            lastEntriesWritten = intel.LastEntriesWritten,
+            lastError = intel.LastError,
+            feeds
+        }, AppJson.Options);
+    }
+
     private async Task<CommandResult> GetThreatIntelStatusAsync(CancellationToken cancellationToken)
     {
         var active = await database.GetActiveBadIpsAsync(cancellationToken).ConfigureAwait(false);
-        var data = JsonSerializer.SerializeToElement(new
-        {
-            entryCount = active.Count,
-            lastRunUtc = threatIntel.LastSuccessfulRunUtc?.UtcDateTime.ToString("O"),
-            lastEntriesWritten = threatIntel.LastEntriesWritten,
-            lastError = threatIntel.LastError
-        }, AppJson.Options);
+        var data = BuildThreatIntelStatusData(active, threatIntel);
         return new CommandResult(true, "get_threat_intel_status", "ok", data);
     }
 
@@ -620,14 +642,169 @@ public sealed class ResponseCommandService(
         await threatIntel.RunUpdateAsync(cancellationToken).ConfigureAwait(false);
         await database.AppendAuditAsync("refresh_threat_intel", "ok", clientIp, cancellationToken).ConfigureAwait(false);
         var active = await database.GetActiveBadIpsAsync(cancellationToken).ConfigureAwait(false);
-        var data = JsonSerializer.SerializeToElement(new
-        {
-            entryCount = active.Count,
-            lastRunUtc = threatIntel.LastSuccessfulRunUtc?.UtcDateTime.ToString("O"),
-            lastEntriesWritten = threatIntel.LastEntriesWritten,
-            lastError = threatIntel.LastError
-        }, AppJson.Options);
+        var data = BuildThreatIntelStatusData(active, threatIntel);
         return new CommandResult(true, "refresh_threat_intel", "ok", data);
+    }
+
+    private static int ParseDelaySeconds(JsonElement root)
+    {
+        if (!root.TryGetProperty("delaySeconds", out var el)) return 0;
+        if (el.TryGetInt32(out var d)) return Math.Clamp(d, 0, 300);
+        return 0;
+    }
+
+    private async Task<CommandResult> LockScreenAsync(string? clientIp, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var p = Process.Start(new ProcessStartInfo("rundll32.exe", "user32.dll,LockWorkStation")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+            p?.WaitForExit(30_000);
+            await database.AppendAuditAsync("lock_screen", "ok", clientIp, cancellationToken).ConfigureAwait(false);
+            return new CommandResult(true, "lock_screen", "Screen locked");
+        }
+        catch (Exception ex)
+        {
+            return new CommandResult(false, "lock_screen", ex.Message);
+        }
+    }
+
+    private async Task<CommandResult> LogoffUserAsync(string? clientIp, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var p = Process.Start(new ProcessStartInfo("shutdown", "/l")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+            });
+            p?.WaitForExit(60_000);
+            await database.AppendAuditAsync("logoff_user", "ok", clientIp, cancellationToken).ConfigureAwait(false);
+            return new CommandResult(true, "logoff_user", "Current user logged off");
+        }
+        catch (Exception ex)
+        {
+            return new CommandResult(false, "logoff_user", ex.Message);
+        }
+    }
+
+    private async Task<CommandResult> RestartMachineAsync(JsonElement root, string? clientIp, CancellationToken cancellationToken)
+    {
+        var delay = ParseDelaySeconds(root);
+        try
+        {
+            var args = $"/r /t {delay} /c \"Endpoint Monitor remote restart\"";
+            using var p = Process.Start(new ProcessStartInfo("shutdown", args)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+            });
+            p?.WaitForExit(30_000);
+            await database.AppendAuditAsync("restart_machine", $"t={delay}", clientIp, cancellationToken).ConfigureAwait(false);
+            var msg = delay == 0
+                ? "Restart initiated immediately"
+                : $"Restart initiated in {delay} seconds";
+            return new CommandResult(true, "restart_machine", msg);
+        }
+        catch (Exception ex)
+        {
+            return new CommandResult(false, "restart_machine", ex.Message);
+        }
+    }
+
+    private async Task<CommandResult> ShutdownMachineAsync(JsonElement root, string? clientIp, CancellationToken cancellationToken)
+    {
+        var delay = ParseDelaySeconds(root);
+        try
+        {
+            var args = $"/s /t {delay} /c \"Endpoint Monitor remote shutdown\"";
+            using var p = Process.Start(new ProcessStartInfo("shutdown", args)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+            });
+            p?.WaitForExit(30_000);
+            await database.AppendAuditAsync("shutdown_machine", $"t={delay}", clientIp, cancellationToken).ConfigureAwait(false);
+            var msg = delay == 0
+                ? "Shutdown initiated immediately"
+                : $"Shutdown initiated in {delay} seconds";
+            return new CommandResult(true, "shutdown_machine", msg);
+        }
+        catch (Exception ex)
+        {
+            return new CommandResult(false, "shutdown_machine", ex.Message);
+        }
+    }
+
+    private async Task<CommandResult> SleepMachineAsync(string? clientIp, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var p = Process.Start(new ProcessStartInfo("rundll32.exe", "powrprof.dll,SetSuspendState 0,1,0")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+            p?.WaitForExit(60_000);
+            await database.AppendAuditAsync("sleep_machine", "ok", clientIp, cancellationToken).ConfigureAwait(false);
+            return new CommandResult(true, "sleep_machine", "Sleep initiated");
+        }
+        catch (Exception ex)
+        {
+            return new CommandResult(false, "sleep_machine", ex.Message);
+        }
+    }
+
+    private async Task<CommandResult> CancelShutdownAsync(string? clientIp, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var p = Process.Start(new ProcessStartInfo("shutdown", "/a")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+            });
+            p?.WaitForExit(30_000);
+            var code = p?.ExitCode ?? 1;
+            if (code != 0)
+            {
+                await database.AppendAuditAsync("cancel_shutdown", "failed", clientIp, cancellationToken).ConfigureAwait(false);
+                return new CommandResult(false, "cancel_shutdown", "No pending shutdown to cancel");
+            }
+
+            await database.AppendAuditAsync("cancel_shutdown", "ok", clientIp, cancellationToken).ConfigureAwait(false);
+            return new CommandResult(true, "cancel_shutdown", "Pending shutdown or restart cancelled");
+        }
+        catch (Exception ex)
+        {
+            return new CommandResult(false, "cancel_shutdown", ex.Message);
+        }
+    }
+
+    private async Task<CommandResult> TurnOffDisplayAsync(string? clientIp, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // P/Invoke: turn monitor off. Fallback if this fails on some setups: nircmd.exe monitor off (nircmd must be on PATH).
+            NativeMethods.SendMonitorPowerOff();
+            await database.AppendAuditAsync("turn_off_display", "ok", clientIp, cancellationToken).ConfigureAwait(false);
+            return new CommandResult(true, "turn_off_display", "Display turned off");
+        }
+        catch (Exception ex)
+        {
+            return new CommandResult(false, "turn_off_display", ex.Message);
+        }
     }
 
     private static void RunNetsh(string arguments)
@@ -663,5 +840,18 @@ internal static class NativeMethods
     {
         handle = OpenProcess(ProcessSuspendResume, false, pid);
         return handle != IntPtr.Zero;
+    }
+
+    private const int WmSyscommand = 0x0112;
+    private const int ScMonitorpower = 0xF170;
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+    /// <summary>Broadcast SC_MONITORPOWER 2 to turn displays off.</summary>
+    public static void SendMonitorPowerOff()
+    {
+        var hwndBroadcast = (IntPtr)0xffff;
+        SendMessage(hwndBroadcast, WmSyscommand, (IntPtr)ScMonitorpower, (IntPtr)2);
     }
 }
