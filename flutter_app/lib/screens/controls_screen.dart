@@ -14,6 +14,7 @@ const _borderPowerAmber = Color(0xFFFF8F00);
 const _borderPowerRed = Color(0xFFC62828);
 const _borderDisplay = Color(0xFF1565C0);
 const _borderCancel = Color(0xFF757575);
+const _borderAudio = Color(0xFF7B1FA2);
 
 class ControlsScreen extends StatelessWidget {
   const ControlsScreen({super.key});
@@ -78,12 +79,11 @@ class ControlsScreen extends StatelessWidget {
                       commandType: 'lock_screen',
                       icon: Icons.lock_outline_rounded,
                       title: 'Lock Screen',
-                      description:
-                          'Lock the Windows session immediately',
+                      description: 'Lock the Windows session immediately',
                       buttonLabel: 'Lock Screen',
                       onPrimaryTap: (ctx) => ctx.read<ControlsBloc>().send(
-                            const {'type': 'lock_screen'},
-                          ),
+                        const {'type': 'lock_screen'},
+                      ),
                     ),
                     const SizedBox(height: 12),
                     _ControlCard(
@@ -93,11 +93,13 @@ class ControlsScreen extends StatelessWidget {
                       commandType: 'logoff_user',
                       icon: Icons.logout_rounded,
                       title: 'Log Off',
-                      description:
-                          'Log off the current Windows user',
+                      description: 'Log off the current Windows user',
                       buttonLabel: 'Log Off',
                       onPrimaryTap: (ctx) => _logoffFlow(ctx, host),
                     ),
+                    const SizedBox(height: 20),
+                    _sectionTitle(context, scheme, 'AUDIO'),
+                    _SystemVolumeCard(enabled: connected),
                     const SizedBox(height: 20),
                     _sectionTitle(context, scheme, 'POWER'),
                     _ControlCard(
@@ -144,12 +146,11 @@ class ControlsScreen extends StatelessWidget {
                       commandType: 'turn_off_display',
                       icon: Icons.desktop_access_disabled_outlined,
                       title: 'Turn Off Display',
-                      description:
-                          'Turn off the monitor without sleeping',
+                      description: 'Turn off the monitor without sleeping',
                       buttonLabel: 'Turn Off Display',
                       onPrimaryTap: (ctx) => ctx.read<ControlsBloc>().send(
-                            const {'type': 'turn_off_display'},
-                          ),
+                        const {'type': 'turn_off_display'},
+                      ),
                     ),
                     const SizedBox(height: 20),
                     _sectionTitle(context, scheme, 'CANCEL'),
@@ -160,12 +161,11 @@ class ControlsScreen extends StatelessWidget {
                       commandType: 'cancel_shutdown',
                       icon: Icons.cancel_outlined,
                       title: 'Cancel Pending Shutdown',
-                      description:
-                          'Cancel a pending restart or shutdown',
+                      description: 'Cancel a pending restart or shutdown',
                       buttonLabel: 'Cancel Shutdown',
                       onPrimaryTap: (ctx) => ctx.read<ControlsBloc>().send(
-                            const {'type': 'cancel_shutdown'},
-                          ),
+                        const {'type': 'cancel_shutdown'},
+                      ),
                     ),
                   ],
                 );
@@ -295,8 +295,7 @@ class ControlsScreen extends StatelessWidget {
                     ButtonSegment(value: 300, label: Text('5 min')),
                   ],
                   selected: {delaySec},
-                  onSelectionChanged: (s) =>
-                      setSt(() => delaySec = s.first),
+                  onSelectionChanged: (s) => setSt(() => delaySec = s.first),
                   showSelectedIcon: false,
                 ),
                 const SizedBox(height: 16),
@@ -389,8 +388,7 @@ class ControlsScreen extends StatelessWidget {
                     ButtonSegment(value: 300, label: Text('5 min')),
                   ],
                   selected: {delaySec},
-                  onSelectionChanged: (s) =>
-                      setSt(() => delaySec = s.first),
+                  onSelectionChanged: (s) => setSt(() => delaySec = s.first),
                   showSelectedIcon: false,
                 ),
                 const SizedBox(height: 16),
@@ -500,6 +498,203 @@ class ControlsScreen extends StatelessWidget {
   }
 }
 
+/// Volume applies on [Slider.onChangeEnd] only. Mute sends `toggle_mute` per tap.
+class _SystemVolumeCard extends StatefulWidget {
+  const _SystemVolumeCard({required this.enabled});
+
+  final bool enabled;
+
+  @override
+  State<_SystemVolumeCard> createState() => _SystemVolumeCardState();
+}
+
+class _SystemVolumeCardState extends State<_SystemVolumeCard> {
+  double _sliderValue = 50;
+
+  /// Optimistic UI: we don’t read live mute state from the PC (assume unmuted until user toggles).
+  bool _muted = false;
+
+  void _onMuteTap(BuildContext context) {
+    setState(() => _muted = !_muted);
+    context.read<ControlsBloc>().toggleMute();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final volumePending = context.select<ControlsBloc, bool>(
+      (b) => b.state.pending.contains('set_volume'),
+    );
+    final mutePending = context.select<ControlsBloc, bool>(
+      (b) => b.state.pending.contains('toggle_mute'),
+    );
+    final opacity = widget.enabled ? 1.0 : 0.45;
+    final sliderLive = widget.enabled && !volumePending;
+
+    return Opacity(
+      opacity: opacity,
+      child: Container(
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainer,
+          borderRadius: BorderRadius.circular(EmDesign.radiusLg),
+          border: Border.all(
+            color: scheme.outlineVariant.withValues(alpha: 0.18),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: scheme.shadow.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                width: 4,
+                decoration: BoxDecoration(
+                  color: _borderAudio.withValues(alpha: 0.95),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(EmDesign.radiusLg),
+                    bottomLeft: Radius.circular(EmDesign.radiusLg),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.graphic_eq_rounded,
+                            color: scheme.primary,
+                            size: 22,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'System volume',
+                              style: GoogleFonts.manrope(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: scheme.onSurface,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '${_sliderValue.round()}%',
+                            style: GoogleFonts.manrope(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Drag to choose a level, then release to apply on the PC. '
+                        'Mute toggles Windows master audio.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          height: 1.35,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Tooltip(
+                            message: _muted ? 'Unmute' : 'Mute',
+                            child: IconButton.filled(
+                              onPressed: widget.enabled && !mutePending
+                                  ? () => _onMuteTap(context)
+                                  : null,
+                              icon: mutePending
+                                  ? SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: _muted
+                                            ? scheme.onErrorContainer
+                                            : scheme.onPrimaryContainer,
+                                      ),
+                                    )
+                                  : Icon(
+                                      _muted
+                                          ? Icons.volume_off_rounded
+                                          : Icons.volume_up_rounded,
+                                    ),
+                              style: IconButton.styleFrom(
+                                backgroundColor: _muted
+                                    ? scheme.errorContainer
+                                    : scheme.primaryContainer,
+                                foregroundColor: _muted
+                                    ? scheme.onErrorContainer
+                                    : scheme.onPrimaryContainer,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Slider(
+                              value: _sliderValue.clamp(0.0, 100.0),
+                              min: 0,
+                              max: 100,
+                              divisions: 20,
+                              onChanged: sliderLive
+                                  ? (v) => setState(() => _sliderValue = v)
+                                  : null,
+                              onChangeEnd: sliderLive
+                                  ? (v) {
+                                      final muteInFlight = context
+                                          .read<ControlsBloc>()
+                                          .state
+                                          .pending
+                                          .contains('toggle_mute');
+                                      setState(() {
+                                        _sliderValue = v;
+                                        if (!muteInFlight) _muted = false;
+                                      });
+                                      context
+                                          .read<ControlsBloc>()
+                                          .setVolume(v.round());
+                                    }
+                                  : null,
+                            ),
+                          ),
+                          if (volumePending) ...[
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: scheme.primary,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 typedef _ControlsTap = void Function(BuildContext context);
 
 class _ControlCard extends StatelessWidget {
@@ -529,8 +724,8 @@ class _ControlCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
-    final loading =
-        context.select<ControlsBloc, bool>((b) => b.state.pending.contains(commandType));
+    final loading = context.select<ControlsBloc, bool>(
+        (b) => b.state.pending.contains(commandType));
     final effective = enabled && !loading;
     final opacity = enabled ? 1.0 : 0.45;
 
@@ -601,9 +796,8 @@ class _ControlCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 14),
                       FilledButton.tonal(
-                        onPressed: effective
-                            ? () => onPrimaryTap(context)
-                            : null,
+                        onPressed:
+                            effective ? () => onPrimaryTap(context) : null,
                         child: loading
                             ? SizedBox(
                                 height: 20,

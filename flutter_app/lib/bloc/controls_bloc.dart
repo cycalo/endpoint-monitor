@@ -51,9 +51,17 @@ class ControlsBloc extends Cubit<ControlsState> {
     'sleep_machine',
     'cancel_shutdown',
     'turn_off_display',
+    'set_volume',
+    'toggle_mute',
   };
 
   void clearFeedback() => emit(state.copyWith(clearFeedback: true));
+
+  /// Sent when the user releases the volume slider (final level only).
+  void setVolume(int volume) =>
+      send({'type': 'set_volume', 'volume': volume.clamp(0, 100)});
+
+  void toggleMute() => send(const {'type': 'toggle_mute'});
 
   void send(Map<String, dynamic> cmd) {
     final t = cmd['type']?.toString();

@@ -88,6 +88,8 @@ public sealed class ResponseCommandService(
                 "sleep_machine" => await SleepMachineAsync(clientIp, cancellationToken).ConfigureAwait(false),
                 "cancel_shutdown" => await CancelShutdownAsync(clientIp, cancellationToken).ConfigureAwait(false),
                 "turn_off_display" => await TurnOffDisplayAsync(clientIp, cancellationToken).ConfigureAwait(false),
+                "set_volume" => await SetVolumeAsync(root, clientIp, cancellationToken).ConfigureAwait(false),
+                "toggle_mute" => await ToggleMuteAsync(clientIp, cancellationToken).ConfigureAwait(false),
                 _ => new CommandResult(false, type, "unknown_command")
             };
         }
@@ -834,6 +836,41 @@ public sealed class ResponseCommandService(
         }
     }
 
+    private async Task<CommandResult> SetVolumeAsync(JsonElement root, string? clientIp, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var volume = 50;
+            if (root.TryGetProperty("volume", out var volEl) && volEl.ValueKind == JsonValueKind.Number)
+                volume = volEl.GetInt32();
+            volume = Math.Clamp(volume, 0, 100);
+
+            if (!VolumeNativeMethods.TrySetMasterVolumePercent(volume))
+                return new CommandResult(false, "set_volume", "Could not set system volume (audio endpoint unavailable).");
+
+            await database.AppendAuditAsync("set_volume", $"v={volume}", clientIp, cancellationToken).ConfigureAwait(false);
+            return new CommandResult(true, "set_volume", $"Volume set to {volume}%");
+        }
+        catch (Exception ex)
+        {
+            return new CommandResult(false, "set_volume", ex.Message);
+        }
+    }
+
+    private async Task<CommandResult> ToggleMuteAsync(string? clientIp, CancellationToken cancellationToken)
+    {
+        try
+        {
+            VolumeNativeMethods.PressVolumeMuteKey();
+            await database.AppendAuditAsync("toggle_mute", "ok", clientIp, cancellationToken).ConfigureAwait(false);
+            return new CommandResult(true, "toggle_mute", "Mute toggled");
+        }
+        catch (Exception ex)
+        {
+            return new CommandResult(false, "toggle_mute", ex.Message);
+        }
+    }
+
     private static void RunNetsh(string arguments)
     {
         using var p = Process.Start(new ProcessStartInfo("netsh", arguments)
@@ -881,4 +918,111 @@ internal static class NativeMethods
         var hwndBroadcast = (IntPtr)0xffff;
         SendMessage(hwndBroadcast, WmSyscommand, (IntPtr)ScMonitorpower, (IntPtr)2);
     }
+}
+
+/// <summary>Default render endpoint master volume via Core Audio (vtable-accurate COM).</summary>
+internal static class VolumeNativeMethods
+{
+    [DllImport("user32.dll")]
+    private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+
+    private const byte VK_VOLUME_MUTE = 0xAD;
+    private const uint KEYEVENTF_KEYUP = 0x0002;
+
+    public static void PressVolumeMuteKey()
+    {
+        keybd_event(VK_VOLUME_MUTE, 0, 0, UIntPtr.Zero);
+        keybd_event(VK_VOLUME_MUTE, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+    }
+
+    public static bool TrySetMasterVolumePercent(int percent)
+    {
+        percent = Math.Clamp(percent, 0, 100);
+        IMMDeviceEnumerator? deviceEnum = null;
+        IMMDevice? device = null;
+        IAudioEndpointVolume? vol = null;
+        try
+        {
+            deviceEnum = (IMMDeviceEnumerator)new MMDeviceEnumeratorComObject();
+            device = deviceEnum.GetDefaultAudioEndpoint(MMDataFlow.Render, MMRole.Console);
+            var iid = typeof(IAudioEndpointVolume).GUID;
+            device.Activate(ref iid, (uint)CLSCTX_ALL, IntPtr.Zero, out var activated);
+            vol = (IAudioEndpointVolume)activated;
+            var ctx = Guid.Empty;
+            vol.SetMasterVolumeLevelScalar(percent / 100f, ref ctx);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+        finally
+        {
+            if (vol != null) Marshal.ReleaseComObject(vol);
+            if (device != null) Marshal.ReleaseComObject(device);
+            if (deviceEnum != null) Marshal.ReleaseComObject(deviceEnum);
+        }
+    }
+
+    private const int CLSCTX_ALL = 23;
+
+    [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
+    private class MMDeviceEnumeratorComObject;
+
+    [Guid("0BD7A1BE-7A1A-44DB-8397-C0C2C1F6F989"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IMMDeviceCollection;
+
+    [Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IMMDeviceEnumerator
+    {
+        [PreserveSig]
+        int EnumAudioEndpoints(
+            MMDataFlow dataFlow,
+            uint dwStateMask,
+            [MarshalAs(UnmanagedType.Interface)] out IMMDeviceCollection? devices);
+
+        [return: MarshalAs(UnmanagedType.Interface)]
+        IMMDevice GetDefaultAudioEndpoint(MMDataFlow dataFlow, MMRole role);
+    }
+
+    [Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IMMDevice
+    {
+        void Activate(
+            ref Guid iid,
+            uint dwClsCtx,
+            IntPtr pActivationParams,
+            [MarshalAs(UnmanagedType.IUnknown)] out object ppInterface);
+    }
+
+    [Guid("657804FA-D6AD-4496-8A60-3527522914D0"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IAudioEndpointVolumeCallback;
+
+    [Guid("5CDF2C82-841E-4546-9722-0CF74078229A"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IAudioEndpointVolume
+    {
+        void RegisterControlChangeNotify(
+            [MarshalAs(UnmanagedType.Interface)] IAudioEndpointVolumeCallback pNotify);
+        void UnregisterControlChangeNotify(
+            [MarshalAs(UnmanagedType.Interface)] IAudioEndpointVolumeCallback pNotify);
+        uint GetChannelCount();
+        void SetMasterVolumeLevel(float fLevelDB, ref Guid pguidEventContext);
+        void SetMasterVolumeLevelScalar(float fLevel, ref Guid pguidEventContext);
+        void GetMasterVolumeLevel(out float pfLevelDB);
+        void GetMasterVolumeLevelScalar(out float pfLevel);
+        void SetChannelVolumeLevel(uint nChannel, float fLevelDB, ref Guid pguidEventContext);
+        void SetChannelVolumeLevelScalar(uint nChannel, float fLevel, ref Guid pguidEventContext);
+        void GetChannelVolumeLevel(uint nChannel, out float pfLevelDB);
+        float GetChannelVolumeLevelScalar(uint nChannel);
+        void SetMute(int bMute, ref Guid pguidEventContext);
+        int GetMute();
+        void GetVolumeStepInfo(out uint pnStep, out uint pnStepCount);
+        void VolumeStepUp(ref Guid pguidEventContext);
+        void VolumeStepDown(ref Guid pguidEventContext);
+        void QueryHardwareSupport(out uint pdwHardwareSupportMask);
+        void GetVolumeRange(out float pflVolumeMindB, out float pflVolumeMaxdB, out float pflVolumeIncrementdB);
+    }
+
+    private enum MMDataFlow { Render, Capture, All }
+    private enum MMRole { Console, Multimedia, Communications }
 }

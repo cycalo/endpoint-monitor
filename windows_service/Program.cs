@@ -1,4 +1,8 @@
 using System.Net.WebSockets;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
 using AspNetCoreRateLimit;
@@ -12,6 +16,11 @@ using EndpointMonitorService.Options;
 using EndpointMonitorService.Services;
 using EndpointMonitorService.Sysmon;
 using Microsoft.AspNetCore.HttpOverrides;
+
+if (!EnsureElevatedOrRelaunch())
+{
+    return;
+}
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseWindowsService();
@@ -233,6 +242,57 @@ static string Escape(object? o)
     if (s.Contains(',') || s.Contains('"'))
         return "\"" + s.Replace("\"", "\"\"") + "\"";
     return s;
+}
+
+static bool EnsureElevatedOrRelaunch()
+{
+    if (!OperatingSystem.IsWindows())
+        return true;
+
+    // Avoid UAC prompts for non-interactive hosting scenarios (Windows Service, CI, etc.).
+    if (!Environment.UserInteractive)
+        return true;
+
+    using var identity = WindowsIdentity.GetCurrent();
+    var principal = new WindowsPrincipal(identity);
+    var isAdmin = principal.IsInRole(WindowsBuiltInRole.Administrator);
+    if (isAdmin)
+        return true;
+
+    var exePath = Environment.ProcessPath;
+    if (string.IsNullOrWhiteSpace(exePath))
+        return true;
+
+    var args = Environment.GetCommandLineArgs()
+        .Skip(1)
+        .Select(QuoteArg);
+
+    try
+    {
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = exePath,
+            Arguments = string.Join(' ', args),
+            UseShellExecute = true,
+            Verb = "runas"
+        });
+        return false;
+    }
+    catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
+    {
+        Console.Error.WriteLine("Administrator privileges are required for full functionality.");
+        Console.Error.WriteLine("Relaunch was cancelled or failed. Continue by running this process as Administrator.");
+        return true;
+    }
+}
+
+static string QuoteArg(string arg)
+{
+    if (string.IsNullOrEmpty(arg))
+        return "\"\"";
+    if (!arg.Any(char.IsWhiteSpace) && !arg.Contains('"'))
+        return arg;
+    return "\"" + arg.Replace("\"", "\\\"") + "\"";
 }
 
 internal sealed record TokenRequest(string Token);

@@ -70,7 +70,12 @@ GoRouter createAppRouter(ConnectionBloc connectionBloc) {
                     builder: (context, state) {
                       final pid =
                           int.tryParse(state.pathParameters['pid'] ?? '') ?? 0;
-                      return ProcessDetailScreen(pid: pid);
+                      final ghost =
+                          state.uri.queryParameters['ghost'] == '1';
+                      return ProcessDetailScreen(
+                        pid: pid,
+                        isKilledGhostSnapshot: ghost,
+                      );
                     },
                   ),
                 ],

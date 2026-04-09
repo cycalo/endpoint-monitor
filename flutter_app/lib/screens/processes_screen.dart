@@ -3,163 +3,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../bloc/process_bloc.dart';
-import '../bloc/watchlist_bloc.dart';
 import '../models/ws_models.dart';
 import '../settings/app_settings_keys.dart';
 import '../theme/em_design_system.dart';
 import '../widgets/em_brand_app_bar.dart';
-
-/// Always-on red for destructive Kill control (light/dark themes).
-const _killButtonRed = Color(0xFFC62828);
-
-String _virusTotalHeadline(String verdict) {
-  switch (verdict) {
-    case 'malicious':
-      return 'Malicious';
-    case 'suspicious':
-      return 'Suspicious';
-    case 'clean_or_unknown':
-      return 'Clean';
-    case 'unknown':
-      return 'Unknown';
-    default:
-      return verdict.isEmpty ? 'Unknown' : verdict;
-  }
-}
-
-String _virusTotalExplanation(String verdict) {
-  switch (verdict) {
-    case 'malicious':
-      return 'At least one engine flagged this file as malicious.';
-    case 'suspicious':
-      return 'No malicious verdicts, but some engines reported suspicious.';
-    case 'clean_or_unknown':
-      return 'No malicious or suspicious engine hits for this hash.';
-    case 'unknown':
-      return 'VirusTotal has no result for this file, or scan stats are unavailable.';
-    default:
-      return 'See engine counts below.';
-  }
-}
-
-Future<void> _openVirusTotalSheet(BuildContext context, ProcessInfo p) async {
-  final bloc = context.read<ProcessBloc>();
-  bloc.requestVirusTotalCheck(p.pid);
-  await showModalBottomSheet<void>(
-    context: context,
-    useRootNavigator: true,
-    showDragHandle: true,
-    builder: (c) {
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          child: BlocBuilder<ProcessBloc, ProcessState>(
-            bloc: bloc,
-            builder: (c, st) {
-              final loading =
-                  st.vtLoadingPid == p.pid && st.vtByPid[p.pid] == null;
-              final data = st.vtByPid[p.pid];
-              if (loading) {
-                return const Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(height: 20),
-                    Center(child: CircularProgressIndicator()),
-                    SizedBox(height: 16),
-                    Text('Checking VirusTotal…'),
-                    SizedBox(height: 12),
-                  ],
-                );
-              }
-              if (data == null) {
-                return const Text('Waiting for response…');
-              }
-              final ok = data['ok'] == true;
-              if (!ok) {
-                return Text(
-                  'Check failed: ${data['error'] ?? 'unknown'}',
-                  style: TextStyle(color: Theme.of(c).colorScheme.error),
-                );
-              }
-              final verdictRaw = data['verdict']?.toString() ?? 'unknown';
-              final headline = _virusTotalHeadline(verdictRaw);
-              final expl = _virusTotalExplanation(verdictRaw);
-              final mal = data['malicious'] is num ? (data['malicious'] as num).toInt() : 0;
-              final sus = data['suspicious'] is num ? (data['suspicious'] as num).toInt() : 0;
-              final harm = data['harmless'] is num ? (data['harmless'] as num).toInt() : 0;
-              final und = data['undetected'] is num ? (data['undetected'] as num).toInt() : 0;
-              final totalEngines = mal + sus + harm + und;
-              final sha = data['sha256']?.toString() ?? '';
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'VirusTotal',
-                    style: EmDesign.labelCaps(c, Theme.of(c).colorScheme),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    p.name,
-                    style: Theme.of(c).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    headline,
-                    style: Theme.of(c).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    expl,
-                    style: Theme.of(c).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(c).colorScheme.onSurfaceVariant,
-                          height: 1.35,
-                        ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Engines: $mal malicious · $sus suspicious · $harm harmless · $und undetected'
-                    '${totalEngines > 0 ? ' ($totalEngines reporting)' : ''}',
-                    style: Theme.of(c).textTheme.bodySmall,
-                  ),
-                  if (sha.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    FilledButton(
-                      onPressed: () async {
-                        final u = Uri.parse(
-                          'https://www.virustotal.com/gui/file/$sha',
-                        );
-                        final launched = await launchUrl(
-                          u,
-                          mode: LaunchMode.externalApplication,
-                        );
-                        if (!launched && c.mounted) {
-                          ScaffoldMessenger.of(c).showSnackBar(
-                            const SnackBar(
-                              content: Text('Could not open VirusTotal link'),
-                            ),
-                          );
-                        }
-                      },
-                      child: const Text('Open in VirusTotal'),
-                    ),
-                  ],
-                ],
-              );
-            },
-          ),
-        ),
-      );
-    },
-  );
-}
 
 class ProcessesScreen extends StatefulWidget {
   const ProcessesScreen({super.key, this.initialWatchFilter});
@@ -196,7 +45,6 @@ class _ProcessViewRowData {
 class _ProcessesScreenState extends State<ProcessesScreen> {
   final _search = TextEditingController();
   _Sort _sort = _Sort.cpu;
-  int? _expandedPid;
   bool _compactCards = false;
 
   @override
@@ -271,8 +119,6 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final mono =
-        GoogleFonts.jetBrainsMono(color: scheme.onSurfaceVariant, fontSize: 11);
 
     return Scaffold(
       backgroundColor: scheme.surface,
@@ -432,24 +278,20 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
                     itemBuilder: (context, i) {
                       final row = rows[i];
                       final p = row.snapshot;
-                      final expanded = _expandedPid == p.pid;
                       return _ProcessRow(
+                        key: ValueKey<String>(
+                          '${row.isKilledGhost ? 'g' : 'l'}-${p.pid}',
+                        ),
                         p: p,
                         index: i,
                         isKilledGhost: row.isKilledGhost,
                         killedAt: row.killedAt,
-                        expanded: expanded,
                         compact: _compactCards,
-                        mono: mono,
-                        onToggle: () => setState(() {
-                          _expandedPid = expanded ? null : p.pid;
-                        }),
-                        onOpenDetail: row.isKilledGhost
-                            ? null
-                            : () => context.push('/processes/${p.pid}'),
-                        onKill: row.isKilledGhost
-                            ? null
-                            : () => _confirmKill(context, p),
+                        onRowTap: () => context.push(
+                          row.isKilledGhost
+                              ? '/processes/${p.pid}?ghost=1'
+                              : '/processes/${p.pid}',
+                        ),
                         onDismissGhost: row.isKilledGhost
                             ? () => context
                                 .read<ProcessBloc>()
@@ -465,37 +307,6 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
         ],
       ),
     );
-  }
-
-  Future<void> _confirmKill(BuildContext context, ProcessInfo p) async {
-    final scheme = Theme.of(context).colorScheme;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('Kill process?'),
-        content: Text(
-          'Kill ${p.name} (PID ${p.pid})? This will immediately terminate the process '
-          'and cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(c, false),
-              child: const Text('Cancel')),
-          FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: scheme.error,
-                foregroundColor: scheme.onError,
-              ),
-              onPressed: () => Navigator.pop(c, true),
-              child: const Text('Kill')),
-        ],
-      ),
-    );
-    if (ok == true && context.mounted) {
-      context
-          .read<ProcessBloc>()
-          .sendCommand({'type': 'kill_process', 'pid': p.pid});
-    }
   }
 }
 
@@ -557,35 +368,15 @@ class _ProcessCategory {
   }
 }
 
-/// Taps pass through to [onCollapse] while [child] stays non-interactive (disabled buttons).
-class _TapDisabledCollapses extends StatelessWidget {
-  const _TapDisabledCollapses({required this.onCollapse, required this.child});
-
-  final VoidCallback onCollapse;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onCollapse,
-      child: IgnorePointer(child: child),
-    );
-  }
-}
-
 class _ProcessRow extends StatelessWidget {
   const _ProcessRow({
+    super.key,
     required this.p,
     required this.index,
     required this.isKilledGhost,
     this.killedAt,
-    required this.expanded,
     this.compact = false,
-    required this.mono,
-    required this.onToggle,
-    this.onOpenDetail,
-    this.onKill,
+    required this.onRowTap,
     this.onDismissGhost,
   });
 
@@ -593,12 +384,8 @@ class _ProcessRow extends StatelessWidget {
   final int index;
   final bool isKilledGhost;
   final DateTime? killedAt;
-  final bool expanded;
   final bool compact;
-  final TextStyle mono;
-  final VoidCallback onToggle;
-  final VoidCallback? onOpenDetail;
-  final VoidCallback? onKill;
+  final VoidCallback onRowTap;
   final VoidCallback? onDismissGhost;
 
   static const _highCpuWarn = 40.0;
@@ -643,44 +430,25 @@ class _ProcessRow extends StatelessWidget {
       ),
     );
 
-    void collapseIfExpanded() {
-      if (expanded) onToggle();
-    }
-
-    Widget wrapDisabledTap(Widget child, {required bool disabled}) {
-      if (!disabled) return child;
-      return _TapDisabledCollapses(
-          onCollapse: collapseIfExpanded, child: child);
-    }
-
-    Widget dimIf(bool dim, Widget child) =>
-        dim ? Opacity(opacity: 0.4, child: child) : child;
-
     return Material(
       color: Colors.transparent,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+      child: DecoratedBox(
         decoration: BoxDecoration(
-          color: expanded ? scheme.surface : rowBg,
-          border: Border(
-            left: BorderSide(
-              color: expanded ? scheme.primary : Colors.transparent,
-              width: 2,
-            ),
-          ),
+          color: rowBg,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: EdgeInsets.fromLTRB(16, compact ? 8 : 16, 12, compact ? 8 : 16),
+              padding: EdgeInsets.fromLTRB(
+                  16, compact ? 8 : 16, 12, compact ? 8 : 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: onToggle,
+                      onTap: onRowTap,
                       hoverColor:
                           scheme.surfaceContainer.withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(EmDesign.radiusSm),
@@ -744,12 +512,8 @@ class _ProcessRow extends StatelessWidget {
                               ],
                             ),
                           ),
-                          AnimatedRotation(
-                            turns: expanded ? 0.5 : 0,
-                            duration: const Duration(milliseconds: 200),
-                            child: Icon(Icons.expand_more_rounded,
-                                color: scheme.outline, size: 24),
-                          ),
+                          Icon(Icons.chevron_right_rounded,
+                              color: scheme.outline, size: 24),
                         ],
                       ),
                     ),
@@ -860,425 +624,30 @@ class _ProcessRow extends StatelessWidget {
                 ],
               ),
             ),
-            if (expanded)
-              Container(
-                color: scheme.surfaceContainerLowest,
-                padding: EdgeInsets.fromLTRB(16, 0, 16, compact ? 12 : 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Divider(
-                        height: 1,
-                        color: scheme.outlineVariant.withValues(alpha: 0.08)),
-                    const SizedBox(height: 16),
-                    Text(
-                      'COMMAND PATH',
-                      style: EmDesign.labelCaps(context, scheme),
+            if (onDismissGhost != null)
+              Padding(
+                padding: EdgeInsets.fromLTRB(16, 0, 16, compact ? 8 : 12),
+                child: OutlinedButton(
+                  onPressed: onDismissGhost,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: scheme.error,
+                    side: BorderSide(
+                        color: scheme.error.withValues(alpha: 0.45)),
+                    backgroundColor:
+                        scheme.errorContainer.withValues(alpha: 0.16),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                  ),
+                  child: Text(
+                    'Dismiss',
+                    style: GoogleFonts.manrope(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
                     ),
-                    const SizedBox(height: 6),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: scheme.surface.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(EmDesign.radiusSm),
-                      ),
-                      child: SelectableText(
-                        p.commandLine.isEmpty
-                            ? '(no command line)'
-                            : p.commandLine,
-                        style: mono.copyWith(
-                          fontSize: 12,
-                          color: scheme.primary.withValues(alpha: 0.85),
-                          height: 1.4,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'PARENT PID',
-                                style: EmDesign.labelCaps(context, scheme),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${p.parentPid}',
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  color: scheme.onSurface,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'STATUS',
-                                style: EmDesign.labelCaps(context, scheme),
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 6,
-                                    height: 6,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: isKilledGhost
-                                          ? scheme.error
-                                          : (suspended
-                                              ? scheme.outline
-                                              : scheme.tertiary),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: (isKilledGhost
-                                                  ? scheme.error
-                                                  : (suspended
-                                                      ? scheme.outline
-                                                      : scheme.tertiary))
-                                              .withValues(alpha: 0.45),
-                                          blurRadius: 8,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Flexible(
-                                    child: Text(
-                                      isKilledGhost
-                                          ? 'Killed'
-                                          : suspended
-                                              ? 'Suspended'
-                                              : (p.status.isEmpty
-                                                  ? 'Running'
-                                                  : p.status),
-                                      style:
-                                          theme.textTheme.titleSmall?.copyWith(
-                                        fontWeight: FontWeight.w800,
-                                        color: isKilledGhost
-                                            ? scheme.error
-                                            : (suspended
-                                                ? scheme.outline
-                                                : scheme.tertiary),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    wrapDisabledTap(
-                      TextButton(
-                        onPressed: onOpenDetail,
-                        child: const Text('Open full detail'),
-                      ),
-                      disabled: onOpenDetail == null,
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        dimIf(
-                          isKilledGhost || onKill == null,
-                          wrapDisabledTap(
-                            _KillButton(
-                              onPressed: onKill,
-                              label: isKilledGhost ? 'Killed' : 'Kill',
-                              enabled: !isKilledGhost && onKill != null,
-                            ),
-                            disabled: onKill == null,
-                          ),
-                        ),
-                        dimIf(
-                          isKilledGhost || suspended,
-                          wrapDisabledTap(
-                            _GhostProcessButton(
-                              scheme: scheme,
-                              icon: Icons.pause_circle_outline_rounded,
-                              label: 'Suspend',
-                              onPressed: isKilledGhost || suspended
-                                  ? null
-                                  : () =>
-                                      context.read<ProcessBloc>().sendCommand({
-                                        'type': 'suspend_process',
-                                        'pid': p.pid,
-                                      }),
-                            ),
-                            disabled: isKilledGhost || suspended,
-                          ),
-                        ),
-                        dimIf(
-                          isKilledGhost || !suspended,
-                          wrapDisabledTap(
-                            _GhostProcessButton(
-                              scheme: scheme,
-                              icon: Icons.play_circle_outline_rounded,
-                              label: 'Resume',
-                              dimmed: isKilledGhost || !suspended,
-                              onPressed: isKilledGhost || !suspended
-                                  ? null
-                                  : () =>
-                                      context.read<ProcessBloc>().sendCommand({
-                                        'type': 'resume_process',
-                                        'pid': p.pid,
-                                      }),
-                            ),
-                            disabled: isKilledGhost || !suspended,
-                          ),
-                        ),
-                        dimIf(
-                          isKilledGhost,
-                          wrapDisabledTap(
-                            BlocBuilder<WatchlistBloc, WatchlistState>(
-                              buildWhen: (prev, next) =>
-                                  prev.entries != next.entries,
-                              builder: (context, wl) {
-                                final normalized =
-                                    WatchlistBloc.normalizeExecutableName(
-                                        p.name);
-                                final flagged = normalized != null &&
-                                    wl.entries.any((e) =>
-                                        e.name.toLowerCase() ==
-                                        normalized.toLowerCase());
-                                final amber =
-                                    const Color(0xFFE65100); // orange-900
-                                return OutlinedButton.icon(
-                                  onPressed: isKilledGhost
-                                      ? null
-                                      : () => _onProcessFlagTap(
-                                            context,
-                                            p,
-                                            flagged,
-                                          ),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor:
-                                        flagged ? amber : scheme.outline,
-                                    side: BorderSide(
-                                      color: flagged
-                                          ? amber.withValues(alpha: 0.65)
-                                          : scheme.outlineVariant
-                                              .withValues(alpha: 0.3),
-                                    ),
-                                  ),
-                                  icon: Icon(
-                                    flagged
-                                        ? Icons.flag_rounded
-                                        : Icons.flag_outlined,
-                                    size: 18,
-                                  ),
-                                  label: Text(flagged ? 'Flagged' : 'Flag'),
-                                );
-                              },
-                            ),
-                            disabled: isKilledGhost,
-                          ),
-                        ),
-                        dimIf(
-                          isKilledGhost,
-                          wrapDisabledTap(
-                            OutlinedButton.icon(
-                              onPressed: isKilledGhost
-                                  ? null
-                                  : () => _openVirusTotalSheet(context, p),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: scheme.primary,
-                                side: BorderSide(
-                                  color: scheme.primary
-                                      .withValues(alpha: 0.35),
-                                ),
-                              ),
-                              icon: const Icon(Icons.shield_outlined, size: 18),
-                              label: const Text('VirusTotal'),
-                            ),
-                            disabled: isKilledGhost,
-                          ),
-                        ),
-                        if (onDismissGhost != null)
-                          OutlinedButton(
-                            onPressed: onDismissGhost,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: scheme.error,
-                              side: BorderSide(
-                                  color: scheme.error.withValues(alpha: 0.45)),
-                              backgroundColor:
-                                  scheme.errorContainer.withValues(alpha: 0.16),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 10),
-                            ),
-                            child: Text(
-                              'Dismiss',
-                              style: GoogleFonts.manrope(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
               ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-Future<void> _onProcessFlagTap(
-  BuildContext context,
-  ProcessInfo p,
-  bool flagged,
-) async {
-  final wl = context.read<WatchlistBloc>();
-  final normalized = WatchlistBloc.normalizeExecutableName(p.name);
-  if (normalized == null) {
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Could not resolve an executable name to flag')),
-    );
-    return;
-  }
-  if (!flagged) {
-    wl.flagFromProcessesScreen(p.name);
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$normalized added to watchlist')),
-    );
-    return;
-  }
-  final stored = wl.watchlistNameForExecutable(p.name);
-  if (stored == null) return;
-  final ok = await showDialog<bool>(
-    context: context,
-    builder: (c) => AlertDialog(
-      title: const Text('Remove from watchlist?'),
-      content: Text('Remove $stored from watchlist?'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(c, false),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(c, true),
-          child: const Text('Remove'),
-        ),
-      ],
-    ),
-  );
-  if (ok == true && context.mounted) {
-    wl.remove(stored);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$stored removed from watchlist')),
-    );
-  }
-}
-
-class _KillButton extends StatelessWidget {
-  const _KillButton({
-    required this.onPressed,
-    required this.label,
-    required this.enabled,
-  });
-
-  final VoidCallback? onPressed;
-  final String label;
-  final bool enabled;
-
-  @override
-  Widget build(BuildContext context) {
-    final bg = enabled ? _killButtonRed : Colors.grey.shade600;
-    const fg = Colors.white;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(EmDesign.radiusMd),
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(EmDesign.radiusMd),
-            color: bg,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.cancel_rounded, size: 18, color: fg),
-                const SizedBox(width: 8),
-                Text(
-                  label,
-                  style: GoogleFonts.manrope(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: fg,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _GhostProcessButton extends StatelessWidget {
-  const _GhostProcessButton({
-    required this.scheme,
-    required this.icon,
-    required this.label,
-    this.onPressed,
-    this.dimmed = false,
-  });
-
-  final ColorScheme scheme;
-  final IconData icon;
-  final String label;
-  final VoidCallback? onPressed;
-  final bool dimmed;
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = onPressed != null && !dimmed;
-    return Material(
-      color: scheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(EmDesign.radiusMd),
-      child: InkWell(
-        onTap: enabled ? onPressed : null,
-        borderRadius: BorderRadius.circular(EmDesign.radiusMd),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 18, color: scheme.onSurface),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: GoogleFonts.manrope(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: scheme.onSurface,
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );

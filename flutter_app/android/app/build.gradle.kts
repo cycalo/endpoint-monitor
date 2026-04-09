@@ -49,5 +49,7 @@ flutter {
 }
 
 dependencies {
+    implementation(platform("org.jetbrains.kotlin:kotlin-bom:2.2.20"))
+    implementation("org.jetbrains.kotlin:kotlin-stdlib")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
