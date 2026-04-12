@@ -105,7 +105,8 @@ public sealed class AppDatabase(ILogger<AppDatabase> logger)
     public async Task RemoveFlagAsync(string name, CancellationToken cancellationToken = default)
     {
         if (_db == null) return;
-        await _db.ExecuteAsync("DELETE FROM FlaggedProcesses WHERE Name = ?", name).ConfigureAwait(false);
+        // Case-insensitive: UI / Sysmon may differ in casing from the stored row.
+        await _db.ExecuteAsync("DELETE FROM FlaggedProcesses WHERE lower(Name) = lower(?)", name).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<FirewallBlockRow>> GetFirewallBlocksAsync(CancellationToken cancellationToken = default)

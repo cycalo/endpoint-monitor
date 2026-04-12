@@ -2,15 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../bloc/watchlist_bloc.dart';
-import '../models/ws_models.dart';
 
+/// [rawExecutableName] is the process image name or path as shown in the UI
+/// (e.g. from [ProcessInfo.name] or [NetworkConnection.processName]).
 Future<void> processWatchlistFlagTap(
   BuildContext context,
-  ProcessInfo p,
+  String rawExecutableName,
   bool flagged,
 ) async {
   final wl = context.read<WatchlistBloc>();
-  final normalized = WatchlistBloc.normalizeExecutableName(p.name);
+  final normalized = WatchlistBloc.normalizeExecutableName(rawExecutableName);
   if (normalized == null) {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -21,14 +22,14 @@ Future<void> processWatchlistFlagTap(
     return;
   }
   if (!flagged) {
-    wl.flagFromProcessesScreen(p.name);
+    wl.flagFromProcessesScreen(rawExecutableName);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('$normalized added to watchlist')),
     );
     return;
   }
-  final stored = wl.watchlistNameForExecutable(p.name);
+  final stored = wl.watchlistNameForExecutable(rawExecutableName);
   if (stored == null) return;
   final ok = await showDialog<bool>(
     context: context,

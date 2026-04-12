@@ -6,6 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../bloc/blocked_remote_ips_cubit.dart';
 import '../bloc/network_bloc.dart';
 import '../bloc/process_bloc.dart';
+import '../bloc/watchlist_bloc.dart';
+import '../widgets/process_watchlist_flag_action.dart';
 import '../models/ws_models.dart';
 import '../theme/em_design_system.dart';
 import '../utils/country_flag_emoji.dart';
@@ -134,10 +136,16 @@ class NetworkConnectionDetailScreen extends StatelessWidget {
                           icon: Icons.shield_rounded,
                           child: Builder(
                             builder: (context) {
+                              final theme = Theme.of(context);
                               final canBlock = hasBlockableRemoteEndpoint(
                                   current.remoteAddress);
                               final listenOnly =
                                   !canBlock && isListeningStyleSocket(current);
+                              final rawProc = current.processName.trim();
+                              final canWatchlistFlag = rawProc.isNotEmpty &&
+                                  WatchlistBloc.normalizeExecutableName(
+                                          rawProc) !=
+                                      null;
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
@@ -193,6 +201,87 @@ class NetworkConnectionDetailScreen extends StatelessWidget {
                                           : 'Blocking requires a specific remote address (not a wildcard or “any” endpoint).',
                                       style: GoogleFonts.inter(
                                         fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: scheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                  if (canWatchlistFlag) ...[
+                                    const SizedBox(height: 12),
+                                    BlocBuilder<WatchlistBloc, WatchlistState>(
+                                      buildWhen: (prev, next) =>
+                                          prev.entries != next.entries,
+                                      builder: (context, wl) {
+                                        final normalized = WatchlistBloc
+                                            .normalizeExecutableName(rawProc)!;
+                                        final flagged = wl.entries.any(
+                                          (e) =>
+                                              e.name.toLowerCase() ==
+                                              normalized.toLowerCase(),
+                                        );
+                                        final watchYellow =
+                                            const Color(0xFFF0B429);
+                                        final watchYellowOnLight =
+                                            const Color(0xFF4A3D00);
+                                        final watchYellowOnDark =
+                                            const Color(0xFFFFE082);
+                                        final dark = theme.brightness ==
+                                            Brightness.dark;
+                                        return SizedBox(
+                                          width: double.infinity,
+                                          child: OutlinedButton.icon(
+                                            onPressed: () =>
+                                                processWatchlistFlagTap(
+                                              context,
+                                              rawProc,
+                                              flagged,
+                                            ),
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor: flagged
+                                                  ? (dark
+                                                      ? watchYellowOnDark
+                                                      : watchYellowOnLight)
+                                                  : scheme.primary,
+                                              backgroundColor: flagged
+                                                  ? watchYellow.withValues(
+                                                      alpha:
+                                                          dark ? 0.22 : 0.2)
+                                                  : null,
+                                              side: BorderSide(
+                                                color: flagged
+                                                    ? watchYellow
+                                                    : scheme.primary
+                                                        .withValues(
+                                                            alpha: 0.55),
+                                                width: 1.5,
+                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 14,
+                                                vertical: 12,
+                                              ),
+                                            ),
+                                            icon: Icon(
+                                              flagged
+                                                  ? Icons.flag_rounded
+                                                  : Icons.flag_outlined,
+                                              size: 20,
+                                            ),
+                                            label: Text(
+                                              flagged ? 'Flagged' : 'Flag',
+                                              style: GoogleFonts.manrope(
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Alert when this executable starts (same as Processes → watchlist).',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
                                         fontWeight: FontWeight.w600,
                                         color: scheme.onSurfaceVariant,
                                       ),

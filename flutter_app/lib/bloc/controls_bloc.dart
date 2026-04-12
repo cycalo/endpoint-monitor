@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -18,23 +19,30 @@ class ControlsState extends Equatable {
   const ControlsState({
     this.pending = const {},
     this.feedback,
+    this.screenshotPng,
   });
 
   final Set<String> pending;
   final ControlsFeedback? feedback;
 
+  /// Decoded PNG from the last successful `capture_desktop_screenshot` (cleared by [clearScreenshot]).
+  final Uint8List? screenshotPng;
+
   ControlsState copyWith({
     Set<String>? pending,
     ControlsFeedback? feedback,
     bool clearFeedback = false,
+    Uint8List? screenshotPng,
+    bool clearScreenshot = false,
   }) =>
       ControlsState(
         pending: pending ?? this.pending,
         feedback: clearFeedback ? null : (feedback ?? this.feedback),
+        screenshotPng: clearScreenshot ? null : (screenshotPng ?? this.screenshotPng),
       );
 
   @override
-  List<Object?> get props => [pending, feedback];
+  List<Object?> get props => [pending, feedback, screenshotPng];
 }
 
 /// Remote system control commands (Windows service).
@@ -53,9 +61,12 @@ class ControlsBloc extends Cubit<ControlsState> {
     'turn_off_display',
     'set_volume',
     'toggle_mute',
+    'capture_desktop_screenshot',
   };
 
   void clearFeedback() => emit(state.copyWith(clearFeedback: true));
+
+  void clearScreenshot() => emit(state.copyWith(clearScreenshot: true));
 
   /// Sent when the user releases the volume slider (final level only).
   void setVolume(int volume) =>
@@ -82,6 +93,39 @@ class ControlsBloc extends Cubit<ControlsState> {
     final ok = m['success'] == true;
     final msg = m['message']?.toString() ?? '';
     final next = Set<String>.from(state.pending)..remove(cmd);
+
+    if (cmd == 'capture_desktop_screenshot') {
+      Uint8List? png;
+      if (ok) {
+        final raw = m['data'];
+        if (raw is Map) {
+          final b64 = raw['imageBase64']?.toString();
+          if (b64 != null && b64.isNotEmpty) {
+            try {
+              png = base64Decode(b64);
+            } catch (_) {
+              png = null;
+            }
+          }
+        }
+      }
+      emit(state.copyWith(
+        pending: next,
+        clearFeedback: true,
+        clearScreenshot: !(ok && png != null),
+        screenshotPng: (ok && png != null) ? png : null,
+        feedback: ok && png != null
+            ? null
+            : ControlsFeedback(
+                success: false,
+                message: png == null && ok
+                    ? 'Screenshot data missing'
+                    : (msg.isNotEmpty ? msg : 'Failed'),
+              ),
+      ));
+      return;
+    }
+
     emit(state.copyWith(
       pending: next,
       feedback: ControlsFeedback(success: ok, message: msg.isNotEmpty ? msg : (ok ? 'OK' : 'Failed')),

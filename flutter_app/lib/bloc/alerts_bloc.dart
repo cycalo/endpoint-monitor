@@ -7,6 +7,7 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 import '../models/ws_models.dart';
 import '../services/alert_notification_service.dart';
+import 'watchlist_bloc.dart';
 
 class AlertsState extends Equatable {
   const AlertsState({this.items = const [], this.acked = const {}});
@@ -22,9 +23,13 @@ class AlertsState extends Equatable {
 }
 
 class AlertsBloc extends Cubit<AlertsState> {
-  AlertsBloc() : super(const AlertsState()) {
+  AlertsBloc({required WatchlistBloc watchlistBloc})
+      : _watchlistBloc = watchlistBloc,
+        super(const AlertsState()) {
     FlutterForegroundTask.addTaskDataCallback(_onData);
   }
+
+  final WatchlistBloc _watchlistBloc;
 
   void _onData(Object data) {
     if (data is! Map) return;
@@ -34,7 +39,11 @@ class AlertsBloc extends Cubit<AlertsState> {
     if (raw is! Map) return;
     final a = Alert.fromJson(Map<String, dynamic>.from(raw));
     emit(state.copyWith(items: [a, ...state.items].take(500).toList()));
-    unawaited(AlertNotificationService.maybeShowForAlert(a));
+    final watchLower = _watchlistBloc.state.entries
+        .map((e) => e.name.toLowerCase())
+        .toSet();
+    unawaited(
+        AlertNotificationService.maybeShowForAlert(a, watchlistExecutableNamesLower: watchLower));
   }
 
   void acknowledge(String id) {

@@ -44,6 +44,7 @@ class _ProcessViewRowData {
 
 class _ProcessesScreenState extends State<ProcessesScreen> {
   final _search = TextEditingController();
+  final _searchFocus = FocusNode();
   _Sort _sort = _Sort.cpu;
   bool _compactCards = false;
 
@@ -64,8 +65,22 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
 
   @override
   void dispose() {
+    _searchFocus.dispose();
     _search.dispose();
     super.dispose();
+  }
+
+  void _openProcessDetail(BuildContext context, _ProcessViewRowData row) {
+    // Drop focus before navigating so route pop does not restore the IME
+    // for a still-focused search field (common after "minimize" keyboard).
+    _searchFocus.unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
+    final p = row.snapshot;
+    context.push(
+      row.isKilledGhost
+          ? '/processes/${p.pid}?ghost=1'
+          : '/processes/${p.pid}',
+    );
   }
 
   String _sortMenuLabel(_Sort s) {
@@ -122,7 +137,15 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
 
     return Scaffold(
       backgroundColor: scheme.surface,
-      appBar: const EmBrandAppBar(),
+      appBar: EmBrandAppBar(
+        actions: [
+          IconButton(
+            tooltip: 'Alerts',
+            onPressed: () => context.push('/alerts'),
+            icon: Icon(Icons.visibility_rounded, color: scheme.primary),
+          ),
+        ],
+      ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -134,9 +157,13 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
               children: [
                 TextField(
                   controller: _search,
+                  focusNode: _searchFocus,
                   style: theme.textTheme.bodySmall
                       ?.copyWith(color: scheme.onSurface),
                   onChanged: (_) => setState(() {}),
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) => _searchFocus.unfocus(),
+                  onTapOutside: (_) => _searchFocus.unfocus(),
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: scheme.surfaceContainerLowest,
@@ -267,38 +294,42 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
                       ),
                     );
                   }
-                  return ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(0, 0, 0, 96),
-                    itemCount: rows.length,
-                    separatorBuilder: (_, __) => Divider(
-                      height: 1,
-                      thickness: 1,
-                      color: scheme.outlineVariant.withValues(alpha: 0.1),
-                    ),
-                    itemBuilder: (context, i) {
-                      final row = rows[i];
-                      final p = row.snapshot;
-                      return _ProcessRow(
-                        key: ValueKey<String>(
-                          '${row.isKilledGhost ? 'g' : 'l'}-${p.pid}',
-                        ),
-                        p: p,
-                        index: i,
-                        isKilledGhost: row.isKilledGhost,
-                        killedAt: row.killedAt,
-                        compact: _compactCards,
-                        onRowTap: () => context.push(
-                          row.isKilledGhost
-                              ? '/processes/${p.pid}?ghost=1'
-                              : '/processes/${p.pid}',
-                        ),
-                        onDismissGhost: row.isKilledGhost
-                            ? () => context
-                                .read<ProcessBloc>()
-                                .dismissKilledGhost(p.pid)
-                            : null,
-                      );
+                  return NotificationListener<ScrollStartNotification>(
+                    onNotification: (n) {
+                      if (n.dragDetails != null) {
+                        _searchFocus.unfocus();
+                      }
+                      return false;
                     },
+                    child: ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(0, 0, 0, 96),
+                      itemCount: rows.length,
+                      separatorBuilder: (_, __) => Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: scheme.outlineVariant.withValues(alpha: 0.1),
+                      ),
+                      itemBuilder: (context, i) {
+                        final row = rows[i];
+                        final p = row.snapshot;
+                        return _ProcessRow(
+                          key: ValueKey<String>(
+                            '${row.isKilledGhost ? 'g' : 'l'}-${p.pid}',
+                          ),
+                          p: p,
+                          index: i,
+                          isKilledGhost: row.isKilledGhost,
+                          killedAt: row.killedAt,
+                          compact: _compactCards,
+                          onRowTap: () => _openProcessDetail(context, row),
+                          onDismissGhost: row.isKilledGhost
+                              ? () => context
+                                  .read<ProcessBloc>()
+                                  .dismissKilledGhost(p.pid)
+                              : null,
+                        );
+                      },
+                    ),
                   );
                 },
               ),

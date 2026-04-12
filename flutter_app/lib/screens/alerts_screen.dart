@@ -47,7 +47,7 @@ class AlertsScreen extends StatelessWidget {
               final acked = state.acked.contains(a.id);
               return Material(
                 color: scheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+                // [shape] already carries borderRadius; do not also set [borderRadius] on Material.
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(EmDesign.radiusMd),
                   side: BorderSide(color: EmDesign.ghostLine(scheme), width: 1),

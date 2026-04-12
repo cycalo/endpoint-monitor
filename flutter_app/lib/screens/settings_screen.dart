@@ -17,6 +17,7 @@ import '../bloc/events_bloc.dart';
 import '../bloc/system_info_bloc.dart';
 import '../bloc/threat_intel_bloc.dart';
 import '../settings/app_settings_keys.dart';
+import '../settings/groq_testing_defaults.dart';
 import '../theme/em_design_system.dart';
 import '../theme/theme_cubit.dart';
 import '../utils/export_http_base.dart';
@@ -37,8 +38,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _jwt = TextEditingController();
   final _httpBase = TextEditingController();
   final _static = TextEditingController();
+  final _groqApiKey = TextEditingController();
   bool _hideJwt = true;
   bool _hideStatic = true;
+  bool _hideGroqApi = true;
   bool _rememberEndpoint = true;
   bool _pinLock = false;
   String _autoLock = 'never';
@@ -55,6 +58,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _savedJwt = '';
   String _savedHttp = '';
   String _savedStatic = '';
+  String _savedGroqApi = '';
 
   @override
   void initState() {
@@ -68,6 +72,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _jwt.dispose();
     _httpBase.dispose();
     _static.dispose();
+    _groqApiKey.dispose();
     super.dispose();
   }
 
@@ -77,14 +82,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _httpBase.text.trim() != _savedHttp ||
       _static.text.trim() != _savedStatic;
 
+  bool get _groqDirty => _groqApiKey.text.trim() != _savedGroqApi;
+
   Future<void> _load() async {
     final p = await SharedPreferences.getInstance();
     await AppSettingsKeys.ensureDefaults(p);
     const s = FlutterSecureStorage();
     final host = await s.read(key: 'em_host') ?? '';
     final token = await s.read(key: 'em_token') ?? '';
+    final groqKeyStored = await s.read(key: 'groq_api_key') ?? '';
+    final groqKey = groqKeyStored.trim().isNotEmpty ? groqKeyStored : kDefaultGroqApiKeyForTesting;
+    if (groqKeyStored.trim().isEmpty) {
+      await s.write(key: 'groq_api_key', value: groqKey);
+    }
     _endpoint.text = host;
     _jwt.text = token;
+    _groqApiKey.text = groqKey;
     _httpBase.text = p.getString(AppSettingsKeys.httpBase) ?? 'http://192.168.1.10:5000';
     _static.text = await s.read(key: 'em_static_token') ?? '';
     _rememberEndpoint =
@@ -101,9 +114,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _compactProc = p.getBool(AppSettingsKeys.compactProcessCards) ?? false;
     _savedEndpoint = host;
     _savedJwt = token;
+    _savedGroqApi = groqKey.trim();
     _savedHttp = _httpBase.text.trim();
     _savedStatic = _static.text.trim();
     if (mounted) setState(() {});
+  }
+
+  Future<void> _saveGroqApiKey() async {
+    const s = FlutterSecureStorage();
+    final key = _groqApiKey.text.trim();
+    await s.write(key: 'groq_api_key', value: key);
+    _savedGroqApi = key;
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Groq API Key saved')));
   }
 
   Future<void> _persistNonConnection() async {
@@ -632,6 +656,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Display prefs saved')));
                     },
                     child: const Text('Save display prefs'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            _sectionLabel(context, 'GROQ AI'),
+            _card(
+              scheme,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: _groqApiKey,
+                    obscureText: _hideGroqApi,
+                    decoration: InputDecoration(
+                      labelText: 'Groq API Key',
+                      suffixIcon: IconButton(
+                        icon: Icon(_hideGroqApi ? Icons.visibility : Icons.visibility_off),
+                        onPressed: () => setState(() => _hideGroqApi = !_hideGroqApi),
+                      ),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Free API key available at console.groq.com',
+                    style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton.tonal(
+                    onPressed: _groqDirty ? _saveGroqApiKey : null,
+                    child: const Text('Save'),
                   ),
                 ],
               ),

@@ -1,7 +1,13 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../bloc/connection_bloc.dart';
 import '../bloc/controls_bloc.dart';
@@ -45,7 +51,15 @@ class ControlsScreen extends StatelessWidget {
           ),
         );
       },
-      child: Scaffold(
+      child: BlocListener<ControlsBloc, ControlsState>(
+        listenWhen: (p, c) =>
+            c.screenshotPng != null && c.screenshotPng != p.screenshotPng,
+        listener: (context, s) {
+          final bytes = s.screenshotPng!;
+          context.read<ControlsBloc>().clearScreenshot();
+          unawaited(_showScreenshotPreview(context, bytes));
+        },
+        child: Scaffold(
         backgroundColor: scheme.surface,
         appBar: EmBrandAppBar(
           leading: IconButton(
@@ -152,6 +166,21 @@ class ControlsScreen extends StatelessWidget {
                         const {'type': 'turn_off_display'},
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    _ControlCard(
+                      borderColor: _borderDisplay,
+                      muted: false,
+                      enabled: connected,
+                      commandType: 'capture_desktop_screenshot',
+                      icon: Icons.screenshot_monitor_outlined,
+                      title: 'Desktop Screenshot',
+                      description:
+                          'Capture all monitors as PNG. If the agent runs without desktop access (typical for a Windows service), the image may be blank.',
+                      buttonLabel: 'Capture',
+                      onPrimaryTap: (ctx) => ctx.read<ControlsBloc>().send(
+                        const {'type': 'capture_desktop_screenshot'},
+                      ),
+                    ),
                     const SizedBox(height: 20),
                     _sectionTitle(context, scheme, 'CANCEL'),
                     _ControlCard(
@@ -174,7 +203,153 @@ class ControlsScreen extends StatelessWidget {
           },
         ),
       ),
+      ),
     );
+  }
+
+  static Future<void> _showScreenshotPreview(
+      BuildContext hostContext, Uint8List bytes) async {
+    if (!hostContext.mounted) return;
+    await showDialog<void>(
+      context: hostContext,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        final scheme = Theme.of(dialogContext).colorScheme;
+        final maxW = MediaQuery.sizeOf(dialogContext).width * 0.92;
+        final maxH = MediaQuery.sizeOf(dialogContext).height * 0.62;
+        return Dialog(
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          backgroundColor: scheme.surfaceContainerHigh,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Material(
+                color: Colors.transparent,
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(4, 4, 4, 0),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        tooltip: 'Close',
+                        onPressed: () => Navigator.pop(dialogContext),
+                        icon: Icon(Icons.close_rounded, color: scheme.onSurface),
+                      ),
+                      Expanded(
+                        child: Text(
+                          'Desktop screenshot',
+                          style: GoogleFonts.manrope(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                            color: scheme.onSurface,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Download',
+                        onPressed: () =>
+                            unawaited(_saveScreenshot(hostContext, bytes)),
+                        icon: Icon(Icons.download_rounded, color: scheme.primary),
+                      ),
+                      IconButton(
+                        tooltip: 'Share',
+                        onPressed: () =>
+                            unawaited(_shareScreenshot(hostContext, bytes)),
+                        icon: Icon(Icons.share_rounded, color: scheme.primary),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: scheme.outlineVariant.withValues(alpha: 0.35),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: SizedBox(
+                  width: maxW,
+                  height: maxH,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: ColoredBox(
+                      color: scheme.surfaceContainerHighest,
+                      child: InteractiveViewer(
+                        minScale: 0.2,
+                        maxScale: 5,
+                        child: Center(
+                          child: Image.memory(
+                            bytes,
+                            fit: BoxFit.contain,
+                            gaplessPlayback: true,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  static Future<void> _saveScreenshot(
+      BuildContext hostContext, Uint8List bytes) async {
+    try {
+      final downloads = await getDownloadsDirectory();
+      final dir = downloads ?? await getApplicationDocumentsDirectory();
+      final name =
+          'em_screenshot_${DateTime.now().millisecondsSinceEpoch}.png';
+      final f = File('${dir.path}/$name');
+      await f.writeAsBytes(bytes);
+      if (!hostContext.mounted) return;
+      ScaffoldMessenger.of(hostContext).showSnackBar(
+        SnackBar(
+          content: Text(
+            downloads != null
+                ? 'Saved to Downloads'
+                : 'Saved to app documents',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (hostContext.mounted) {
+        ScaffoldMessenger.of(hostContext).showSnackBar(
+          const SnackBar(content: Text('Could not save screenshot')),
+        );
+      }
+    }
+  }
+
+  static Future<void> _shareScreenshot(
+      BuildContext hostContext, Uint8List bytes) async {
+    try {
+      final dir = await getTemporaryDirectory();
+      final f = File(
+        '${dir.path}/em_screenshot_${DateTime.now().millisecondsSinceEpoch}.png',
+      );
+      await f.writeAsBytes(bytes);
+      await Share.shareXFiles(
+        [XFile(f.path)],
+        subject: 'Desktop screenshot',
+      );
+    } catch (_) {
+      if (hostContext.mounted) {
+        ScaffoldMessenger.of(hostContext).showSnackBar(
+          const SnackBar(content: Text('Could not share screenshot')),
+        );
+      }
+    }
   }
 
   static Widget _sectionTitle(

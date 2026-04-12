@@ -1,3 +1,6 @@
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.Linq;
 using System.Diagnostics;
 using System.Management;
@@ -5,6 +8,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Windows.Forms;
 using EndpointMonitorService.Database;
 using EndpointMonitorService.Options;
 using EndpointMonitorService.Services;
@@ -90,6 +94,7 @@ public sealed class ResponseCommandService(
                 "turn_off_display" => await TurnOffDisplayAsync(clientIp, cancellationToken).ConfigureAwait(false),
                 "set_volume" => await SetVolumeAsync(root, clientIp, cancellationToken).ConfigureAwait(false),
                 "toggle_mute" => await ToggleMuteAsync(clientIp, cancellationToken).ConfigureAwait(false),
+                "capture_desktop_screenshot" => await CaptureDesktopScreenshotAsync(clientIp, cancellationToken).ConfigureAwait(false),
                 _ => new CommandResult(false, type, "unknown_command")
             };
         }
@@ -871,6 +876,24 @@ public sealed class ResponseCommandService(
         }
     }
 
+    /// <summary>
+    /// Captures the virtual screen (all monitors), scales to a max dimension for WebSocket payload size,
+    /// and returns PNG as base64 in <c>data</c>. May be blank when the service runs in session 0 without desktop access.
+    /// </summary>
+    private async Task<CommandResult> CaptureDesktopScreenshotAsync(string? clientIp, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var data = await Task.Run(DesktopScreenshot.CaptureScaledPngData, cancellationToken).ConfigureAwait(false);
+            await database.AppendAuditAsync("capture_desktop_screenshot", "ok", clientIp, cancellationToken).ConfigureAwait(false);
+            return new CommandResult(true, "capture_desktop_screenshot", "Screenshot captured", data);
+        }
+        catch (Exception ex)
+        {
+            return new CommandResult(false, "capture_desktop_screenshot", ex.Message);
+        }
+    }
+
     private static void RunNetsh(string arguments)
     {
         using var p = Process.Start(new ProcessStartInfo("netsh", arguments)
@@ -881,6 +904,51 @@ public sealed class ResponseCommandService(
             RedirectStandardOutput = true
         });
         p?.WaitForExit(30_000);
+    }
+}
+
+internal static class DesktopScreenshot
+{
+    private const int MaxDimension = 1920;
+
+    public static JsonElement CaptureScaledPngData()
+    {
+        var bounds = SystemInformation.VirtualScreen;
+        var sw = bounds.Width;
+        var sh = bounds.Height;
+        if (sw <= 0 || sh <= 0)
+            throw new InvalidOperationException("invalid_virtual_screen_bounds");
+
+        var scale = 1.0;
+        if (sw > MaxDimension || sh > MaxDimension)
+            scale = Math.Min((double)MaxDimension / sw, (double)MaxDimension / sh);
+        var tw = Math.Max(1, (int)Math.Round(sw * scale));
+        var th = Math.Max(1, (int)Math.Round(sh * scale));
+
+        using var output = new Bitmap(tw, th, PixelFormat.Format32bppArgb);
+        using (var g = Graphics.FromImage(output))
+        {
+            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            using var full = new Bitmap(sw, sh, PixelFormat.Format32bppArgb);
+            using (var gFull = Graphics.FromImage(full))
+            {
+                gFull.CopyFromScreen(bounds.Left, bounds.Top, 0, 0, full.Size, CopyPixelOperation.SourceCopy);
+            }
+
+            g.DrawImage(full, 0, 0, tw, th);
+        }
+
+        using var ms = new MemoryStream();
+        output.Save(ms, ImageFormat.Png);
+        return JsonSerializer.SerializeToElement(new
+        {
+            imageBase64 = Convert.ToBase64String(ms.ToArray()),
+            width = tw,
+            height = th,
+            sourceWidth = sw,
+            sourceHeight = sh
+        }, AppJson.Options);
     }
 }
 

@@ -57,9 +57,17 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     super.dispose();
   }
 
-  bool _isRunning(String processName, List<ProcessInfo> processes) {
+  /// First live process whose name matches the watchlist entry (case-insensitive).
+  /// Used for "running" UI and to open `/processes/:pid` directly.
+  static ProcessInfo? _matchWatchlistProcess(
+    String processName,
+    List<ProcessInfo> processes,
+  ) {
     final want = processName.toLowerCase();
-    return processes.any((p) => p.name.toLowerCase() == want);
+    for (final p in processes) {
+      if (p.name.toLowerCase() == want) return p;
+    }
+    return null;
   }
 
   Future<void> _confirmRemove(String name) async {
@@ -182,7 +190,8 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                   builder: (context, ps) {
                     return Column(
                       children: wl.entries.map((e) {
-                        final running = _isRunning(e.name, ps.items);
+                        final match = _matchWatchlistProcess(e.name, ps.items);
+                        final running = match != null;
                         final loadingSeen = wl.lastSeenLoadingNames.contains(e.name);
                         final seen = wl.lastSeenByName[e.name];
                         return Padding(
@@ -282,10 +291,13 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                                       _rel(seen),
                                       style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
                                     ),
-                                  if (running) ...[
+                                  if (match != null) ...[
                                     const SizedBox(height: 10),
                                     OutlinedButton(
-                                      onPressed: () => context.go('/processes?watch=${Uri.encodeComponent(e.name)}'),
+                                      // `go` (not `push`): pushing from /watchlist into the shell's
+                                      // nested /processes/:pid duplicates Navigator page keys.
+                                      onPressed: () =>
+                                          context.go('/processes/${match.pid}'),
                                       child: const Text('View Process'),
                                     ),
                                   ],

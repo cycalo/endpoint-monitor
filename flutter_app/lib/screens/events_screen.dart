@@ -596,40 +596,40 @@ class _EventsScreenState extends State<EventsScreen>
             builder: (context) {
               final isNarrow = MediaQuery.sizeOf(context).width < 460;
               Future<void> exportEvents() async {
-                try {
-                  final p = await SharedPreferences.getInstance();
+              try {
+                final p = await SharedPreferences.getInstance();
                   final base =
                       p.getString('em_http_base') ?? 'http://192.168.1.10:5000';
-                  const s = FlutterSecureStorage();
-                  final token = await s.read(key: 'em_token') ?? '';
-                  final dio = Dio(BaseOptions(baseUrl: base));
-                  final res = await dio.get<dynamic>(
-                    '/export/events',
+                const s = FlutterSecureStorage();
+                final token = await s.read(key: 'em_token') ?? '';
+                final dio = Dio(BaseOptions(baseUrl: base));
+                final res = await dio.get<dynamic>(
+                  '/export/events',
                     options:
                         Options(headers: {'Authorization': 'Bearer $token'}),
-                  );
-                  if (!context.mounted) return;
-                  await showDialog<void>(
-                    context: context,
-                    builder: (c) => AlertDialog(
-                      title: const Text('Export preview'),
-                      content: SingleChildScrollView(
-                        child: Text(() {
-                          final str = res.data?.toString() ?? '';
-                          if (str.length <= 4000) return str;
-                          return '${str.substring(0, 4000)}…';
-                        }()),
-                      ),
+                );
+                if (!context.mounted) return;
+                await showDialog<void>(
+                  context: context,
+                  builder: (c) => AlertDialog(
+                    title: const Text('Export preview'),
+                    content: SingleChildScrollView(
+                      child: Text(() {
+                        final str = res.data?.toString() ?? '';
+                        if (str.length <= 4000) return str;
+                        return '${str.substring(0, 4000)}…';
+                      }()),
+                    ),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(c),
                           child: const Text('Close'),
                         ),
                       ],
-                    ),
-                  );
-                } catch (e) {
-                  if (!context.mounted) return;
+                  ),
+                );
+              } catch (e) {
+                if (!context.mounted) return;
                   ScaffoldMessenger.of(context)
                       .showSnackBar(SnackBar(content: Text('$e')));
                 }
@@ -680,13 +680,13 @@ class _EventsScreenState extends State<EventsScreen>
             color: scheme.surfaceContainerLow,
             elevation: 3,
             shadowColor: Colors.black.withValues(alpha: 0.35),
-            child: Padding(
+          child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              child: Column(
+            child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: _search,
+              children: [
+                TextField(
+                  controller: _search,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: scheme.onSurface,
                     ),
@@ -724,9 +724,9 @@ class _EventsScreenState extends State<EventsScreen>
                         borderSide:
                             BorderSide(color: scheme.primary, width: 1.2),
                       ),
-                    ),
-                    onChanged: (_) => setState(() {}),
                   ),
+                  onChanged: (_) => setState(() {}),
+                ),
                   const SizedBox(height: 10),
                   if (widget.focusHourUtc != null &&
                       widget.focusHourUtc!.isNotEmpty)
@@ -763,14 +763,14 @@ class _EventsScreenState extends State<EventsScreen>
                   else if (widget.focusHourUtc == null ||
                       widget.focusHourUtc!.isEmpty)
                     const SizedBox.shrink(),
-                ],
-              ),
+              ],
             ),
           ),
+        ),
           Expanded(
             child: BlocBuilder<EventsBloc, EventsState>(
-              builder: (context, state) {
-                final q = _search.text.trim().toLowerCase();
+        builder: (context, state) {
+          final q = _search.text.trim().toLowerCase();
                 final cutoff = _timeRangeMinutes <= 0
                     ? null
                     : DateTime.now().toUtc().subtract(
@@ -799,17 +799,17 @@ class _EventsScreenState extends State<EventsScreen>
                       return false;
                     }
                   }
-                  if (q.isEmpty) return true;
-                  return e.processName.toLowerCase().contains(q) ||
-                      (e.commandLine?.toLowerCase().contains(q) ?? false) ||
-                      (e.dnsQuery?.toLowerCase().contains(q) ?? false) ||
+            if (q.isEmpty) return true;
+            return e.processName.toLowerCase().contains(q) ||
+                (e.commandLine?.toLowerCase().contains(q) ?? false) ||
+                (e.dnsQuery?.toLowerCase().contains(q) ?? false) ||
                       (e.remoteAddress?.toLowerCase().contains(q) ?? false) ||
                       e.type.toLowerCase().contains(q) ||
                       '${e.eventId}'.contains(q);
-                }).toList();
+          }).toList();
                 final list = filtered;
 
-                if (list.isEmpty) {
+          if (list.isEmpty) {
                   return Center(
                     child: Text(
                       'No events yet',
@@ -836,7 +836,7 @@ class _EventsScreenState extends State<EventsScreen>
                         delegate: SliverChildBuilderDelegate(
                           (context, index) {
                             final e = list[index];
-                            final ts = DateTime.tryParse(e.timestamp);
+              final ts = DateTime.tryParse(e.timestamp);
                             final tsText = ts != null
                                 ? DateFormat('HH:mm:ss.SSS')
                                     .format(ts.toLocal())
@@ -854,30 +854,30 @@ class _EventsScreenState extends State<EventsScreen>
                                     BorderRadius.circular(EmDesign.radiusLg),
                                 clipBehavior: Clip.antiAlias,
                                 child: InkWell(
-                                  onTap: () {
-                                    showModalBottomSheet<void>(
-                                      context: context,
+                onTap: () {
+                  showModalBottomSheet<void>(
+                    context: context,
                                       useRootNavigator: true,
-                                      showDragHandle: true,
+                    showDragHandle: true,
                                       backgroundColor:
                                           scheme.surfaceContainerHigh,
-                                      builder: (c) => Padding(
-                                        padding: const EdgeInsets.all(16),
-                                        child: ListView(
-                                          children: [
+                    builder: (c) => Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: ListView(
+                        children: [
                                             Text(
                                               'PID ${e.pid}',
                                               style: Theme.of(context)
                                                   .textTheme
                                                   .titleMedium,
                                             ),
-                                            const SizedBox(height: 8),
-                                            SelectableText(e.rawXml),
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  },
+                          const SizedBox(height: 8),
+                          SelectableText(e.rawXml),
+                        ],
+                      ),
+                    ),
+                  );
+                },
                                   child: IntrinsicHeight(
                                     child: Row(
                                       crossAxisAlignment:

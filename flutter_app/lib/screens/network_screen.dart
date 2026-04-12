@@ -318,44 +318,6 @@ class _NetworkScreenState extends State<NetworkScreen>
     });
   }
 
-  void _showBlockingInfoDialog(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    showDialog<void>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: Text(
-          'About IP blocking',
-          style: GoogleFonts.manrope(fontWeight: FontWeight.w800),
-        ),
-        content: SingleChildScrollView(
-          child: Text(
-            'Blocking adds a Windows Firewall rule that stops new outbound connections '
-            'to that remote IP. It does not forcibly close sockets that are already open; '
-            'those can keep working until they close.\n\n'
-            'Open a connection row that shows a real remote address (TCP Established), '
-            'not a listening socket (LISTEN / 0.0.0.0) — there is no remote IP to block on a listener.\n\n'
-            'Sites on large CDNs often use many IPv4 and IPv6 addresses. Blocking one IP '
-            'may not block the whole hostname — traffic can succeed via another address.\n\n'
-            'To stop a specific program entirely, use process actions (for example '
-            'terminate) rather than relying on IP rules alone.',
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              height: 1.45,
-              color: scheme.onSurfaceVariant,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(c),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   void dispose() {
     _search.dispose();
@@ -385,9 +347,9 @@ class _NetworkScreenState extends State<NetworkScreen>
       appBar: EmBrandAppBar(
         actions: [
           IconButton(
-            tooltip: 'About IP blocking',
-            onPressed: () => _showBlockingInfoDialog(context),
-            icon: Icon(Icons.info_outline_rounded, color: scheme.primary),
+            tooltip: 'Alerts',
+            onPressed: () => context.push('/alerts'),
+            icon: Icon(Icons.visibility_rounded, color: scheme.primary),
           ),
           IconButton(
             tooltip: 'Filters',
