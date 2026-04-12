@@ -1,10 +1,12 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:dio/dio.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart' show DateFormat;
 
 import '../bloc/events_bloc.dart';
@@ -17,6 +19,156 @@ import '../theme/em_design_system.dart';
 import '../widgets/process_control_buttons.dart';
 import '../widgets/process_virus_total_sheet.dart';
 import '../widgets/process_watchlist_flag_action.dart';
+
+/// First `{` … matching `}` as a JSON object, respecting quoted strings.
+String? _extractFirstJsonObject(String input) {
+  final start = input.indexOf('{');
+  if (start < 0) return null;
+  var depth = 0;
+  var inString = false;
+  var escape = false;
+  for (var i = start; i < input.length; i++) {
+    final ch = input[i];
+    if (inString) {
+      if (escape) {
+        escape = false;
+      } else if (ch == r'\') {
+        escape = true;
+      } else if (ch == '"') {
+        inString = false;
+      }
+    } else {
+      if (ch == '"') {
+        inString = true;
+      } else if (ch == '{') {
+        depth++;
+      } else if (ch == '}') {
+        depth--;
+        if (depth == 0) {
+          return input.substring(start, i + 1);
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/// LLMs often emit Windows paths with invalid single `\` in JSON strings. Repair only inside "…" runs.
+String _repairInvalidBackslashesInJsonStrings(String json) {
+  final sb = StringBuffer();
+  var inString = false;
+  var i = 0;
+  while (i < json.length) {
+    final c = json[i];
+    if (!inString) {
+      if (c == '"') inString = true;
+      sb.write(c);
+      i++;
+      continue;
+    }
+    if (c == '"') {
+      inString = false;
+      sb.write(c);
+      i++;
+      continue;
+    }
+    if (c == r'\') {
+      if (i + 1 >= json.length) {
+        sb.write(r'\\');
+        i++;
+        continue;
+      }
+      final n = json[i + 1];
+      if (n == '"' ||
+          n == '\\' ||
+          n == '/' ||
+          n == 'b' ||
+          n == 'f' ||
+          n == 'n' ||
+          n == 'r' ||
+          n == 't') {
+        sb.write(c);
+        sb.write(n);
+        i += 2;
+        continue;
+      }
+      if (n == 'u' && i + 5 <= json.length) {
+        sb.write(json.substring(i, i + 6));
+        i += 6;
+        continue;
+      }
+      if (n == r'\') {
+        sb.write(c);
+        sb.write(n);
+        i += 2;
+        continue;
+      }
+      sb.write(r'\\');
+      sb.write(n);
+      i += 2;
+      continue;
+    }
+    sb.write(c);
+    i++;
+  }
+  return sb.toString();
+}
+
+ProcessExplanation? _parseProcessExplanationFromGroqContent(String raw) {
+  var s = raw.trim();
+  if (s.isEmpty) return null;
+  if (s.startsWith('\uFEFF')) s = s.substring(1);
+
+  if (s.startsWith('```json')) {
+    s = s.substring(7);
+  } else if (s.startsWith('```')) {
+    s = s.substring(3);
+  }
+  if (s.endsWith('```')) {
+    s = s.substring(0, s.length - 3);
+  }
+  s = s.trim();
+
+  Object? tryDecode(String blob) {
+    try {
+      return jsonDecode(blob);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Map<String, dynamic>? asMap(Object? o) {
+    if (o is Map) {
+      return Map<String, dynamic>.from(o);
+    }
+    return null;
+  }
+
+  var decoded = tryDecode(s);
+  var map = asMap(decoded);
+
+  if (map == null) {
+    final extracted = _extractFirstJsonObject(s);
+    if (extracted != null) {
+      decoded = tryDecode(extracted);
+      map = asMap(decoded);
+    }
+  }
+
+  if (map == null) {
+    final extracted = _extractFirstJsonObject(s) ?? s;
+    final repaired = _repairInvalidBackslashesInJsonStrings(extracted);
+    decoded = tryDecode(repaired);
+    map = asMap(decoded);
+  }
+
+  if (map == null) return null;
+  try {
+    return ProcessExplanation.fromJson(map);
+  } catch (_) {
+    return null;
+  }
+}
 
 ProcessInfo? _snapshotForPid(ProcessState s, int pid, bool ghost) {
   if (ghost) {
@@ -271,7 +423,7 @@ class ProcessDetailScreen extends StatelessWidget {
   }
 }
 
-class _OverviewTab extends StatelessWidget {
+class _OverviewTab extends StatefulWidget {
   const _OverviewTab({
     required this.pid,
     required this.isKilledGhost,
@@ -283,9 +435,19 @@ class _OverviewTab extends StatelessWidget {
   final TextStyle mono;
 
   @override
+  State<_OverviewTab> createState() => _OverviewTabState();
+}
+
+class _OverviewTabState extends State<_OverviewTab> {
+  final GlobalKey _explainReportCardKey = GlobalKey();
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final pid = widget.pid;
+    final isKilledGhost = widget.isKilledGhost;
+    final mono = widget.mono;
 
     return BlocSelector<ProcessBloc, ProcessState, bool>(
       selector: (s) =>
@@ -669,7 +831,11 @@ class _OverviewTab extends StatelessWidget {
                               ),
                             ],
                           ),
-                          _ExplainProcessSection(pid: pid, process: p),
+                          _ExplainProcessSection(
+                            pid: pid,
+                            process: p,
+                            reportCardKey: _explainReportCardKey,
+                          ),
                         ],
                       );
                     },
@@ -706,15 +872,23 @@ class ProcessExplanation {
   });
 
   factory ProcessExplanation.fromJson(Map<String, dynamic> json) {
+    String pick(String key) {
+      final v = json[key];
+      if (v == null) return '';
+      if (v is String) return v;
+      return v.toString();
+    }
+
+    final verdictRaw = pick('verdict').trim();
     return ProcessExplanation(
-      verdict: json['verdict'] as String? ?? 'Unknown',
-      verdictReason: json['verdictReason'] as String? ?? '',
-      who: json['who'] as String? ?? '',
-      what: json['what'] as String? ?? '',
-      where: json['where'] as String? ?? '',
-      allowed: json['allowed'] as String? ?? '',
-      path: json['path'] as String? ?? '',
-      behaviour: json['behaviour'] as String? ?? '',
+      verdict: verdictRaw.isEmpty ? 'Unknown' : verdictRaw,
+      verdictReason: pick('verdictReason'),
+      who: pick('who'),
+      what: pick('what'),
+      where: pick('where'),
+      allowed: pick('allowed'),
+      path: pick('path'),
+      behaviour: pick('behaviour'),
     );
   }
 }
@@ -727,12 +901,56 @@ class ExplainResult {
   ExplainResult({this.explanation, this.rawError, required this.timestamp, required this.isError});
 }
 
+String _plainTextAiReport(ExplainResult res, ProcessInfo process) {
+  final buf = StringBuffer();
+  buf.writeln('Process AI report — ${process.name} (PID ${process.pid})');
+  buf.writeln('Generated: ${res.timestamp.toIso8601String()}');
+  buf.writeln();
+  if (res.isError || res.explanation == null) {
+    buf.writeln(res.rawError ?? 'Unknown error');
+    buf.writeln();
+    buf.writeln('Powered by Groq · llama-3.3-70b-versatile');
+    buf.writeln('AI analysis is a guide only — verify findings independently');
+    return buf.toString();
+  }
+  final e = res.explanation!;
+  buf.writeln('Verdict: ${e.verdict}');
+  buf.writeln(e.verdictReason);
+  buf.writeln();
+  buf.writeln('WHO');
+  buf.writeln(e.who);
+  buf.writeln();
+  buf.writeln('WHAT');
+  buf.writeln(e.what);
+  buf.writeln();
+  buf.writeln('WHERE');
+  buf.writeln(e.where);
+  buf.writeln();
+  buf.writeln('PATH');
+  buf.writeln(e.path);
+  buf.writeln();
+  buf.writeln('BEHAVIOUR');
+  buf.writeln(e.behaviour);
+  buf.writeln();
+  buf.writeln('AUTHORISED ACTIVITY');
+  buf.writeln(e.allowed);
+  buf.writeln();
+  buf.writeln('Powered by Groq · llama-3.3-70b-versatile');
+  buf.writeln('AI analysis is a guide only — verify findings independently');
+  return buf.toString();
+}
+
 final Map<int, ExplainResult> _explainCache = {};
 
 class _ExplainProcessSection extends StatefulWidget {
-  const _ExplainProcessSection({required this.pid, required this.process});
+  const _ExplainProcessSection({
+    required this.pid,
+    required this.process,
+    required this.reportCardKey,
+  });
   final int pid;
   final ProcessInfo process;
+  final GlobalKey reportCardKey;
 
   @override
   State<_ExplainProcessSection> createState() => _ExplainProcessSectionState();
@@ -767,7 +985,7 @@ no explanation outside the JSON, no code fences. Use exactly this structure:
   "verdictReason": "One sentence summary of why this verdict was reached.",
   "who": "Who created this process and what application it belongs to.",
   "what": "What this process does and what it is currently doing.",
-  "where": "Where the executable is located on disk. Note if the location is normal or unusual.",
+  "where": "Describe only whether the install/runtime location looks normal for this app (e.g. standard Program Files vs temp, user profile, or suspicious path). Do NOT repeat the full path here — the path field carries the exact path.",
   "allowed": "Whether this behaviour is expected and normal for this process type. Note anything unusual.",
   "path": "The full executable path exactly as provided. CRITICAL: You must escape all Windows backslashes (e.g. use C:\\\\Windows\\\\System32 instead of C:\\Windows\\System32)",
   "behaviour": "Two to five words summarising current behaviour. Example: Normal, low CPU usage"
@@ -803,8 +1021,9 @@ $connText
             { "role": "system", "content": prompt },
             { "role": "user", "content": userMsg }
           ],
-          "max_tokens": 400,
-          "temperature": 0.3
+          "max_tokens": 800,
+          "temperature": 0.3,
+          "response_format": {"type": "json_object"},
         },
         options: Options(
           headers: {
@@ -816,32 +1035,14 @@ $connText
 
       final content = res.data?['choices']?[0]?['message']?['content'] as String?;
       if (content != null) {
-        try {
-          var cleanContent = content.trim();
-          if (cleanContent.startsWith('```json')) {
-            cleanContent = cleanContent.substring(7);
-          } else if (cleanContent.startsWith('```')) {
-            cleanContent = cleanContent.substring(3);
-          }
-          if (cleanContent.endsWith('```')) {
-            cleanContent = cleanContent.substring(0, cleanContent.length - 3);
-          }
-          cleanContent = cleanContent.trim();
-          
-          // Fix common unescaped backslashes in Windows paths from LLMs
-          cleanContent = cleanContent.replaceAllMapped(
-            RegExp(r'\\([^"\\/bfnrtu])'),
-            (m) => '\\\\${m.group(1)}',
-          );
-
-          final json = jsonDecode(cleanContent);
-          final explanation = ProcessExplanation.fromJson(json);
+        final explanation = _parseProcessExplanationFromGroqContent(content);
+        if (explanation != null) {
           _explainCache[widget.pid] = ExplainResult(
             explanation: explanation,
             timestamp: DateTime.now(),
             isError: false,
           );
-        } catch (e) {
+        } else {
           _explainCache[widget.pid] = ExplainResult(
             rawError: 'Analysis format error — showing raw response\n\n$content',
             timestamp: DateTime.now(),
@@ -879,8 +1080,43 @@ $connText
         isError: true,
       );
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+        _scheduleScrollReportIntoView();
+      }
     }
+  }
+
+  void _scheduleScrollReportIntoView() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final ctx = widget.reportCardKey.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          alignment: 0.12,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    });
+  }
+
+  Future<void> _copyReport(ExplainResult res) async {
+    final text = _plainTextAiReport(res, widget.process);
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Report copied to clipboard')),
+    );
+  }
+
+  Future<void> _shareReport(ExplainResult res) async {
+    final text = _plainTextAiReport(res, widget.process);
+    await Share.share(
+      text,
+      subject: 'Process AI report — ${widget.process.name} (PID ${widget.pid})',
+    );
   }
 
   String _timeAgo(DateTime d) {
@@ -958,6 +1194,32 @@ $connText
     );
   }
 
+  Widget _buildPathCodeBlock(String path, ColorScheme scheme) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: ColoredBox(
+        color: scheme.surfaceContainerHighest,
+        child: SizedBox(
+          width: double.infinity,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: SelectionArea(
+                child: Text(
+                  path,
+                  style: GoogleFonts.jetBrainsMono(fontSize: 11, height: 1.35),
+                  maxLines: 1,
+                  softWrap: false,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildDetailRow(String label, IconData icon, String value, {Widget? extra}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -1021,48 +1283,50 @@ $connText
           AnimatedOpacity(
             opacity: 1.0,
             duration: const Duration(milliseconds: 300),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: EmDesign.cardShell(scheme).copyWith(
-                border: res.explanation?.verdict.toLowerCase() == 'malicious'
-                    ? Border.all(color: Colors.red.withValues(alpha: 0.5), width: 2)
-                    : null,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Icon(res.isError ? Icons.warning_amber_rounded : Icons.lightbulb_outline,
-                          size: 16, color: res.isError ? Colors.amber : Colors.cyan),
-                      const SizedBox(width: 8),
-                      Text(
-                        res.isError ? 'Error' : 'AI Analysis',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              color: res.isError ? Colors.amber : Colors.cyan,
-                              fontWeight: FontWeight.w700,
-                            ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        _timeAgo(res.timestamp),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
-                      ),
-                      const SizedBox(width: 8),
-                      TextButton(
-                        onPressed: _loading ? null : _explain,
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          minimumSize: const Size(0, 0),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            child: KeyedSubtree(
+              key: widget.reportCardKey,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: EmDesign.cardShell(scheme).copyWith(
+                  border: res.explanation?.verdict.toLowerCase() == 'malicious'
+                      ? Border.all(color: Colors.red.withValues(alpha: 0.5), width: 2)
+                      : null,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(res.isError ? Icons.warning_amber_rounded : Icons.lightbulb_outline,
+                            size: 16, color: res.isError ? Colors.amber : Colors.cyan),
+                        const SizedBox(width: 8),
+                        Text(
+                          res.isError ? 'Error' : 'AI Analysis',
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                color: res.isError ? Colors.amber : Colors.cyan,
+                                fontWeight: FontWeight.w700,
+                              ),
                         ),
-                        child: const Text('Recheck', style: TextStyle(fontSize: 12)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
+                        const Spacer(),
+                        Text(
+                          _timeAgo(res.timestamp),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                        ),
+                        const SizedBox(width: 8),
+                        TextButton(
+                          onPressed: _loading ? null : _explain,
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: const Size(0, 0),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text('Recheck', style: TextStyle(fontSize: 12)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                   if (res.isError || res.explanation == null)
                     Text(
                       res.rawError ?? 'Unknown error',
@@ -1087,18 +1351,7 @@ $connText
                       'Where',
                       Icons.location_on_outlined,
                       res.explanation!.where,
-                      extra: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: scheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          res.explanation!.path,
-                          style: GoogleFonts.jetBrainsMono(fontSize: 11),
-                        ),
-                      ),
+                      extra: _buildPathCodeBlock(res.explanation!.path, scheme),
                     ),
                     const Divider(height: 16),
                     Padding(
@@ -1189,7 +1442,23 @@ $connText
                       ),
                     ),
                   ],
-                  const SizedBox(height: 20),
+                  Divider(height: 32, thickness: 1, color: scheme.outlineVariant.withValues(alpha: 0.35)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        tooltip: 'Copy report',
+                        onPressed: () => _copyReport(res),
+                        icon: Icon(Icons.copy_outlined, size: 20, color: scheme.onSurfaceVariant),
+                      ),
+                      IconButton(
+                        tooltip: 'Share report',
+                        onPressed: () => _shareReport(res),
+                        icon: Icon(Icons.share_outlined, size: 20, color: scheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
                   Text(
                     'Powered by Groq · llama-3.3-70b-versatile\nAI analysis is a guide only — verify findings independently',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -1200,6 +1469,7 @@ $connText
                   ),
                 ],
               ),
+            ),
             ),
           ),
         ],
