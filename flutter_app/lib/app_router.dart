@@ -31,7 +31,13 @@ GoRouter createAppRouter(ConnectionBloc connectionBloc) {
       final connected = connectionBloc.state.isConnected;
       final loc = state.matchedLocation;
       final onConnect = loc == '/connect';
-      if (!connected && !onConnect) return '/connect';
+      final onDashboard = loc == '/dashboard';
+      final canReconnect = connectionBloc.state.host != null &&
+          connectionBloc.state.host!.trim().isNotEmpty;
+      if (!connected && !onConnect) {
+        if (canReconnect && !onDashboard) return '/dashboard';
+        if (!canReconnect) return '/connect';
+      }
       if (connected && onConnect) return '/dashboard';
       return null;
     },

@@ -7,6 +7,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:dio/dio.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart' show DateFormat;
 
 import '../bloc/events_bloc.dart';
@@ -240,7 +241,8 @@ String? _sysmonEventContextLine(SysmonEvent e) {
 
   final host = e.remoteAddress?.trim();
   if (host != null && host.isNotEmpty) {
-    final port = e.remotePort != null && e.remotePort! > 0 ? ':${e.remotePort}' : '';
+    final port =
+        e.remotePort != null && e.remotePort! > 0 ? ':${e.remotePort}' : '';
     return '$host$port';
   }
 
@@ -286,15 +288,15 @@ class _ExpandableCommandLineBlock extends StatefulWidget {
       _ExpandableCommandLineBlockState();
 }
 
-class _ExpandableCommandLineBlockState extends State<_ExpandableCommandLineBlock> {
+class _ExpandableCommandLineBlockState
+    extends State<_ExpandableCommandLineBlock> {
   bool _expanded = false;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final direction = Directionality.of(context);
-    final display =
-        widget.cmd.isEmpty ? '(no command line)' : widget.cmd;
+    final display = widget.cmd.isEmpty ? '(no command line)' : widget.cmd;
     final style = widget.mono.copyWith(
       fontSize: 12,
       color: widget.textColor,
@@ -328,9 +330,8 @@ class _ExpandableCommandLineBlockState extends State<_ExpandableCommandLineBlock
                   display,
                   style: style,
                   maxLines: _expanded ? null : 5,
-                  overflow: _expanded
-                      ? TextOverflow.visible
-                      : TextOverflow.ellipsis,
+                  overflow:
+                      _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
                 ),
               ),
             ),
@@ -439,7 +440,15 @@ class _OverviewTab extends StatefulWidget {
 }
 
 class _OverviewTabState extends State<_OverviewTab> {
-  final GlobalKey _explainReportCardKey = GlobalKey();
+  final GlobalKey _explainReportAnchorKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _hydrateExplainCacheIfNeeded().then((_) {
+      if (mounted) setState(() {});
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -461,6 +470,7 @@ class _OverviewTabState extends State<_OverviewTab> {
             final exists = _snapshotForPid(s, pid, isKilledGhost) != null;
             if (!exists) {
               _explainCache.remove(pid);
+              _persistExplainCache();
             }
             return exists;
           },
@@ -574,8 +584,7 @@ class _OverviewTabState extends State<_OverviewTab> {
                           key: ValueKey(cmd),
                           cmd: cmd,
                           mono: mono,
-                          textColor:
-                              scheme.primary.withValues(alpha: 0.85),
+                          textColor: scheme.primary.withValues(alpha: 0.85),
                         );
                       },
                     ),
@@ -595,7 +604,8 @@ class _OverviewTabState extends State<_OverviewTab> {
                             const SizedBox(height: 4),
                             BlocSelector<ProcessBloc, ProcessState, int>(
                               selector: (s) {
-                                final p = _snapshotForPid(s, pid, isKilledGhost);
+                                final p =
+                                    _snapshotForPid(s, pid, isKilledGhost);
                                 return p?.parentPid ?? 0;
                               },
                               builder: (context, ppid) {
@@ -620,9 +630,11 @@ class _OverviewTabState extends State<_OverviewTab> {
                               style: EmDesign.labelCaps(context, scheme),
                             ),
                             const SizedBox(height: 4),
-                            BlocSelector<ProcessBloc, ProcessState, (String, bool)>(
+                            BlocSelector<ProcessBloc, ProcessState,
+                                (String, bool)>(
                               selector: (s) {
-                                final p = _snapshotForPid(s, pid, isKilledGhost);
+                                final p =
+                                    _snapshotForPid(s, pid, isKilledGhost);
                                 final st = p?.status ?? '';
                                 final susp = !isKilledGhost &&
                                     (s.suspendedPids.contains(pid) ||
@@ -635,9 +647,7 @@ class _OverviewTabState extends State<_OverviewTab> {
                                     ? 'Killed'
                                     : suspended
                                         ? 'Suspended'
-                                        : (status.isEmpty
-                                            ? 'Running'
-                                            : status);
+                                        : (status.isEmpty ? 'Running' : status);
                                 final color = isKilledGhost
                                     ? scheme.error
                                     : suspended
@@ -653,7 +663,8 @@ class _OverviewTabState extends State<_OverviewTab> {
                                         color: color,
                                         boxShadow: [
                                           BoxShadow(
-                                            color: color.withValues(alpha: 0.45),
+                                            color:
+                                                color.withValues(alpha: 0.45),
                                             blurRadius: 8,
                                           ),
                                         ],
@@ -695,8 +706,8 @@ class _OverviewTabState extends State<_OverviewTab> {
                                 bloc.state.suspendedPids.contains(pid) ||
                                 p.status.toLowerCase().contains('suspend'),
                           );
-                      final highCpu =
-                          !isKilledGhost && p.cpuPercent > ProcessDetailScreen._highCpuWarn;
+                      final highCpu = !isKilledGhost &&
+                          p.cpuPercent > ProcessDetailScreen._highCpuWarn;
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -721,7 +732,9 @@ class _OverviewTabState extends State<_OverviewTab> {
                                   dimmed: isKilledGhost || suspended,
                                   onPressed: isKilledGhost || suspended
                                       ? null
-                                      : () => context.read<ProcessBloc>().sendCommand({
+                                      : () => context
+                                              .read<ProcessBloc>()
+                                              .sendCommand({
                                             'type': 'suspend_process',
                                             'pid': p.pid,
                                           }),
@@ -736,7 +749,9 @@ class _OverviewTabState extends State<_OverviewTab> {
                                   dimmed: isKilledGhost || !suspended,
                                   onPressed: isKilledGhost || !suspended
                                       ? null
-                                      : () => context.read<ProcessBloc>().sendCommand({
+                                      : () => context
+                                              .read<ProcessBloc>()
+                                              .sendCommand({
                                             'type': 'resume_process',
                                             'pid': p.pid,
                                           }),
@@ -753,7 +768,8 @@ class _OverviewTabState extends State<_OverviewTab> {
                                       const SizedBox(width: 4),
                                       Text(
                                         'High CPU',
-                                        style: theme.textTheme.labelSmall?.copyWith(
+                                        style: theme.textTheme.labelSmall
+                                            ?.copyWith(
                                           color: scheme.error,
                                           fontWeight: FontWeight.w700,
                                         ),
@@ -766,7 +782,8 @@ class _OverviewTabState extends State<_OverviewTab> {
                                     prev.entries != next.entries,
                                 builder: (context, wl) {
                                   final normalized =
-                                      WatchlistBloc.normalizeExecutableName(p.name);
+                                      WatchlistBloc.normalizeExecutableName(
+                                          p.name);
                                   final flagged = normalized != null &&
                                       wl.entries.any((e) =>
                                           e.name.toLowerCase() ==
@@ -776,7 +793,8 @@ class _OverviewTabState extends State<_OverviewTab> {
                                       const Color(0xFF4A3D00);
                                   final watchYellowOnDark =
                                       const Color(0xFFFFE082);
-                                  final dark = theme.brightness == Brightness.dark;
+                                  final dark =
+                                      theme.brightness == Brightness.dark;
                                   return OutlinedButton.icon(
                                     onPressed: isKilledGhost
                                         ? null
@@ -792,7 +810,8 @@ class _OverviewTabState extends State<_OverviewTab> {
                                               : watchYellowOnLight)
                                           : scheme.primary,
                                       backgroundColor: flagged
-                                          ? watchYellow.withValues(alpha: dark ? 0.22 : 0.2)
+                                          ? watchYellow.withValues(
+                                              alpha: dark ? 0.22 : 0.2)
                                           : null,
                                       side: BorderSide(
                                         color: flagged
@@ -819,14 +838,17 @@ class _OverviewTabState extends State<_OverviewTab> {
                               OutlinedButton.icon(
                                 onPressed: isKilledGhost
                                     ? null
-                                    : () => openProcessVirusTotalSheet(context, p),
+                                    : () =>
+                                        openProcessVirusTotalSheet(context, p),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: scheme.primary,
                                   side: BorderSide(
-                                    color: scheme.primary.withValues(alpha: 0.35),
+                                    color:
+                                        scheme.primary.withValues(alpha: 0.35),
                                   ),
                                 ),
-                                icon: const Icon(Icons.shield_outlined, size: 18),
+                                icon:
+                                    const Icon(Icons.shield_outlined, size: 18),
                                 label: const Text('VirusTotal'),
                               ),
                             ],
@@ -834,7 +856,7 @@ class _OverviewTabState extends State<_OverviewTab> {
                           _ExplainProcessSection(
                             pid: pid,
                             process: p,
-                            reportCardKey: _explainReportCardKey,
+                            reportAnchorKey: _explainReportAnchorKey,
                           ),
                         ],
                       );
@@ -898,7 +920,11 @@ class ExplainResult {
   final String? rawError;
   final DateTime timestamp;
   final bool isError;
-  ExplainResult({this.explanation, this.rawError, required this.timestamp, required this.isError});
+  ExplainResult(
+      {this.explanation,
+      this.rawError,
+      required this.timestamp,
+      required this.isError});
 }
 
 String _plainTextAiReport(ExplainResult res, ProcessInfo process) {
@@ -910,7 +936,8 @@ String _plainTextAiReport(ExplainResult res, ProcessInfo process) {
     buf.writeln(res.rawError ?? 'Unknown error');
     buf.writeln();
     buf.writeln('Powered by Groq · llama-3.3-70b-versatile');
-    buf.writeln('AI analysis is a guide only — verify findings independently');
+    buf.writeln('AI analysis is a guide only and may not be accurate');
+    buf.writeln('Verify findings independently');
     return buf.toString();
   }
   final e = res.explanation!;
@@ -936,21 +963,87 @@ String _plainTextAiReport(ExplainResult res, ProcessInfo process) {
   buf.writeln(e.allowed);
   buf.writeln();
   buf.writeln('Powered by Groq · llama-3.3-70b-versatile');
-  buf.writeln('AI analysis is a guide only — verify findings independently');
+  buf.writeln('AI analysis is a guide only and may not be accurate');
+  buf.writeln('Verify findings independently');
   return buf.toString();
 }
 
 final Map<int, ExplainResult> _explainCache = {};
+const String _explainCachePrefsKey = 'process_explain_cache_v1';
+bool _explainCacheHydrated = false;
+
+Future<void> _hydrateExplainCacheIfNeeded() async {
+  if (_explainCacheHydrated) return;
+  _explainCacheHydrated = true;
+  final prefs = await SharedPreferences.getInstance();
+  final raw = prefs.getString(_explainCachePrefsKey);
+  if (raw == null || raw.trim().isEmpty) return;
+  try {
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) return;
+    for (final entry in decoded.entries) {
+      final pid = int.tryParse(entry.key.toString());
+      if (pid == null) continue;
+      final value = entry.value;
+      if (value is! Map) continue;
+      final map = Map<String, dynamic>.from(value);
+      final timestamp =
+          DateTime.tryParse((map['timestamp'] ?? '').toString()) ??
+              DateTime.now();
+      final isError = map['isError'] == true;
+      final rawError = map['rawError']?.toString();
+      final explanationMap = map['explanation'];
+      ProcessExplanation? explanation;
+      if (explanationMap is Map) {
+        explanation = ProcessExplanation.fromJson(
+            Map<String, dynamic>.from(explanationMap));
+      }
+      _explainCache[pid] = ExplainResult(
+        explanation: explanation,
+        rawError: rawError,
+        timestamp: timestamp,
+        isError: isError,
+      );
+    }
+  } catch (_) {
+    // Ignore malformed cache; app continues with empty in-memory state.
+  }
+}
+
+Future<void> _persistExplainCache() async {
+  final prefs = await SharedPreferences.getInstance();
+  final payload = <String, dynamic>{};
+  _explainCache.forEach((pid, result) {
+    payload[pid.toString()] = {
+      'timestamp': result.timestamp.toIso8601String(),
+      'isError': result.isError,
+      'rawError': result.rawError,
+      'explanation': result.explanation == null
+          ? null
+          : {
+              'verdict': result.explanation!.verdict,
+              'verdictReason': result.explanation!.verdictReason,
+              'who': result.explanation!.who,
+              'what': result.explanation!.what,
+              'where': result.explanation!.where,
+              'allowed': result.explanation!.allowed,
+              'path': result.explanation!.path,
+              'behaviour': result.explanation!.behaviour,
+            },
+    };
+  });
+  await prefs.setString(_explainCachePrefsKey, jsonEncode(payload));
+}
 
 class _ExplainProcessSection extends StatefulWidget {
   const _ExplainProcessSection({
     required this.pid,
     required this.process,
-    required this.reportCardKey,
+    required this.reportAnchorKey,
   });
   final int pid;
   final ProcessInfo process;
-  final GlobalKey reportCardKey;
+  final GlobalKey reportAnchorKey;
 
   @override
   State<_ExplainProcessSection> createState() => _ExplainProcessSectionState();
@@ -962,6 +1055,9 @@ class _ExplainProcessSectionState extends State<_ExplainProcessSection> {
   @override
   void initState() {
     super.initState();
+    _hydrateExplainCacheIfNeeded().then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   Future<void> _explain() async {
@@ -972,11 +1068,16 @@ class _ExplainProcessSectionState extends State<_ExplainProcessSection> {
 
     setState(() => _loading = true);
 
-    final conns = netBloc.state.items.where((c) => c.pid == widget.pid).take(5).toList();
-    final connLines = conns.map((c) => '${c.remoteAddress}:${c.remotePort} ${c.protocol} ${c.state}').join('\n');
+    final conns =
+        netBloc.state.items.where((c) => c.pid == widget.pid).take(5).toList();
+    final connLines = conns
+        .map((c) =>
+            '${c.remoteAddress}:${c.remotePort} ${c.protocol} ${c.state}')
+        .join('\n');
     final connText = conns.isEmpty ? 'none' : connLines;
 
-    final prompt = '''You are a Windows endpoint security analyst. When given details about a
+    final prompt =
+        '''You are a Windows endpoint security analyst. When given details about a
 running Windows process, respond with a JSON object only — no markdown,
 no explanation outside the JSON, no code fences. Use exactly this structure:
 
@@ -1018,8 +1119,8 @@ $connText
         data: {
           "model": "llama-3.3-70b-versatile",
           "messages": [
-            { "role": "system", "content": prompt },
-            { "role": "user", "content": userMsg }
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": userMsg}
           ],
           "max_tokens": 800,
           "temperature": 0.3,
@@ -1033,7 +1134,8 @@ $connText
         ),
       );
 
-      final content = res.data?['choices']?[0]?['message']?['content'] as String?;
+      final content =
+          res.data?['choices']?[0]?['message']?['content'] as String?;
       if (content != null) {
         final explanation = _parseProcessExplanationFromGroqContent(content);
         if (explanation != null) {
@@ -1042,19 +1144,23 @@ $connText
             timestamp: DateTime.now(),
             isError: false,
           );
+          _persistExplainCache();
         } else {
           _explainCache[widget.pid] = ExplainResult(
-            rawError: 'Analysis format error — showing raw response\n\n$content',
+            rawError:
+                'Analysis format error — showing raw response\n\n$content',
             timestamp: DateTime.now(),
             isError: true,
           );
+          _persistExplainCache();
         }
       } else {
         throw StateError('Invalid response format');
       }
     } on DioException catch (e) {
       String errStr = 'Request failed: ${e.message}';
-      if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.receiveTimeout) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout) {
         errStr = 'Request timed out — check your internet connection';
       } else if (e.response != null) {
         if (e.response!.statusCode == 401) {
@@ -1073,12 +1179,14 @@ $connText
         timestamp: DateTime.now(),
         isError: true,
       );
+      _persistExplainCache();
     } catch (e) {
       _explainCache[widget.pid] = ExplainResult(
         rawError: 'Error: $e',
         timestamp: DateTime.now(),
         isError: true,
       );
+      _persistExplainCache();
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -1090,11 +1198,12 @@ $connText
   void _scheduleScrollReportIntoView() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final ctx = widget.reportCardKey.currentContext;
+      final ctx = widget.reportAnchorKey.currentContext;
       if (ctx != null) {
         Scrollable.ensureVisible(
           ctx,
-          alignment: 0.12,
+          alignment: 0.0,
+          alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
           duration: const Duration(milliseconds: 400),
           curve: Curves.easeOutCubic,
         );
@@ -1159,7 +1268,8 @@ $connText
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(8),
-        border: isMalicious ? Border.all(color: Colors.redAccent, width: 2) : null,
+        border:
+            isMalicious ? Border.all(color: Colors.redAccent, width: 2) : null,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1220,13 +1330,15 @@ $connText
     );
   }
 
-  Widget _buildDetailRow(String label, IconData icon, String value, {Widget? extra}) {
+  Widget _buildDetailRow(String label, IconData icon, String value,
+      {Widget? extra}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+          Icon(icon,
+              size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -1234,7 +1346,8 @@ $connText
               children: [
                 Text(
                   label,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 13),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -1279,54 +1392,83 @@ $connText
           label: const Text('Explain Process'),
         ),
         if (res != null) ...[
-          const SizedBox(height: 16),
+          KeyedSubtree(
+            key: widget.reportAnchorKey,
+            child: const SizedBox(height: 16),
+          ),
           AnimatedOpacity(
             opacity: 1.0,
             duration: const Duration(milliseconds: 300),
-            child: KeyedSubtree(
-              key: widget.reportCardKey,
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: EmDesign.cardShell(scheme).copyWith(
-                  border: res.explanation?.verdict.toLowerCase() == 'malicious'
-                      ? Border.all(color: Colors.red.withValues(alpha: 0.5), width: 2)
-                      : null,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(res.isError ? Icons.warning_amber_rounded : Icons.lightbulb_outline,
-                            size: 16, color: res.isError ? Colors.amber : Colors.cyan),
-                        const SizedBox(width: 8),
-                        Text(
-                          res.isError ? 'Error' : 'AI Analysis',
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                color: res.isError ? Colors.amber : Colors.cyan,
-                                fontWeight: FontWeight.w700,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: EmDesign.cardShell(scheme).copyWith(
+                border: res.explanation?.verdict.toLowerCase() == 'malicious'
+                    ? Border.all(
+                        color: Colors.red.withValues(alpha: 0.5), width: 2)
+                    : null,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              res.isError
+                                  ? Icons.warning_amber_rounded
+                                  : Icons.lightbulb_outline,
+                              size: 16,
+                              color: res.isError ? Colors.amber : Colors.cyan,
+                            ),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                res.isError ? 'Error' : 'AI Analysis',
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleSmall
+                                    ?.copyWith(
+                                      color: res.isError
+                                          ? Colors.amber
+                                          : Colors.cyan,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                               ),
+                            ),
+                          ],
                         ),
-                        const Spacer(),
-                        Text(
-                          _timeAgo(res.timestamp),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: scheme.onSurfaceVariant,
-                              ),
-                        ),
-                        const SizedBox(width: 8),
-                        TextButton(
-                          onPressed: _loading ? null : _explain,
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            minimumSize: const Size(0, 0),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      const SizedBox(width: 8),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            _timeAgo(res.timestamp),
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: scheme.onSurfaceVariant,
+                                    ),
                           ),
-                          child: const Text('Recheck', style: TextStyle(fontSize: 12)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
+                          TextButton(
+                            onPressed: _loading ? null : _explain,
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(0, 0),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text('Recheck',
+                                style: TextStyle(fontSize: 12)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
                   if (res.isError || res.explanation == null)
                     Text(
                       res.rawError ?? 'Unknown error',
@@ -1343,9 +1485,11 @@ $connText
                       style: EmDesign.labelCaps(context, scheme),
                     ),
                     const SizedBox(height: 8),
-                    _buildDetailRow('Who', Icons.person_outline, res.explanation!.who),
+                    _buildDetailRow(
+                        'Who', Icons.person_outline, res.explanation!.who),
                     const Divider(height: 16),
-                    _buildDetailRow('What', Icons.info_outline, res.explanation!.what),
+                    _buildDetailRow(
+                        'What', Icons.info_outline, res.explanation!.what),
                     const Divider(height: 16),
                     _buildDetailRow(
                       'Where',
@@ -1359,7 +1503,8 @@ $connText
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.local_activity_outlined, size: 16, color: scheme.onSurfaceVariant),
+                          Icon(Icons.local_activity_outlined,
+                              size: 16, color: scheme.onSurfaceVariant),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Column(
@@ -1367,21 +1512,33 @@ $connText
                               children: [
                                 const Text(
                                   'Behaviour',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13),
                                 ),
                                 const SizedBox(height: 4),
                                 Align(
                                   alignment: Alignment.centerLeft,
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: res.explanation!.verdict.toLowerCase() == 'safe'
+                                      color: res.explanation!.verdict
+                                                  .toLowerCase() ==
+                                              'safe'
                                           ? Colors.green.withValues(alpha: 0.2)
-                                          : res.explanation!.verdict.toLowerCase() == 'suspicious'
-                                              ? Colors.amber.withValues(alpha: 0.2)
-                                              : res.explanation!.verdict.toLowerCase() == 'malicious'
-                                                  ? Colors.red.withValues(alpha: 0.2)
-                                                  : Colors.grey.withValues(alpha: 0.2),
+                                          : res.explanation!.verdict
+                                                      .toLowerCase() ==
+                                                  'suspicious'
+                                              ? Colors.amber
+                                                  .withValues(alpha: 0.2)
+                                              : res.explanation!.verdict
+                                                          .toLowerCase() ==
+                                                      'malicious'
+                                                  ? Colors.red
+                                                      .withValues(alpha: 0.2)
+                                                  : Colors.grey
+                                                      .withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text(
@@ -1389,11 +1546,17 @@ $connText
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w500,
-                                        color: res.explanation!.verdict.toLowerCase() == 'safe'
+                                        color: res.explanation!.verdict
+                                                    .toLowerCase() ==
+                                                'safe'
                                             ? Colors.green.shade700
-                                            : res.explanation!.verdict.toLowerCase() == 'suspicious'
+                                            : res.explanation!.verdict
+                                                        .toLowerCase() ==
+                                                    'suspicious'
                                                 ? Colors.amber.shade700
-                                                : res.explanation!.verdict.toLowerCase() == 'malicious'
+                                                : res.explanation!.verdict
+                                                            .toLowerCase() ==
+                                                        'malicious'
                                                     ? Colors.red.shade700
                                                     : scheme.onSurface,
                                       ),
@@ -1412,7 +1575,8 @@ $connText
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.shield_outlined, size: 16, color: scheme.onSurfaceVariant),
+                          Icon(Icons.shield_outlined,
+                              size: 16, color: scheme.onSurfaceVariant),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Column(
@@ -1420,7 +1584,9 @@ $connText
                               children: [
                                 const Text(
                                   'Authorised Activity',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
@@ -1428,9 +1594,13 @@ $connText
                                   style: TextStyle(
                                     fontSize: 13,
                                     height: 1.4,
-                                    color: res.explanation!.verdict.toLowerCase() == 'suspicious'
+                                    color: res.explanation!.verdict
+                                                .toLowerCase() ==
+                                            'suspicious'
                                         ? Colors.amber.shade700
-                                        : res.explanation!.verdict.toLowerCase() == 'malicious'
+                                        : res.explanation!.verdict
+                                                    .toLowerCase() ==
+                                                'malicious'
                                             ? Colors.red.shade700
                                             : scheme.onSurface,
                                   ),
@@ -1442,25 +1612,30 @@ $connText
                       ),
                     ),
                   ],
-                  Divider(height: 32, thickness: 1, color: scheme.outlineVariant.withValues(alpha: 0.35)),
+                  Divider(
+                      height: 32,
+                      thickness: 1,
+                      color: scheme.outlineVariant.withValues(alpha: 0.35)),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       IconButton(
                         tooltip: 'Copy report',
                         onPressed: () => _copyReport(res),
-                        icon: Icon(Icons.copy_outlined, size: 20, color: scheme.onSurfaceVariant),
+                        icon: Icon(Icons.copy_outlined,
+                            size: 20, color: scheme.onSurfaceVariant),
                       ),
                       IconButton(
                         tooltip: 'Share report',
                         onPressed: () => _shareReport(res),
-                        icon: Icon(Icons.share_outlined, size: 20, color: scheme.onSurfaceVariant),
+                        icon: Icon(Icons.share_outlined,
+                            size: 20, color: scheme.onSurfaceVariant),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Powered by Groq · llama-3.3-70b-versatile\nAI analysis is a guide only — verify findings independently',
+                    'Powered by Groq · llama-3.3-70b-versatile\nAI analysis is a guide only\nVerify findings independently',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: scheme.onSurfaceVariant,
                           fontSize: 10,
@@ -1469,7 +1644,6 @@ $connText
                   ),
                 ],
               ),
-            ),
             ),
           ),
         ],
@@ -1539,7 +1713,9 @@ class _SysmonEventsTab extends StatelessWidget {
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: cs.onSurfaceVariant,
                               height: 1.35,
-                              fontFeatures: const [FontFeature.tabularFigures()],
+                              fontFeatures: const [
+                                FontFeature.tabularFigures()
+                              ],
                             ),
                           ),
                         ),

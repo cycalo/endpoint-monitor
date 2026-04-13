@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:web_socket_channel/io.dart';
@@ -26,7 +27,8 @@ class EndpointMonitorTaskHandler extends TaskHandler {
     final host = await FlutterForegroundTask.getData<String>(key: 'ws_host');
     final token = await FlutterForegroundTask.getData<String>(key: 'ws_token');
     if (host == null || token == null) {
-      FlutterForegroundTask.sendDataToMain(_connectionPayload('error', message: 'missing_credentials'));
+      FlutterForegroundTask.sendDataToMain(
+          _connectionPayload('error', message: 'missing_credentials'));
       return;
     }
     unawaited(_connectLoop(host, token));
@@ -40,9 +42,7 @@ class EndpointMonitorTaskHandler extends TaskHandler {
   @override
   Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {
     _stopping = true;
-    _pingTimer?.cancel();
-    await _sub?.cancel();
-    await _channel?.sink.close();
+    await _resetConnection();
   }
 
   @override
@@ -52,23 +52,22 @@ class EndpointMonitorTaskHandler extends TaskHandler {
       final action = m['action'] as String?;
       if (action == _kDisconnect) {
         _stopping = true;
-        _pingTimer?.cancel();
-        unawaited(_sub?.cancel());
-        unawaited(_channel?.sink.close());
+        unawaited(_resetConnection());
         return;
       }
       if (action == _kConnect) {
         final host = m['host'] as String?;
         final token = m['token'] as String?;
         if (host != null && token != null) {
-          unawaited(FlutterForegroundTask.saveData(key: 'ws_host', value: host));
-          unawaited(FlutterForegroundTask.saveData(key: 'ws_token', value: token));
+          unawaited(
+              FlutterForegroundTask.saveData(key: 'ws_host', value: host));
+          unawaited(
+              FlutterForegroundTask.saveData(key: 'ws_token', value: token));
           _stopping = true;
-          _pingTimer?.cancel();
-          unawaited(_sub?.cancel());
-          unawaited(_channel?.sink.close());
-          _stopping = false;
-          unawaited(_connectLoop(host, token));
+          unawaited(_resetConnection().then((_) {
+            _stopping = false;
+            return _connectLoop(host, token);
+          }));
         }
       }
       if (action == _kMeasurePing) {
@@ -86,40 +85,47 @@ class EndpointMonitorTaskHandler extends TaskHandler {
   }
 
   Future<void> _connectLoop(String host, String token) async {
-    var delay = const Duration(seconds: 1);
-    while (!_stopping) {
-      try {
-        FlutterForegroundTask.sendDataToMain(_connectionPayload('connecting'));
-        final uri = Uri.parse(host.startsWith('ws') ? host : 'ws://$host');
-        final channel = IOWebSocketChannel.connect(uri, headers: {'Authorization': 'Bearer $token'});
-        _channel = channel;
-        final done = Completer<void>();
-        _sub = channel.stream.listen(
-          (message) {
-            if (message is String) {
-              _forwardMessage(message);
-            }
-          },
-          onError: (Object e) {
-            FlutterForegroundTask.sendDataToMain(_connectionPayload('error', message: e.toString()));
-            if (!done.isCompleted) done.complete();
-          },
-          onDone: () {
-            FlutterForegroundTask.sendDataToMain(_connectionPayload('disconnected'));
-            if (!done.isCompleted) done.complete();
-          },
-          cancelOnError: true,
-        );
-        _startPing();
-        FlutterForegroundTask.sendDataToMain(_connectionPayload('connected'));
-        delay = const Duration(seconds: 1);
-        await done.future;
-        _pingTimer?.cancel();
-      } catch (e) {
-        FlutterForegroundTask.sendDataToMain(_connectionPayload('error', message: e.toString()));
-        await Future<void>.delayed(delay);
-        delay = Duration(seconds: (delay.inSeconds * 2).clamp(1, 60));
+    try {
+      FlutterForegroundTask.sendDataToMain(_connectionPayload('connecting'));
+      final uri = Uri.parse(host.startsWith('ws') ? host : 'ws://$host');
+      final socket = await WebSocket.connect(
+        uri.toString(),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (_stopping) {
+        await socket.close();
+        return;
       }
+
+      final channel = IOWebSocketChannel(socket);
+      _channel = channel;
+      final done = Completer<void>();
+      _sub = channel.stream.listen(
+        (message) {
+          if (message is String) {
+            _forwardMessage(message);
+          }
+        },
+        onError: (Object e) {
+          FlutterForegroundTask.sendDataToMain(
+              _connectionPayload('disconnected', message: _sanitizeConnectionError(e)));
+          if (!done.isCompleted) done.complete();
+        },
+        onDone: () {
+          FlutterForegroundTask.sendDataToMain(
+              _connectionPayload('disconnected'));
+          if (!done.isCompleted) done.complete();
+        },
+        cancelOnError: true,
+      );
+      _startPing();
+      FlutterForegroundTask.sendDataToMain(_connectionPayload('connected'));
+      await done.future;
+    } catch (e) {
+      FlutterForegroundTask.sendDataToMain(
+          _connectionPayload('disconnected', message: _sanitizeConnectionError(e)));
+    } finally {
+      await _resetConnection();
     }
   }
 
@@ -153,9 +159,7 @@ class EndpointMonitorTaskHandler extends TaskHandler {
       if (map is Map<String, dynamic>) {
         if (map['type'] == 'pong' && map['clientTs'] != null) {
           final raw = map['clientTs'];
-          final sent = raw is int
-              ? raw
-              : int.tryParse(raw.toString()) ?? 0;
+          final sent = raw is int ? raw : int.tryParse(raw.toString()) ?? 0;
           if (sent > 0) {
             final ms = DateTime.now().millisecondsSinceEpoch - sent;
             FlutterForegroundTask.sendDataToMain({
@@ -170,5 +174,30 @@ class EndpointMonitorTaskHandler extends TaskHandler {
     } catch (_) {
       // ignore malformed
     }
+  }
+
+  Future<void> _resetConnection() async {
+    _pingTimer?.cancel();
+    _pingTimer = null;
+    await _sub?.cancel();
+    _sub = null;
+    await _channel?.sink.close();
+    _channel = null;
+  }
+
+  String _sanitizeConnectionError(Object error) {
+    final text = error.toString().toLowerCase();
+    if (text.contains('timed out')) {
+      return 'Connection timed out.';
+    }
+    if (text.contains('refused')) {
+      return 'Connection was refused.';
+    }
+    if (text.contains('network is unreachable') ||
+        text.contains('no route to host') ||
+        text.contains('failed host lookup')) {
+      return 'Unable to reach the endpoint.';
+    }
+    return 'Connection lost.';
   }
 }

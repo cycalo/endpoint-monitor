@@ -38,110 +38,139 @@ class DashboardScreen extends StatelessWidget {
           final i = s.info;
           return BlocBuilder<ConnectionBloc, EmConnectionState>(
             builder: (context, conn) {
-              return BlocBuilder<AlertsBloc, AlertsState>(
-                builder: (context, alerts) {
-                  final unacked = alerts.items
-                      .where((a) => !alerts.acked.contains(a.id))
-                      .length;
-                  final hostDisplay = emDisplayConnectionHost(conn.host);
-                  final ipLine =
-                      _looksLikeIpv4(hostDisplay) ? hostDisplay : '—';
+              final hostDisplay = emDisplayConnectionHost(conn.host);
+              final ipLine =
+                  _looksLikeIpv4(hostDisplay) ? hostDisplay : '—';
 
-                  return SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const _DashboardDataBootstrap(),
-                        const _DashboardConnectionHero(),
-                        const SizedBox(height: 20),
-                        const _DashboardActivityHeatmap(),
-                        const SizedBox(height: 16),
-                        const _DashboardThreatIntelCard(),
-                        const SizedBox(height: 24),
-                        if (i == null)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 32),
-                            child: Center(
-                              child: Text(
-                                'Waiting for system metrics…',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: scheme.onSurfaceVariant,
+              return SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const _DashboardDataBootstrap(),
+                    const _DashboardConnectionHero(),
+                    if (!conn.isConnected) ...[
+                      const SizedBox(height: 24),
+                      _DashboardDisconnectedMetrics(
+                        scheme: scheme,
+                        theme: theme,
+                      ),
+                    ] else ...[
+                      const SizedBox(height: 20),
+                      const _DashboardActivityHeatmap(),
+                      const SizedBox(height: 16),
+                      const _DashboardThreatIntelCard(),
+                      const SizedBox(height: 24),
+                      if (i == null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 32),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  width: 26,
+                                  height: 26,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: scheme.primary,
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Waiting for system metrics…',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: scheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
                             ),
-                          )
-                        else ...[
-                          _SummaryMetricsPair(
-                            processCount: i.processCount,
-                            networkCount: i.networkConnectionCount,
-                            scheme: scheme,
-                            theme: theme,
-                            radiusCard: radiusCard,
                           ),
-                          const SizedBox(height: 24),
-                          LayoutBuilder(
-                            builder: (context, c) {
-                              final twoCol = c.maxWidth >= 600;
-                              final cpu = _CpuLoadCard(
-                                info: i,
-                                mono: mono,
-                                scheme: scheme,
-                                theme: theme,
-                                radiusCard: radiusCard,
-                              );
-                              final ramDisk = _RamDiskCard(
-                                info: i,
-                                scheme: scheme,
-                                theme: theme,
-                                radiusCard: radiusCard,
-                              );
-                              if (twoCol) {
-                                return Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(child: cpu),
-                                    const SizedBox(width: 16),
-                                    Expanded(child: ramDisk),
-                                  ],
-                                );
-                              }
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  cpu,
-                                  const SizedBox(height: 16),
-                                  ramDisk,
+                        )
+                      else ...[
+                        BlocBuilder<AlertsBloc, AlertsState>(
+                          builder: (context, alerts) {
+                            final unacked = alerts.items
+                                .where((a) => !alerts.acked.contains(a.id))
+                                .length;
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _SummaryMetricsPair(
+                                  processCount: i.processCount,
+                                  networkCount: i.networkConnectionCount,
+                                  scheme: scheme,
+                                  theme: theme,
+                                  radiusCard: radiusCard,
+                                ),
+                                const SizedBox(height: 24),
+                                LayoutBuilder(
+                                  builder: (context, c) {
+                                    final twoCol = c.maxWidth >= 600;
+                                    final cpu = _CpuLoadCard(
+                                      info: i,
+                                      mono: mono,
+                                      scheme: scheme,
+                                      theme: theme,
+                                      radiusCard: radiusCard,
+                                    );
+                                    final ramDisk = _RamDiskCard(
+                                      info: i,
+                                      scheme: scheme,
+                                      theme: theme,
+                                      radiusCard: radiusCard,
+                                    );
+                                    if (twoCol) {
+                                      return Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Expanded(child: cpu),
+                                          const SizedBox(width: 16),
+                                          Expanded(child: ramDisk),
+                                        ],
+                                      );
+                                    }
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        cpu,
+                                        const SizedBox(height: 16),
+                                        ramDisk,
+                                      ],
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 24),
+                                _SystemInformationCard(
+                                  info: i,
+                                  hostDisplay: hostDisplay,
+                                  ipLine: ipLine,
+                                  mono: mono,
+                                  scheme: scheme,
+                                  theme: theme,
+                                  radiusCard: radiusCard,
+                                ),
+                                if (unacked > 0) ...[
+                                  const SizedBox(height: 12),
+                                  _AlertsStrip(count: unacked, scheme: scheme),
                                 ],
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 24),
-                          _SystemInformationCard(
-                            info: i,
-                            hostDisplay: hostDisplay,
-                            ipLine: ipLine,
-                            mono: mono,
-                            scheme: scheme,
-                            theme: theme,
-                            radiusCard: radiusCard,
-                          ),
-                          if (unacked > 0) ...[
-                            const SizedBox(height: 12),
-                            _AlertsStrip(count: unacked, scheme: scheme),
-                          ],
-                          const SizedBox(height: 32),
-                          _DangerZoneSection(
-                            scheme: scheme,
-                            theme: theme,
-                            radiusCard: radiusCard,
-                            onIsolate: () => _runIsolateFlow(context),
-                          ),
-                        ],
+                                const SizedBox(height: 32),
+                                _DangerZoneSection(
+                                  scheme: scheme,
+                                  theme: theme,
+                                  radiusCard: radiusCard,
+                                  onIsolate: () => _runIsolateFlow(context),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
                       ],
-                    ),
-                  );
-                },
+                    ],
+                  ],
+                ),
               );
             },
           );
@@ -253,21 +282,42 @@ class _DashboardConnectionHero extends StatelessWidget {
                               fontWeight: FontWeight.w800,
                             ),
                           ),
-                        ] else
+                        ] else if (c.status ==
+                            ConnectionStatus.connecting) ...[
+                          SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: scheme.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
                           Text(
-                            'Offline',
+                            'Connecting…',
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              color: scheme.primary,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ] else ...[
+                          Text(
+                            'Disconnected',
                             style: theme.textTheme.headlineSmall?.copyWith(
                               color: scheme.outline,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 6),
                     Text(
                       c.isConnected
                           ? 'Secure channel · $host'
-                          : 'Use the link control in the header to connect.',
+                          : c.status == ConnectionStatus.connecting
+                              ? 'Restoring the secure channel…'
+                              : 'Connection lost. Use Reconnect below or the link control in the header.',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: c.isConnected
                             ? scheme.tertiary
@@ -296,6 +346,88 @@ class _DashboardConnectionHero extends StatelessWidget {
                     ),
                   ),
                 ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _DashboardDisconnectedMetrics extends StatelessWidget {
+  const _DashboardDisconnectedMetrics({
+    required this.scheme,
+    required this.theme,
+  });
+
+  final ColorScheme scheme;
+  final ThemeData theme;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<ConnectionBloc, EmConnectionState>(
+      builder: (context, c) {
+        if (c.status == ConnectionStatus.connecting) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 40),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: scheme.primary,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Reconnecting…',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (c.message != null && c.message!.isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: scheme.errorContainer.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+                    border: Border.all(
+                      color: scheme.error.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Text(
+                    c.message!,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onErrorContainer,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+              FilledButton.icon(
+                onPressed: () {
+                  context.read<ConnectionBloc>().add(
+                        const ConnectionReconnectRequested(),
+                      );
+                },
+                icon: const Icon(Icons.link_rounded),
+                label: const Text('Reconnect'),
               ),
             ],
           ),
@@ -721,56 +853,83 @@ class _RamDiskCardState extends State<_RamDiskCard> {
       } else if (firstVolumeTopGap > 0) {
         out.add(SizedBox(height: firstVolumeTopGap));
       }
+      final accent = _diskAccentForIndex(i, scheme);
+      final diskSurface = Color.alphaBlend(
+        accent.withValues(alpha: 0.12),
+        scheme.surfaceContainerLow,
+      );
       out.add(
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
+        Container(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          decoration: BoxDecoration(
+            color: diskSurface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: accent.withValues(alpha: 0.35)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    _driveTitle(d.name),
-                    style: body?.copyWith(color: scheme.onSurface),
-                  ),
-                  if (d.label.trim().isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        d.label.trim(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          fontSize: 11,
-                          color: scheme.onSurfaceVariant,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _driveTitle(d.name),
+                          style: body?.copyWith(color: scheme.onSurface),
                         ),
-                      ),
+                        if (d.label.trim().isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              d.label.trim(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                fontSize: 11,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _storageLine(d.usedGb, d.totalGb),
+                    style: body?.copyWith(color: accent),
+                  ),
                 ],
               ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              _storageLine(d.usedGb, d.totalGb),
-              style: body?.copyWith(color: scheme.tertiary),
-            ),
-          ],
-        ),
-      );
-      out.add(const SizedBox(height: 6));
-      out.add(
-        ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: LinearProgressIndicator(
-            value: frac,
-            minHeight: 6,
-            backgroundColor: scheme.surfaceContainerLow,
-            valueColor: AlwaysStoppedAnimation<Color>(scheme.tertiary),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: frac,
+                  minHeight: 6,
+                  backgroundColor: scheme.surfaceContainerHighest,
+                  valueColor: AlwaysStoppedAnimation<Color>(accent),
+                ),
+              ),
+            ],
           ),
         ),
       );
     }
     return out;
+  }
+
+  static Color _diskAccentForIndex(int index, ColorScheme scheme) {
+    final palette = <Color>[
+      scheme.primary,
+      scheme.tertiary,
+      scheme.secondary,
+      scheme.primaryFixed,
+      scheme.tertiaryFixed,
+    ];
+    return palette[index % palette.length];
   }
 
   static String _driveTitle(String path) {
@@ -831,6 +990,7 @@ class _SystemInformationCard extends StatelessWidget {
         ? '—'
         : '${info.loggedInUsers.take(8).join(', ')}${info.loggedInUsers.length > 8 ? '…' : ''}';
     final archDisplay = _formatArchitecture(info.osArchitecture);
+    final powerOnLine = _dash(info.lastBootTime);
     final uptimeLine = info.uptime.trim().isEmpty ? '—' : info.uptime.trim();
     final networkLine = _primaryNetworkLine(info, ipLine);
 
@@ -871,9 +1031,9 @@ class _SystemInformationCard extends StatelessWidget {
           _infoRow('SYSTEM NAME', _dash(info.systemName), valueMono: true),
           _infoRow('OS VERSION', _dash(info.osDisplayLine)),
           _infoRow('ARCHITECTURE', archDisplay),
+          _infoRow('POWERED ON AT', powerOnLine, valueMono: true),
           _infoRow('UPTIME', uptimeLine, valueMono: true),
           _infoRow('PATCH LEVEL', _patchValue(patch, isLatest)),
-          _infoRow('LAST BOOT', _dash(info.lastBootTime), valueMono: true),
           _infoRow('PRIMARY NETWORK', networkLine),
           if (hostDisplay != '—' && ipLine == '—')
             _infoRow('MGMT ENDPOINT', hostDisplay, valueMono: true),
@@ -1229,6 +1389,7 @@ class _DashboardDataBootstrapState extends State<_DashboardDataBootstrap> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      context.read<SystemInfoBloc>().requestLatest();
       final hm = context.read<ActivityHeatmapBloc>();
       hm.refresh();
       hm.startAutoRefresh();

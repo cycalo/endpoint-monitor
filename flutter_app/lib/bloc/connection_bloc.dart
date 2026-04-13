@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -80,6 +81,11 @@ class ConnectionDisconnectRequested extends ConnectionEvent {
   const ConnectionDisconnectRequested();
 }
 
+/// Re-reads [em_host] / [em_token] from secure storage and reconnects (same as last session).
+class ConnectionReconnectRequested extends ConnectionEvent {
+  const ConnectionReconnectRequested();
+}
+
 class ConnectionPingMeasureRequested extends ConnectionEvent {
   const ConnectionPingMeasureRequested();
 }
@@ -98,6 +104,7 @@ class ConnectionBloc extends Bloc<ConnectionEvent, EmConnectionState> {
     on<ConnectionStarted>(_onStarted);
     on<ConnectionConnectRequested>(_onConnect);
     on<ConnectionDisconnectRequested>(_onDisconnect);
+    on<ConnectionReconnectRequested>(_onReconnect);
     on<ConnectionPingMeasureRequested>(_onPingMeasure);
     on<ConnectionTaskMessage>(_onTaskMessage);
     FlutterForegroundTask.addTaskDataCallback(_taskCallback);
@@ -114,11 +121,21 @@ class ConnectionBloc extends Bloc<ConnectionEvent, EmConnectionState> {
   }
 
   Future<void> _onStarted(ConnectionStarted event, Emitter<EmConnectionState> emit) async {
-    final host = await _storage.read(key: _hostKey);
-    final token = await _storage.read(key: _tokenKey);
-    if (host != null && token != null) {
-      add(ConnectionConnectRequested(host: host, token: token));
+    try {
+      FlutterForegroundTask.sendDataToTask(<String, Object?>{'action': 'em_disconnect'});
+      final running = await FlutterForegroundTask.isRunningService;
+      if (running) {
+        await FlutterForegroundTask.stopService();
+      }
+    } catch (_) {
+      // Best-effort reset: keep app usable even if service teardown fails.
     }
+    emit(state.copyWith(
+      status: ConnectionStatus.disconnected,
+      message: null,
+      clearConnectedAt: true,
+      clearPingTest: true,
+    ));
   }
 
   Future<void> _onConnect(ConnectionConnectRequested event, Emitter<EmConnectionState> emit) async {
@@ -164,6 +181,22 @@ class ConnectionBloc extends Bloc<ConnectionEvent, EmConnectionState> {
     emit(const EmConnectionState(status: ConnectionStatus.disconnected));
   }
 
+  Future<void> _onReconnect(ConnectionReconnectRequested event, Emitter<EmConnectionState> emit) async {
+    final host = await _storage.read(key: _hostKey);
+    final token = await _storage.read(key: _tokenKey);
+    if (host == null ||
+        host.trim().isEmpty ||
+        token == null ||
+        token.isEmpty) {
+      emit(state.copyWith(
+        status: ConnectionStatus.disconnected,
+        message: 'No saved session. Use Connect to sign in again.',
+      ));
+      return;
+    }
+    add(ConnectionConnectRequested(host: host.trim(), token: token));
+  }
+
   void _onPingMeasure(ConnectionPingMeasureRequested event, Emitter<EmConnectionState> emit) {
     emit(state.copyWith(clearPingTest: true));
     FlutterForegroundTask.sendDataToTask(<String, Object?>{'action': 'em_measure_ping'});
@@ -195,6 +228,7 @@ class ConnectionBloc extends Bloc<ConnectionEvent, EmConnectionState> {
             message: null,
             connectedAt: DateTime.now(),
           ));
+          FlutterForegroundTask.sendDataToTask(jsonEncode({'type': 'get_system_info'}));
           break;
         case 'connecting':
           emit(state.copyWith(status: ConnectionStatus.connecting));

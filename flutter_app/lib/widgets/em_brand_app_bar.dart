@@ -31,11 +31,24 @@ class _EmConnectionStatus extends StatelessWidget {
       builder: (context, constraints) {
         return BlocBuilder<ConnectionBloc, EmConnectionState>(
           builder: (context, c) {
+            if (c.status == ConnectionStatus.connecting) {
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'CONNECTING…',
+                  style: dataStyle.copyWith(
+                    fontSize: 10,
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              );
+            }
             if (!c.isConnected) {
               return Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  'OFFLINE',
+                  'DISCONNECTED',
                   style:
                       dataStyle.copyWith(fontSize: 10, color: scheme.outline),
                 ),

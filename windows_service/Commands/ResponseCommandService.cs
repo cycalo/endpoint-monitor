@@ -9,7 +9,9 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Windows.Forms;
+using EndpointMonitorService.Collectors;
 using EndpointMonitorService.Database;
+using EndpointMonitorService.Hosted;
 using EndpointMonitorService.Options;
 using EndpointMonitorService.Services;
 using Microsoft.Extensions.Options;
@@ -25,7 +27,10 @@ public sealed class ResponseCommandService(
     Browser.BrowserHistoryReader browserHistoryReader,
     Collectors.InstalledSoftwareCollector installedSoftwareCollector,
     VirusTotalReputationService virusTotal,
-    ThreatIntelUpdater threatIntel)
+    ThreatIntelUpdater threatIntel,
+    SystemInfoCollector systemInfoCollector,
+    ProcessCollector processCollector,
+    NetworkCollector networkCollector)
 {
     /// <summary>
     /// Firewall snapshots must always include <c>sourceProcessName</c> on each block (string or JSON null).
@@ -84,6 +89,7 @@ public sealed class ResponseCommandService(
                 "check_reputation" => await CheckReputationAsync(root, cancellationToken).ConfigureAwait(false),
                 "get_threat_intel_status" => await GetThreatIntelStatusAsync(cancellationToken).ConfigureAwait(false),
                 "get_threat_intel_entries" => await GetThreatIntelEntriesAsync(cancellationToken).ConfigureAwait(false),
+                "get_system_info" => await GetSystemInfoSnapshotAsync(cancellationToken).ConfigureAwait(false),
                 "refresh_threat_intel" => await RefreshThreatIntelAsync(clientIp, cancellationToken).ConfigureAwait(false),
                 "lock_screen" => await LockScreenAsync(clientIp, cancellationToken).ConfigureAwait(false),
                 "logoff_user" => await LogoffUserAsync(clientIp, cancellationToken).ConfigureAwait(false),
@@ -103,6 +109,41 @@ public sealed class ResponseCommandService(
             logger.LogWarning(ex, "Command {Type} failed", type);
             return new CommandResult(false, type, ex.Message);
         }
+    }
+
+    /// <summary>Same payload shape as <see cref="SystemInfoHostedService"/> broadcasts, for on-demand refresh.</summary>
+    private async Task<CommandResult> GetSystemInfoSnapshotAsync(CancellationToken cancellationToken)
+    {
+        var info = systemInfoCollector.Collect();
+        try
+        {
+            info.ProcessCount = processCollector.Collect().Count;
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Process count failed");
+        }
+
+        try
+        {
+            info.NetworkConnectionCount = networkCollector.Collect().Count;
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Network count failed");
+        }
+
+        try
+        {
+            info.EventsTodayCount = await database.CountEventsSinceAsync(DateTime.UtcNow.Date, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Events count failed");
+        }
+
+        var data = JsonSerializer.SerializeToElement(info, AppJson.Options);
+        return new CommandResult(true, "get_system_info", "ok", data);
     }
 
     private async Task<CommandResult> KillAsync(JsonElement root, string? clientIp, CancellationToken cancellationToken)

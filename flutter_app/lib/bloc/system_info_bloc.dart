@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
@@ -18,6 +20,11 @@ class SystemInfoState extends Equatable {
 class SystemInfoBloc extends Cubit<SystemInfoState> {
   SystemInfoBloc() : super(const SystemInfoState()) {
     FlutterForegroundTask.addTaskDataCallback(_onData);
+  }
+
+  /// Ask the agent for an immediate snapshot (same message shape as periodic broadcast).
+  void requestLatest() {
+    FlutterForegroundTask.sendDataToTask(jsonEncode({'type': 'get_system_info'}));
   }
 
   void _onData(Object data) {
