@@ -144,10 +144,18 @@ class EmBrandAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final fallbackLeading = leading ??
+        (Navigator.of(context).canPop()
+            ? IconButton(
+                tooltip: 'Back',
+                onPressed: () => context.pop(),
+                icon: Icon(Icons.arrow_back_rounded, color: scheme.primary),
+              )
+            : null);
 
     return AppBar(
       bottom: bottom,
-      leading: leading,
+      leading: fallbackLeading,
       automaticallyImplyLeading: false,
       centerTitle: false,
       titleSpacing: 12,

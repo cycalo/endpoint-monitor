@@ -67,16 +67,20 @@ public sealed class NetworkCollector(ILogger<NetworkCollector> logger, GeoIpLook
         {
             using var searcher = new ManagementObjectSearcher(
                 "SELECT ProcessId, Name FROM Win32_Process");
-            foreach (ManagementObject mo in searcher.Get())
+            using var collection = searcher.Get();
+            foreach (ManagementObject mo in collection)
             {
-                try
+                using (mo)
                 {
-                    var pid = Convert.ToInt32(mo["ProcessId"]);
-                    map[pid] = mo["Name"]?.ToString() ?? "";
-                }
-                catch
-                {
-                    // ignore
+                    try
+                    {
+                        var pid = Convert.ToInt32(mo["ProcessId"]);
+                        map[pid] = mo["Name"]?.ToString() ?? "";
+                    }
+                    catch
+                    {
+                        // ignore
+                    }
                 }
             }
         }
@@ -96,27 +100,31 @@ public sealed class NetworkCollector(ILogger<NetworkCollector> logger, GeoIpLook
             scope.Connect();
             using var searcher = new ManagementObjectSearcher(scope, new ObjectQuery(
                 "SELECT LocalAddress, LocalPort, RemoteAddress, RemotePort, State, OwningProcess FROM MSFT_NetTCPConnection"));
-            foreach (ManagementObject mo in searcher.Get())
+            using var collection = searcher.Get();
+            foreach (ManagementObject mo in collection)
             {
-                try
+                using (mo)
                 {
-                    var pid = mo["OwningProcess"] != null ? Convert.ToInt32(mo["OwningProcess"]) : 0;
-                    pidToName.TryGetValue(pid, out var pname);
-                    list.Add(new NetworkConnection
+                    try
                     {
-                        Pid = pid,
-                        ProcessName = FormatOwningProcess(pid, pname),
-                        LocalAddress = mo["LocalAddress"]?.ToString() ?? "",
-                        LocalPort = mo["LocalPort"] != null ? Convert.ToInt32(mo["LocalPort"]) : 0,
-                        RemoteAddress = mo["RemoteAddress"]?.ToString() ?? "",
-                        RemotePort = mo["RemotePort"] != null ? Convert.ToInt32(mo["RemotePort"]) : 0,
-                        Protocol = "TCP",
-                        State = mo["State"]?.ToString() ?? ""
-                    });
-                }
-                catch (Exception ex)
-                {
-                    logger.LogDebug(ex, "TCP row skip");
+                        var pid = mo["OwningProcess"] != null ? Convert.ToInt32(mo["OwningProcess"]) : 0;
+                        pidToName.TryGetValue(pid, out var pname);
+                        list.Add(new NetworkConnection
+                        {
+                            Pid = pid,
+                            ProcessName = FormatOwningProcess(pid, pname),
+                            LocalAddress = mo["LocalAddress"]?.ToString() ?? "",
+                            LocalPort = mo["LocalPort"] != null ? Convert.ToInt32(mo["LocalPort"]) : 0,
+                            RemoteAddress = mo["RemoteAddress"]?.ToString() ?? "",
+                            RemotePort = mo["RemotePort"] != null ? Convert.ToInt32(mo["RemotePort"]) : 0,
+                            Protocol = "TCP",
+                            State = mo["State"]?.ToString() ?? ""
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogDebug(ex, "TCP row skip");
+                    }
                 }
             }
         }
@@ -134,27 +142,31 @@ public sealed class NetworkCollector(ILogger<NetworkCollector> logger, GeoIpLook
             scope.Connect();
             using var searcher = new ManagementObjectSearcher(scope, new ObjectQuery(
                 "SELECT LocalAddress, LocalPort, OwningProcess FROM MSFT_NetUDPEndpoint"));
-            foreach (ManagementObject mo in searcher.Get())
+            using var collection = searcher.Get();
+            foreach (ManagementObject mo in collection)
             {
-                try
+                using (mo)
                 {
-                    var pid = mo["OwningProcess"] != null ? Convert.ToInt32(mo["OwningProcess"]) : 0;
-                    pidToName.TryGetValue(pid, out var pname);
-                    list.Add(new NetworkConnection
+                    try
                     {
-                        Pid = pid,
-                        ProcessName = FormatOwningProcess(pid, pname),
-                        LocalAddress = mo["LocalAddress"]?.ToString() ?? "",
-                        LocalPort = mo["LocalPort"] != null ? Convert.ToInt32(mo["LocalPort"]) : 0,
-                        RemoteAddress = "",
-                        RemotePort = 0,
-                        Protocol = "UDP",
-                        State = ""
-                    });
-                }
-                catch (Exception ex)
-                {
-                    logger.LogDebug(ex, "UDP row skip");
+                        var pid = mo["OwningProcess"] != null ? Convert.ToInt32(mo["OwningProcess"]) : 0;
+                        pidToName.TryGetValue(pid, out var pname);
+                        list.Add(new NetworkConnection
+                        {
+                            Pid = pid,
+                            ProcessName = FormatOwningProcess(pid, pname),
+                            LocalAddress = mo["LocalAddress"]?.ToString() ?? "",
+                            LocalPort = mo["LocalPort"] != null ? Convert.ToInt32(mo["LocalPort"]) : 0,
+                            RemoteAddress = "",
+                            RemotePort = 0,
+                            Protocol = "UDP",
+                            State = ""
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogDebug(ex, "UDP row skip");
+                    }
                 }
             }
         }

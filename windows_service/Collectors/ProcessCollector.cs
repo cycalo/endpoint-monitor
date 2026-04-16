@@ -17,47 +17,51 @@ public sealed class ProcessCollector(ILogger<ProcessCollector> logger)
         {
             using var searcher = new ManagementObjectSearcher(
                 "SELECT ProcessId, Name, CommandLine, ParentProcessId, WorkingSetSize, CreationDate FROM Win32_Process");
-            foreach (ManagementObject mo in searcher.Get())
+            using var collection = searcher.Get();
+            foreach (ManagementObject mo in collection)
             {
-                try
+                using (mo)
                 {
-                    var pid = Convert.ToInt32(mo["ProcessId"]);
-                    var name = mo["Name"]?.ToString() ?? "";
-                    var cmd = mo["CommandLine"]?.ToString() ?? "";
-                    var parent = mo["ParentProcessId"] != null ? Convert.ToInt32(mo["ParentProcessId"]) : 0;
-                    var ws = mo["WorkingSetSize"] != null ? Convert.ToUInt64(mo["WorkingSetSize"]) : 0UL;
-                    var memMb = ws / (1024.0 * 1024.0);
-                    string start = "";
-                    if (mo["CreationDate"] != null)
+                    try
                     {
-                        try
+                        var pid = Convert.ToInt32(mo["ProcessId"]);
+                        var name = mo["Name"]?.ToString() ?? "";
+                        var cmd = mo["CommandLine"]?.ToString() ?? "";
+                        var parent = mo["ParentProcessId"] != null ? Convert.ToInt32(mo["ParentProcessId"]) : 0;
+                        var ws = mo["WorkingSetSize"] != null ? Convert.ToUInt64(mo["WorkingSetSize"]) : 0UL;
+                        var memMb = ws / (1024.0 * 1024.0);
+                        string start = "";
+                        if (mo["CreationDate"] != null)
                         {
-                            start = ManagementDateTimeConverter.ToDateTime(mo["CreationDate"].ToString()!)
-                                .ToUniversalTime().ToString("O");
+                            try
+                            {
+                                start = ManagementDateTimeConverter.ToDateTime(mo["CreationDate"].ToString()!)
+                                    .ToUniversalTime().ToString("O");
+                            }
+                            catch
+                            {
+                                start = "";
+                            }
                         }
-                        catch
-                        {
-                            start = "";
-                        }
-                    }
 
-                    cpuByPid.TryGetValue(pid, out var cpu);
-                    var cpuNormalized = Math.Clamp(cpu / processors, 0.0, 100.0);
-                    list.Add(new ProcessInfo
+                        cpuByPid.TryGetValue(pid, out var cpu);
+                        var cpuNormalized = Math.Clamp(cpu / processors, 0.0, 100.0);
+                        list.Add(new ProcessInfo
+                        {
+                            Pid = pid,
+                            Name = name,
+                            CommandLine = cmd,
+                            ParentPid = parent,
+                            CpuPercent = Math.Round(cpuNormalized, 2),
+                            MemoryMb = Math.Round(memMb, 2),
+                            StartTime = start,
+                            Status = "Running"
+                        });
+                    }
+                    catch (Exception ex)
                     {
-                        Pid = pid,
-                        Name = name,
-                        CommandLine = cmd,
-                        ParentPid = parent,
-                        CpuPercent = Math.Round(cpuNormalized, 2),
-                        MemoryMb = Math.Round(memMb, 2),
-                        StartTime = start,
-                        Status = "Running"
-                    });
-                }
-                catch (Exception ex)
-                {
-                    logger.LogDebug(ex, "Skipping process row");
+                        logger.LogDebug(ex, "Skipping process row");
+                    }
                 }
             }
         }
@@ -76,17 +80,21 @@ public sealed class ProcessCollector(ILogger<ProcessCollector> logger)
         {
             using var searcher = new ManagementObjectSearcher(
                 "SELECT IDProcess, Name, PercentProcessorTime FROM Win32_PerfFormattedData_PerfProc_Process WHERE Name <> '_Total' AND Name <> 'Idle'");
-            foreach (ManagementObject mo in searcher.Get())
+            using var collection = searcher.Get();
+            foreach (ManagementObject mo in collection)
             {
-                try
+                using (mo)
                 {
-                    var pid = Convert.ToInt32(mo["IDProcess"]);
-                    var pct = mo["PercentProcessorTime"] != null ? Convert.ToDouble(mo["PercentProcessorTime"]) : 0;
-                    result[pid] = pct;
-                }
-                catch
-                {
-                    // ignore
+                    try
+                    {
+                        var pid = Convert.ToInt32(mo["IDProcess"]);
+                        var pct = mo["PercentProcessorTime"] != null ? Convert.ToDouble(mo["PercentProcessorTime"]) : 0;
+                        result[pid] = pct;
+                    }
+                    catch
+                    {
+                        // ignore
+                    }
                 }
             }
         }

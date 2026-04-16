@@ -41,13 +41,26 @@ class MoreScreen extends StatelessWidget {
                 showDivider: true,
                 onTap: () => context.pushNamed('browser'),
               ),
-              _MoreMenuRow(
-                icon: Icons.apps_rounded,
-                iconColor: scheme.primary,
-                title: 'Installed software',
-                subtitle: 'Manage applications and versions',
-                showDivider: true,
-                onTap: () => context.pushNamed('software'),
+              BlocBuilder<AlertsBloc, AlertsState>(
+                builder: (context, alerts) {
+                  final softwareNewCount = alerts.items
+                      .where((a) =>
+                          !alerts.acked.contains(a.id) &&
+                          a.type == AlertsBloc.softwareInstallDetectedType)
+                      .length;
+                  return _MoreMenuRow(
+                    icon: Icons.apps_rounded,
+                    iconColor: scheme.primary,
+                    title: 'Installed software',
+                    subtitle: softwareNewCount > 0
+                        ? '$softwareNewCount new install alert${softwareNewCount == 1 ? '' : 's'} detected'
+                        : 'Manage applications and versions',
+                    subtitleIsAlert: softwareNewCount > 0,
+                    badge: softwareNewCount > 0 ? '$softwareNewCount' : null,
+                    showDivider: true,
+                    onTap: () => context.pushNamed('software'),
+                  );
+                },
               ),
               BlocBuilder<AlertsBloc, AlertsState>(
                 builder: (context, alerts) {

@@ -260,7 +260,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                             controller: _host,
                                             style: mono,
                                             decoration: InputDecoration(
-                                              hintText: '192.168.1.100',
+                                              hintText: '192.168.1.100 or 100.x.x.x (Tailscale)',
                                               hintStyle: mono.copyWith(
                                                 color: scheme.outline.withValues(alpha: 0.45),
                                               ),
@@ -270,6 +270,14 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                                 size: 20,
                                               ),
                                             ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          'Use a local IP or a Tailscale IP (100.x.x.x) for remote access.',
+                                          style: theme.textTheme.bodySmall?.copyWith(
+                                            color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+                                            fontSize: 11,
                                           ),
                                         ),
                                         const SizedBox(height: 18),

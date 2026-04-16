@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../bloc/alerts_bloc.dart';
 import '../bloc/software_bloc.dart';
 import '../models/ws_models.dart';
 import '../theme/em_design_system.dart';
@@ -225,6 +226,56 @@ class _SoftwareScreenState extends State<SoftwareScreen> {
                 ),
               ],
             ),
+          ),
+          BlocBuilder<AlertsBloc, AlertsState>(
+            builder: (context, alerts) {
+              final softwareAlerts = alerts.items
+                  .where((a) =>
+                      a.type == AlertsBloc.softwareInstallDetectedType &&
+                      !alerts.acked.contains(a.id))
+                  .toList();
+              final n = softwareAlerts.length;
+              if (n == 0) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(16, 2, 16, 10),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: scheme.secondaryContainer.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+                    border: Border.all(
+                      color: scheme.secondary.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.add_task_rounded,
+                        size: 18,
+                        color: scheme.secondary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '$n new software install alert${n == 1 ? '' : 's'}',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: scheme.onSurface,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => context
+                            .push('/alerts?type=${AlertsBloc.softwareInstallDetectedType}'),
+                        child: const Text('View alerts'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
           BlocBuilder<SoftwareBloc, SoftwareState>(
             builder: (context, state) {

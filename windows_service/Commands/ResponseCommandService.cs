@@ -260,12 +260,16 @@ public sealed class ResponseCommandService(
         {
             var n = processName.Replace("'", "''", StringComparison.Ordinal);
             using var searcher = new ManagementObjectSearcher($"SELECT ExecutablePath FROM Win32_Process WHERE Name = '{n}'");
-            foreach (var o in searcher.Get())
+            using var collection = searcher.Get();
+            foreach (var o in collection)
             {
                 if (o is ManagementObject mo)
                 {
-                    var path = mo["ExecutablePath"]?.ToString();
-                    if (!string.IsNullOrWhiteSpace(path)) return path;
+                    using (mo)
+                    {
+                        var path = mo["ExecutablePath"]?.ToString();
+                        if (!string.IsNullOrWhiteSpace(path)) return path;
+                    }
                 }
             }
         }

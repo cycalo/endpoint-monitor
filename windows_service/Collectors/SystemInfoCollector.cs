@@ -56,28 +56,32 @@ public sealed class SystemInfoCollector(
         {
             using var searcher = new ManagementObjectSearcher(
                 "SELECT Caption, OSArchitecture, LastBootUpTime, FreePhysicalMemory, TotalVisibleMemorySize FROM Win32_OperatingSystem");
-            foreach (ManagementObject mo in searcher.Get())
+            using var collection = searcher.Get();
+            foreach (ManagementObject mo in collection)
             {
-                info.OsCaption = mo["Caption"]?.ToString() ?? "";
-                info.OsArchitecture = mo["OSArchitecture"]?.ToString() ?? "";
-                var lbs = mo["LastBootUpTime"]?.ToString();
-                if (!string.IsNullOrEmpty(lbs))
+                using (mo)
                 {
-                    try
+                    info.OsCaption = mo["Caption"]?.ToString() ?? "";
+                    info.OsArchitecture = mo["OSArchitecture"]?.ToString() ?? "";
+                    var lbs = mo["LastBootUpTime"]?.ToString();
+                    if (!string.IsNullOrEmpty(lbs))
                     {
-                        var boot = ToDateTime(lbs);
-                        info.LastBootTime = boot.ToString("yyyy-MM-dd HH:mm:ss");
+                        try
+                        {
+                            var boot = ToDateTime(lbs);
+                            info.LastBootTime = boot.ToString("yyyy-MM-dd HH:mm:ss");
+                        }
+                        catch
+                        {
+                            // ignore parse errors
+                        }
                     }
-                    catch
-                    {
-                        // ignore parse errors
-                    }
-                }
 
-                var freeKb = Convert.ToDouble(mo["FreePhysicalMemory"]);
-                var totalKb = Convert.ToDouble(mo["TotalVisibleMemorySize"]);
-                info.RamTotalGb = Math.Round(totalKb / (1024 * 1024), 2);
-                info.RamUsedGb = Math.Round((totalKb - freeKb) / (1024 * 1024), 2);
+                    var freeKb = Convert.ToDouble(mo["FreePhysicalMemory"]);
+                    var totalKb = Convert.ToDouble(mo["TotalVisibleMemorySize"]);
+                    info.RamTotalGb = Math.Round(totalKb / (1024 * 1024), 2);
+                    info.RamUsedGb = Math.Round((totalKb - freeKb) / (1024 * 1024), 2);
+                }
             }
         }
         catch (Exception ex)
@@ -88,10 +92,14 @@ public sealed class SystemInfoCollector(
         try
         {
             using var csSearcher = new ManagementObjectSearcher("SELECT Domain FROM Win32_ComputerSystem");
-            foreach (ManagementObject mo in csSearcher.Get())
+            using var collection = csSearcher.Get();
+            foreach (ManagementObject mo in collection)
             {
-                info.Domain = mo["Domain"]?.ToString() ?? "";
-                break;
+                using (mo)
+                {
+                    info.Domain = mo["Domain"]?.ToString() ?? "";
+                    break;
+                }
             }
         }
         catch (Exception ex)
@@ -199,13 +207,17 @@ public sealed class SystemInfoCollector(
         {
             using var s = new ManagementObjectSearcher(
                 "SELECT State FROM Win32_Service WHERE Name='Sysmon64' OR Name='Sysmon'");
-            foreach (ManagementObject mo in s.Get())
+            using var collection = s.Get();
+            foreach (ManagementObject mo in collection)
             {
-                var state = mo["State"]?.ToString() ?? "";
-                if (string.Equals(state, "Running", StringComparison.OrdinalIgnoreCase))
-                    return "Running";
-                if (string.Equals(state, "Stopped", StringComparison.OrdinalIgnoreCase))
-                    return "Stopped";
+                using (mo)
+                {
+                    var state = mo["State"]?.ToString() ?? "";
+                    if (string.Equals(state, "Running", StringComparison.OrdinalIgnoreCase))
+                        return "Running";
+                    if (string.Equals(state, "Stopped", StringComparison.OrdinalIgnoreCase))
+                        return "Stopped";
+                }
             }
         }
         catch
@@ -222,32 +234,39 @@ public sealed class SystemInfoCollector(
         {
             using var searcher = new ManagementObjectSearcher(
                 "SELECT Description, IPAddress FROM Win32_NetworkAdapterConfiguration WHERE IPEnabled=True");
-            foreach (ManagementObject mo in searcher.Get())
+            using var collection = searcher.Get();
+            foreach (ManagementObject mo in collection)
             {
-                var desc = mo["Description"]?.ToString()?.Trim() ?? "";
-                if (mo["IPAddress"] is not string[] ips) continue;
-                foreach (var ip in ips)
+                using (mo)
                 {
-                    if (string.IsNullOrWhiteSpace(ip)) continue;
-                    if (!IPAddress.TryParse(ip, out var addr)) continue;
-                    if (addr.AddressFamily != AddressFamily.InterNetwork) continue;
-                    if (IPAddress.IsLoopback(addr)) continue;
-                    if (ip.StartsWith("169.254.", StringComparison.Ordinal)) continue;
-                    return (desc, ip);
+                    var desc = mo["Description"]?.ToString()?.Trim() ?? "";
+                    if (mo["IPAddress"] is not string[] ips) continue;
+                    foreach (var ip in ips)
+                    {
+                        if (string.IsNullOrWhiteSpace(ip)) continue;
+                        if (!IPAddress.TryParse(ip, out var addr)) continue;
+                        if (addr.AddressFamily != AddressFamily.InterNetwork) continue;
+                        if (IPAddress.IsLoopback(addr)) continue;
+                        if (ip.StartsWith("169.254.", StringComparison.Ordinal)) continue;
+                        return (desc, ip);
+                    }
                 }
             }
 
-            foreach (ManagementObject mo in searcher.Get())
+            foreach (ManagementObject mo in collection)
             {
-                var desc = mo["Description"]?.ToString()?.Trim() ?? "";
-                if (mo["IPAddress"] is not string[] ips2) continue;
-                foreach (var ip in ips2)
+                using (mo)
                 {
-                    if (string.IsNullOrWhiteSpace(ip)) continue;
-                    if (!IPAddress.TryParse(ip, out var addr)) continue;
-                    if (addr.AddressFamily != AddressFamily.InterNetwork) continue;
-                    if (IPAddress.IsLoopback(addr)) continue;
-                    return (desc, ip);
+                    var desc = mo["Description"]?.ToString()?.Trim() ?? "";
+                    if (mo["IPAddress"] is not string[] ips2) continue;
+                    foreach (var ip in ips2)
+                    {
+                        if (string.IsNullOrWhiteSpace(ip)) continue;
+                        if (!IPAddress.TryParse(ip, out var addr)) continue;
+                        if (addr.AddressFamily != AddressFamily.InterNetwork) continue;
+                        if (IPAddress.IsLoopback(addr)) continue;
+                        return (desc, ip);
+                    }
                 }
             }
         }
@@ -286,10 +305,14 @@ public sealed class SystemInfoCollector(
         try
         {
             using var searcher = new ManagementObjectSearcher("SELECT UserName FROM Win32_ComputerSystem");
-            foreach (ManagementObject mo in searcher.Get())
+            using var collection = searcher.Get();
+            foreach (ManagementObject mo in collection)
             {
-                user = mo["UserName"]?.ToString()?.Trim();
-                break;
+                using (mo)
+                {
+                    user = mo["UserName"]?.ToString()?.Trim();
+                    break;
+                }
             }
         }
         catch

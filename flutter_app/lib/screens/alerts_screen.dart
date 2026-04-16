@@ -19,6 +19,26 @@ class AlertsScreen extends StatelessWidget {
     };
   }
 
+  String _typeLabel(String type) {
+    return switch (type) {
+      AlertsBloc.softwareInstallDetectedType => 'Software install detected',
+      'flagged_process' => 'Flagged process',
+      'threat_intel_connection' => 'Threat intel connection',
+      'suspicious_connection' => 'Suspicious connection',
+      _ => type.replaceAll('_', ' '),
+    };
+  }
+
+  IconData _typeIcon(String type) {
+    return switch (type) {
+      AlertsBloc.softwareInstallDetectedType => Icons.apps_rounded,
+      'flagged_process' => Icons.flag_rounded,
+      'threat_intel_connection' => Icons.public_off_rounded,
+      'suspicious_connection' => Icons.travel_explore_rounded,
+      _ => Icons.warning_amber_rounded,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -53,9 +73,9 @@ class AlertsScreen extends StatelessWidget {
                   side: BorderSide(color: EmDesign.ghostLine(scheme), width: 1),
                 ),
                 child: ListTile(
-                  leading: Icon(Icons.warning_amber_rounded, color: _sev(a.severity, scheme)),
+                  leading: Icon(_typeIcon(a.type), color: _sev(a.severity, scheme)),
                   title: Text(a.message),
-                  subtitle: Text('${a.severity} · ${a.type} · ${a.timestamp}'),
+                  subtitle: Text('${a.severity} · ${_typeLabel(a.type)} · ${a.timestamp}'),
                   trailing: acked
                       ? Icon(Icons.check_circle_outline_rounded, color: scheme.tertiary)
                       : IconButton(

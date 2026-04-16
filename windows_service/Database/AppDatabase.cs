@@ -26,6 +26,7 @@ public sealed class AppDatabase(ILogger<AppDatabase> logger)
         await TryMigrateBadIpColumnsAsync().ConfigureAwait(false);
         await _db.CreateTableAsync<AlertHistoryRow>().ConfigureAwait(false);
         await _db.CreateTableAsync<AlertAckRow>().ConfigureAwait(false);
+        await _db.CreateTableAsync<InstalledSoftwareStateRow>().ConfigureAwait(false);
 
         var iso = await _db.Table<IsolationStateRow>().FirstOrDefaultAsync().ConfigureAwait(false);
         if (iso == null)
@@ -274,13 +275,12 @@ public sealed class AppDatabase(ILogger<AppDatabase> logger)
     public async Task<int> DeleteExpiredBadIpsAsync(CancellationToken cancellationToken = default)
     {
         if (_db == null) return 0;
-        var now = DateTime.UtcNow;
-        var all = await _db.Table<BadIpRow>().ToListAsync().ConfigureAwait(false);
+        var nowIso = DateTime.UtcNow.ToString("O");
+        // SQLite string comparison works for ISO dates
+        var expired = await _db.Table<BadIpRow>().Where(r => r.ExpiresAt != "" && r.ExpiresAt.CompareTo(nowIso) < 0).ToListAsync().ConfigureAwait(false);
         var n = 0;
-        foreach (var r in all)
+        foreach (var r in expired)
         {
-            if (string.IsNullOrEmpty(r.ExpiresAt)) continue;
-            if (!DateTime.TryParse(r.ExpiresAt, out var exp) || exp > now) continue;
             await _db.DeleteAsync(r).ConfigureAwait(false);
             n++;
         }
@@ -290,13 +290,8 @@ public sealed class AppDatabase(ILogger<AppDatabase> logger)
     public async Task<IReadOnlyList<BadIpRow>> GetActiveBadIpsAsync(CancellationToken cancellationToken = default)
     {
         if (_db == null) return [];
-        var now = DateTime.UtcNow;
-        var list = await _db.Table<BadIpRow>().ToListAsync().ConfigureAwait(false);
-        return list.Where(r =>
-        {
-            if (string.IsNullOrEmpty(r.ExpiresAt)) return true;
-            return DateTime.TryParse(r.ExpiresAt, out var exp) && exp > now;
-        }).ToList();
+        var nowIso = DateTime.UtcNow.ToString("O");
+        return await _db.Table<BadIpRow>().Where(r => r.ExpiresAt == "" || r.ExpiresAt.CompareTo(nowIso) >= 0).ToListAsync().ConfigureAwait(false);
     }
 
     private async Task TryMigrateBadIpColumnsAsync()
@@ -346,11 +341,11 @@ public sealed class AppDatabase(ILogger<AppDatabase> logger)
     {
         if (_db == null) return;
         var cutoff = DateTime.UtcNow - retain;
-        var rows = await _db.Table<AlertHistoryRow>().ToListAsync().ConfigureAwait(false);
+        var cutoffIso = cutoff.ToString("O");
+        var rows = await _db.Table<AlertHistoryRow>().Where(r => r.OccurredAt.CompareTo(cutoffIso) < 0).ToListAsync().ConfigureAwait(false);
         foreach (var r in rows)
         {
-            if (DateTime.TryParse(r.OccurredAt, out var t) && t < cutoff)
-                await _db.DeleteAsync(r).ConfigureAwait(false);
+            await _db.DeleteAsync(r).ConfigureAwait(false);
         }
     }
 
@@ -372,7 +367,8 @@ public sealed class AppDatabase(ILogger<AppDatabase> logger)
             x => x.ToString("O"),
             x => new TimelineHourDto { HourStart = x.ToString("O") });
 
-        var evs = await _db.Table<SysmonEventRow>().ToListAsync().ConfigureAwait(false);
+        var minTimeIso = minTime.ToString("O");
+        var evs = await _db.Table<SysmonEventRow>().Where(r => r.Timestamp.CompareTo(minTimeIso) >= 0).ToListAsync().ConfigureAwait(false);
         foreach (var e in evs)
         {
             if (!DateTime.TryParse(e.Timestamp, null, System.Globalization.DateTimeStyles.RoundtripKind, out var t))
@@ -396,7 +392,7 @@ public sealed class AppDatabase(ILogger<AppDatabase> logger)
             }
         }
 
-        var ah = await _db.Table<AlertHistoryRow>().ToListAsync().ConfigureAwait(false);
+        var ah = await _db.Table<AlertHistoryRow>().Where(r => r.OccurredAt.CompareTo(minTimeIso) >= 0).ToListAsync().ConfigureAwait(false);
         foreach (var a in ah)
         {
             if (!DateTime.TryParse(a.OccurredAt, null, System.Globalization.DateTimeStyles.RoundtripKind, out var t))
@@ -414,8 +410,21 @@ public sealed class AppDatabase(ILogger<AppDatabase> logger)
     public async Task<int> CountEventsSinceAsync(DateTime utcFrom, CancellationToken cancellationToken = default)
     {
         if (_db == null) return 0;
-        var rows = await _db.Table<SysmonEventRow>().ToListAsync().ConfigureAwait(false);
-        return rows.Count(r => DateTime.TryParse(r.Timestamp, out var t) && t >= utcFrom);
+        var iso = utcFrom.ToString("O");
+        return await _db.Table<SysmonEventRow>().Where(r => r.Timestamp.CompareTo(iso) >= 0).CountAsync().ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyDictionary<string, InstalledSoftwareStateRow>> GetInstalledSoftwareStateMapAsync(CancellationToken cancellationToken = default)
+    {
+        if (_db == null) return new Dictionary<string, InstalledSoftwareStateRow>(StringComparer.Ordinal);
+        var rows = await _db.Table<InstalledSoftwareStateRow>().ToListAsync().ConfigureAwait(false);
+        return rows.ToDictionary(r => r.Signature, StringComparer.Ordinal);
+    }
+
+    public async Task UpsertInstalledSoftwareStateAsync(InstalledSoftwareStateRow row, CancellationToken cancellationToken = default)
+    {
+        if (_db == null) return;
+        await _db.InsertOrReplaceAsync(row).ConfigureAwait(false);
     }
 
     public async Task ExportSysmonRowsAsync(DateTime from, DateTime to, CancellationToken cancellationToken = default)

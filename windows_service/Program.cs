@@ -20,6 +20,7 @@ builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection("Auth")
 builder.Services.Configure<ServerOptions>(builder.Configuration.GetSection("Server"));
 builder.Services.Configure<VirusTotalOptions>(builder.Configuration.GetSection("VirusTotal"));
 builder.Services.Configure<ThreatIntelOptions>(builder.Configuration.GetSection("ThreatIntel"));
+builder.Services.Configure<SoftwareMonitoringOptions>(builder.Configuration.GetSection("SoftwareMonitoring"));
 
 builder.Services.AddMemoryCache();
 builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection("IpRateLimiting"));
@@ -60,6 +61,7 @@ builder.Services.AddHostedService<SysmonHostedService>();
 builder.Services.AddHostedService<TrayIconHostedService>();
 builder.Services.AddHostedService<FirewallBlockExpiryHostedService>();
 builder.Services.AddHostedService<ThreatIntelHostedService>();
+builder.Services.AddHostedService<InstalledSoftwareDetectionHostedService>();
 
 var serverOptions = builder.Configuration.GetSection("Server").Get<ServerOptions>() ?? new ServerOptions();
 builder.WebHost.ConfigureKestrel(k =>

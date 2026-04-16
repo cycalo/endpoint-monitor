@@ -110,3 +110,16 @@ public sealed class AlertAckRow
 
     public string AckedAt { get; set; } = "";
 }
+
+[Table("InstalledSoftwareState")]
+public sealed class InstalledSoftwareStateRow
+{
+    [PrimaryKey]
+    public string Signature { get; set; } = "";
+
+    public string Name { get; set; } = "";
+    public string Version { get; set; } = "";
+    public string Vendor { get; set; } = "";
+    public string FirstSeenAt { get; set; } = "";
+    public string LastSeenAt { get; set; } = "";
+}

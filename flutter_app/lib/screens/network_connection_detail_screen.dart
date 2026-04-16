@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../bloc/blocked_remote_ips_cubit.dart';
@@ -401,44 +400,32 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        IconButton(
-          tooltip: 'Back',
-          onPressed: () => context.pop(),
-          icon: Icon(Icons.arrow_back_rounded, color: scheme.primary),
+        Text(
+          connection.processName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.manrope(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.3,
+            color: scheme.primary,
+          ),
         ),
-        const SizedBox(width: 4),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                connection.processName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.manrope(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.3,
-                  color: scheme.primary,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                formatNetworkEndpoint(
-                  connection.remoteAddress,
-                  connection.remotePort,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.jetBrainsMono(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-            ],
+        const SizedBox(height: 2),
+        Text(
+          formatNetworkEndpoint(
+            connection.remoteAddress,
+            connection.remotePort,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.jetBrainsMono(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: scheme.onSurfaceVariant,
           ),
         ),
       ],

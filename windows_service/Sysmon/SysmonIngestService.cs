@@ -30,7 +30,14 @@ public sealed class SysmonIngestService(
             for (var rec = log.ReadEvent(); rec != null; rec = log.ReadEvent())
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                await IngestRecordAsync(rec, cancellationToken, broadcast: false, evaluateAlerts: false).ConfigureAwait(false);
+                using (rec)
+                {
+                    var ev = SysmonEventParser.TryParse(rec);
+                    if (ev != null)
+                    {
+                        await IngestParsedEventAsync(ev, cancellationToken, broadcast: false, evaluateAlerts: false).ConfigureAwait(false);
+                    }
+                }
                 count++;
                 if (count > 100000)
                     break;
@@ -55,12 +62,28 @@ public sealed class SysmonIngestService(
             {
                 if (args.EventRecord == null)
                     return;
-                var rec = args.EventRecord;
+                
+                SysmonEvent? ev = null;
+                try
+                {
+                    using (var rec = args.EventRecord)
+                    {
+                        ev = SysmonEventParser.TryParse(rec);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogDebug(ex, "Sysmon event parse failed");
+                }
+
+                if (ev == null)
+                    return;
+
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        await IngestRecordAsync(rec, cancellationToken, broadcast: true, evaluateAlerts: true).ConfigureAwait(false);
+                        await IngestParsedEventAsync(ev, cancellationToken, broadcast: true, evaluateAlerts: true).ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {
@@ -78,16 +101,12 @@ public sealed class SysmonIngestService(
         }
     }
 
-    public async Task IngestRecordAsync(
-        EventRecord record,
+    public async Task IngestParsedEventAsync(
+        SysmonEvent ev,
         CancellationToken cancellationToken,
         bool broadcast = true,
         bool evaluateAlerts = true)
     {
-        var ev = SysmonEventParser.TryParse(record);
-        if (ev == null)
-            return;
-
         var row = new SysmonEventRow
         {
             EventId = ev.EventId,

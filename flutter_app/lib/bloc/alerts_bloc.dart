@@ -23,6 +23,8 @@ class AlertsState extends Equatable {
 }
 
 class AlertsBloc extends Cubit<AlertsState> {
+  static const String softwareInstallDetectedType = 'software_install_detected';
+
   AlertsBloc({required WatchlistBloc watchlistBloc})
       : _watchlistBloc = watchlistBloc,
         super(const AlertsState()) {
