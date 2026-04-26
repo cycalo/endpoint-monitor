@@ -30,6 +30,7 @@ builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>()
 
 builder.Services.AddSingleton<AppDatabase>();
 builder.Services.AddSingleton<WebSocketConnectionManager>();
+builder.Services.AddSingleton<PairingAuthService>();
 builder.Services.AddSingleton<AuthTokenValidator>();
 builder.Services.AddSingleton<ProcessCollector>();
 builder.Services.AddSingleton<GeoIpLookupService>();
@@ -85,22 +86,54 @@ await db.InitializeAsync();
 
 app.UseWebSockets();
 
-app.MapPost("/api/auth/token", (HttpContext ctx, TokenRequest body) =>
+app.MapPost("/api/auth/pairing/complete", async (HttpContext ctx, PairingCompleteRequest body) =>
+{
+    if (string.IsNullOrWhiteSpace(body.Code))
+        return Results.BadRequest(new { error = "pairing_code_required" });
+
+    var pairing = ctx.RequestServices.GetRequiredService<PairingAuthService>();
+    var result = await pairing.ExchangePairingCodeAsync(body.Code, body.DeviceName, ctx.RequestAborted).ConfigureAwait(false);
+    if (!result.Success || string.IsNullOrEmpty(result.DeviceToken))
+        return Results.Unauthorized();
+    return Results.Json(new { token = result.DeviceToken });
+});
+
+app.MapGet("/api/auth/devices", async (HttpContext ctx) =>
 {
     var auth = ctx.RequestServices.GetRequiredService<AuthTokenValidator>();
-    var opts = ctx.RequestServices.GetRequiredService<Microsoft.Extensions.Options.IOptions<AuthOptions>>().Value;
-    if (body.Token != opts.Token)
+    if (!(await auth.TryValidateAuthorizationAsync(ctx.Request.Headers.Authorization, ctx.RequestAborted).ConfigureAwait(false)).Valid)
         return Results.Unauthorized();
-    if (string.IsNullOrWhiteSpace(opts.JwtSigningKey) || opts.JwtSigningKey.Length < 32)
-        return Results.Problem("JwtSigningKey must be at least 32 characters");
-    var jwt = JwtIssuer.CreateAccessToken(opts);
-    return Results.Json(new { token = jwt });
+
+    var pairing = ctx.RequestServices.GetRequiredService<PairingAuthService>();
+    var devices = await pairing.ListDeviceTokensAsync(ctx.RequestAborted).ConfigureAwait(false);
+    return Results.Json(devices.Select(d => new
+    {
+        id = d.Id,
+        deviceName = d.DeviceName,
+        createdAt = d.CreatedAt,
+        lastUsedAt = d.LastUsedAt,
+        revoked = d.Revoked
+    }));
+});
+
+app.MapPost("/api/auth/devices/revoke", async (HttpContext ctx, RevokeDeviceRequest body) =>
+{
+    var auth = ctx.RequestServices.GetRequiredService<AuthTokenValidator>();
+    if (!(await auth.TryValidateAuthorizationAsync(ctx.Request.Headers.Authorization, ctx.RequestAborted).ConfigureAwait(false)).Valid)
+        return Results.Unauthorized();
+
+    if (string.IsNullOrWhiteSpace(body.Id))
+        return Results.BadRequest(new { error = "device_id_required" });
+
+    var pairing = ctx.RequestServices.GetRequiredService<PairingAuthService>();
+    await pairing.RevokeDeviceTokenAsync(body.Id, ctx.RequestAborted).ConfigureAwait(false);
+    return Results.Ok();
 });
 
 app.MapGet("/export/events", async (HttpContext ctx, DateTime? from, DateTime? to, string? format) =>
 {
     var auth = ctx.RequestServices.GetRequiredService<AuthTokenValidator>();
-    if (!auth.TryValidateAuthorization(ctx.Request.Headers.Authorization, out _))
+    if (!(await auth.TryValidateAuthorizationAsync(ctx.Request.Headers.Authorization, ctx.RequestAborted).ConfigureAwait(false)).Valid)
         return Results.Unauthorized();
 
     var database = ctx.RequestServices.GetRequiredService<AppDatabase>();
@@ -141,7 +174,7 @@ app.Map("/ws", async context =>
     }
 
     var auth = context.RequestServices.GetRequiredService<AuthTokenValidator>();
-    if (!auth.TryValidateAuthorization(context.Request.Headers.Authorization, out _))
+    if (!(await auth.TryValidateAuthorizationAsync(context.Request.Headers.Authorization, context.RequestAborted).ConfigureAwait(false)).Valid)
     {
         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
         return;
@@ -239,4 +272,5 @@ static string Escape(object? o)
     return s;
 }
 
-internal sealed record TokenRequest(string Token);
+internal sealed record PairingCompleteRequest(string Code, string? DeviceName);
+internal sealed record RevokeDeviceRequest(string Id);

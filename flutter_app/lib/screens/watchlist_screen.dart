@@ -156,18 +156,9 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
               ),
               const SizedBox(height: 8),
               if (wl.serverListLoading && wl.entries.isEmpty)
-                ...List.generate(
-                  3,
-                  (_) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Container(
-                      height: 88,
-                      decoration: EmDesign.cardShell(
-                        scheme,
-                        color: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
-                      ),
-                    ),
-                  ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32),
+                  child: Center(child: CircularProgressIndicator()),
                 )
               else if (wl.entries.isEmpty)
                 Container(
@@ -285,7 +276,25 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                                   ),
                                   const SizedBox(height: 6),
                                   if (loadingSeen)
-                                    Text('Resolving last seen…', style: theme.textTheme.bodySmall)
+                                    Row(
+                                      children: [
+                                        SizedBox(
+                                          width: 14,
+                                          height: 14,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: scheme.outline,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            'Resolving last seen…',
+                                            style: theme.textTheme.bodySmall,
+                                          ),
+                                        ),
+                                      ],
+                                    )
                                   else
                                     Text(
                                       _rel(seen),

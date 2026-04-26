@@ -123,3 +123,16 @@ public sealed class InstalledSoftwareStateRow
     public string FirstSeenAt { get; set; } = "";
     public string LastSeenAt { get; set; } = "";
 }
+
+[Table("DeviceAuthTokens")]
+public sealed class DeviceAuthTokenRow
+{
+    [PrimaryKey]
+    public string Id { get; set; } = "";
+
+    public string DeviceName { get; set; } = "";
+    public string TokenHash { get; set; } = "";
+    public string CreatedAt { get; set; } = "";
+    public string LastUsedAt { get; set; } = "";
+    public bool Revoked { get; set; }
+}

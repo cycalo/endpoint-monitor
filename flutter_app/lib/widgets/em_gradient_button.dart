@@ -8,12 +8,15 @@ class EmGradientButton extends StatelessWidget {
     required this.label,
     this.onPressed,
     this.icon,
+    this.inProgress = false,
     this.padding = const EdgeInsets.symmetric(vertical: 16),
   });
 
   final String label;
   final VoidCallback? onPressed;
   final IconData? icon;
+  /// When true, shows a small throbber instead of [icon] (e.g. during connect).
+  final bool inProgress;
   final EdgeInsetsGeometry padding;
 
   @override
@@ -73,7 +76,17 @@ class EmGradientButton extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (icon != null) ...[
+                if (inProgress) ...[
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: labelColor,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ] else if (icon != null) ...[
                   Icon(icon, color: labelColor, size: 20),
                   const SizedBox(width: 8),
                 ],

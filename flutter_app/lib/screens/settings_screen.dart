@@ -37,10 +37,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _endpoint = TextEditingController();
   final _jwt = TextEditingController();
   final _httpBase = TextEditingController();
-  final _static = TextEditingController();
   final _groqApiKey = TextEditingController();
   bool _hideJwt = true;
-  bool _hideStatic = true;
   bool _hideGroqApi = true;
   bool _rememberEndpoint = true;
   bool _pinLock = false;
@@ -57,7 +55,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _savedEndpoint = '';
   String _savedJwt = '';
   String _savedHttp = '';
-  String _savedStatic = '';
   String _savedGroqApi = '';
 
   @override
@@ -71,7 +68,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _endpoint.dispose();
     _jwt.dispose();
     _httpBase.dispose();
-    _static.dispose();
     _groqApiKey.dispose();
     super.dispose();
   }
@@ -79,8 +75,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool get _connectionDirty =>
       _endpoint.text.trim() != _savedEndpoint ||
       _jwt.text.trim() != _savedJwt ||
-      _httpBase.text.trim() != _savedHttp ||
-      _static.text.trim() != _savedStatic;
+      _httpBase.text.trim() != _savedHttp;
 
   bool get _groqDirty => _groqApiKey.text.trim() != _savedGroqApi;
 
@@ -99,7 +94,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _jwt.text = token;
     _groqApiKey.text = groqKey;
     _httpBase.text = p.getString(AppSettingsKeys.httpBase) ?? 'http://192.168.1.10:5000';
-    _static.text = await s.read(key: 'em_static_token') ?? '';
     _rememberEndpoint =
         p.getBool(AppSettingsKeys.rememberEndpoint) ?? p.getBool('em_remember_connect') ?? true;
     _pinLock = p.getBool(AppSettingsKeys.pinLockEnabled) ?? false;
@@ -116,7 +110,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _savedJwt = token;
     _savedGroqApi = groqKey.trim();
     _savedHttp = _httpBase.text.trim();
-    _savedStatic = _static.text.trim();
     if (mounted) setState(() {});
   }
 
@@ -145,8 +138,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await p.setBool(AppSettingsKeys.showIpv6Network, _showIpv6);
     await p.setBool(AppSettingsKeys.compactProcessCards, _compactProc);
     await p.setString(AppSettingsKeys.httpBase, _httpBase.text.trim());
-    const s = FlutterSecureStorage();
-    await s.write(key: 'em_static_token', value: _static.text.trim());
   }
 
   Future<void> _saveConnection() async {
@@ -159,41 +150,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _savedEndpoint = ep;
     _savedJwt = tok;
     _savedHttp = _httpBase.text.trim();
-    _savedStatic = _static.text.trim();
     if (!mounted) return;
     if (ep.isNotEmpty && tok.isNotEmpty) {
       context.read<ConnectionBloc>().add(ConnectionConnectRequested(host: ep, token: tok));
     }
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved')));
-  }
-
-  Future<void> _exchangeJwt() async {
-    try {
-      final dio = Dio(BaseOptions(
-        baseUrl: _httpBase.text.trim(),
-        connectTimeout: const Duration(seconds: 15),
-      ));
-      final res = await dio.post<Map<String, dynamic>>(
-        '/api/auth/token',
-        data: {'token': _static.text.trim()},
-      );
-      final jwt = res.data?['token'] as String?;
-      if (jwt == null) throw StateError('No token in response');
-      const storage = FlutterSecureStorage();
-      await storage.write(key: 'em_token', value: jwt);
-      _jwt.text = jwt;
-      _savedJwt = jwt;
-      final exp = readJwtExpiryUtc(jwt);
-      if (!mounted) return;
-      final msg = exp != null
-          ? 'JWT saved · expires ${exp.toLocal()}'
-          : 'JWT saved to secure storage';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-      }
-    }
   }
 
   Future<void> _testPing() async {
@@ -215,7 +176,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (token == null || host == null || token.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Save endpoint and JWT first')),
+            const SnackBar(content: Text('Save endpoint and device token first')),
           );
         }
         return;
@@ -410,7 +371,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     obscureText: _hideJwt,
                     style: GoogleFonts.jetBrainsMono(fontSize: 13),
                     decoration: InputDecoration(
-                      labelText: 'JWT / WebSocket token',
+                      labelText: 'Device token (from pairing)',
                       suffixIcon: IconButton(
                         onPressed: () => setState(() => _hideJwt = !_hideJwt),
                         icon: Icon(_hideJwt ? Icons.visibility : Icons.visibility_off),
@@ -421,19 +382,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   TextField(
                     controller: _httpBase,
                     style: GoogleFonts.jetBrainsMono(fontSize: 13),
-                    decoration: const InputDecoration(labelText: 'HTTP base (JWT exchange)'),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _static,
-                    obscureText: _hideStatic,
-                    style: GoogleFonts.jetBrainsMono(fontSize: 13),
-                    decoration: InputDecoration(
-                      labelText: 'Static shared token',
-                      suffixIcon: IconButton(
-                        onPressed: () => setState(() => _hideStatic = !_hideStatic),
-                        icon: Icon(_hideStatic ? Icons.visibility : Icons.visibility_off),
-                      ),
+                    decoration: const InputDecoration(
+                      labelText: 'HTTP base (exports / REST)',
                     ),
                   ),
                   SwitchListTile(
@@ -447,7 +397,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      FilledButton.tonal(onPressed: _exchangeJwt, child: const Text('Exchange for JWT')),
                       OutlinedButton(onPressed: _testPing, child: const Text('Test connection')),
                     ],
                   ),
@@ -505,9 +454,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     future: const FlutterSecureStorage().read(key: 'em_token'),
                     builder: (context, snap) {
                       final t = snap.data;
-                      final line = t != null && t.contains('.')
-                          ? formatJwtExpiryLine(t)
-                          : 'Using static token (or not connected)';
+                      final line = t == null || t.isEmpty
+                          ? 'No device token saved'
+                          : (t.split('.').length == 3
+                              ? formatJwtExpiryLine(t)
+                              : 'Device token saved (pair on Connect to replace)');
                       return Text(line, style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant));
                     },
                   ),
@@ -751,7 +702,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             : () => context
                                 .read<ThreatIntelBloc>()
                                 .requestRefreshFeeds(),
-                        child: Text(ti.loading ? 'Updating…' : 'Update feeds now'),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (ti.loading) ...[
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: scheme.primary,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                            ],
+                            Text(
+                                ti.loading ? 'Updating…' : 'Update feeds now'),
+                          ],
+                        ),
                       ),
                     ],
                   );

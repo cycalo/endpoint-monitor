@@ -809,17 +809,30 @@ class _EventsScreenState extends State<EventsScreen>
           }).toList();
                 final list = filtered;
 
-          if (list.isEmpty) {
+                if (state.loading && state.items.isEmpty) {
+                  return Center(
+                    child: CircularProgressIndicator(
+                      color: scheme.primary,
+                      strokeWidth: 2,
+                    ),
+                  );
+                }
+
+                if (list.isEmpty) {
+                  final msg = state.items.isEmpty
+                      ? 'No events yet'
+                      : 'No events match the current filters';
                   return Center(
                     child: Text(
-                      'No events yet',
+                      msg,
+                      textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium
                           ?.copyWith(color: scheme.onSurfaceVariant),
                     ),
                   );
                 }
 
-                return CustomScrollView(
+                final scroll = CustomScrollView(
                   primary: true,
                   slivers: [
                     SliverPersistentHeader(
@@ -1014,6 +1027,20 @@ class _EventsScreenState extends State<EventsScreen>
                     ),
                   ],
                 );
+
+                if (state.loading && state.items.isNotEmpty) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      LinearProgressIndicator(
+                        minHeight: 2,
+                        color: scheme.primary,
+                      ),
+                      Expanded(child: scroll),
+                    ],
+                  );
+                }
+                return scroll;
               },
             ),
           ),

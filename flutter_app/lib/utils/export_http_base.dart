@@ -11,5 +11,9 @@ String httpBaseFromMonitorHost(String raw) {
   }
   h = h.split('/ws').first;
   if (h.endsWith('/')) h = h.substring(0, h.length - 1);
+  final uri = Uri.parse(h);
+  if (!uri.hasPort) {
+    h = uri.replace(port: 5000).toString();
+  }
   return h;
 }

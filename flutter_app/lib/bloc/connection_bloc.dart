@@ -46,8 +46,10 @@ class EmConnectionState extends Equatable {
         message: message ?? this.message,
         host: host ?? this.host,
         connectedAt: clearConnectedAt ? null : connectedAt ?? this.connectedAt,
-        lastTestPingMs: clearPingTest ? null : lastTestPingMs ?? this.lastTestPingMs,
-        lastTestPingError: clearPingTest ? null : lastTestPingError ?? this.lastTestPingError,
+        lastTestPingMs:
+            clearPingTest ? null : lastTestPingMs ?? this.lastTestPingMs,
+        lastTestPingError:
+            clearPingTest ? null : lastTestPingError ?? this.lastTestPingError,
       );
 
   bool get isConnected => status == ConnectionStatus.connected;
@@ -100,7 +102,10 @@ class ConnectionTaskMessage extends ConnectionEvent {
 }
 
 class ConnectionBloc extends Bloc<ConnectionEvent, EmConnectionState> {
-  ConnectionBloc(this._storage) : super(const EmConnectionState(status: ConnectionStatus.disconnected)) {
+  static const _defaultMonitorPort = 5000;
+
+  ConnectionBloc(this._storage)
+      : super(const EmConnectionState(status: ConnectionStatus.disconnected)) {
     on<ConnectionStarted>(_onStarted);
     on<ConnectionConnectRequested>(_onConnect);
     on<ConnectionDisconnectRequested>(_onDisconnect);
@@ -120,9 +125,11 @@ class ConnectionBloc extends Bloc<ConnectionEvent, EmConnectionState> {
     }
   }
 
-  Future<void> _onStarted(ConnectionStarted event, Emitter<EmConnectionState> emit) async {
+  Future<void> _onStarted(
+      ConnectionStarted event, Emitter<EmConnectionState> emit) async {
     try {
-      FlutterForegroundTask.sendDataToTask(<String, Object?>{'action': 'em_disconnect'});
+      FlutterForegroundTask.sendDataToTask(
+          <String, Object?>{'action': 'em_disconnect'});
       final running = await FlutterForegroundTask.isRunningService;
       if (running) {
         await FlutterForegroundTask.stopService();
@@ -138,8 +145,10 @@ class ConnectionBloc extends Bloc<ConnectionEvent, EmConnectionState> {
     ));
   }
 
-  Future<void> _onConnect(ConnectionConnectRequested event, Emitter<EmConnectionState> emit) async {
-    emit(state.copyWith(status: ConnectionStatus.connecting, message: null, host: event.host));
+  Future<void> _onConnect(
+      ConnectionConnectRequested event, Emitter<EmConnectionState> emit) async {
+    emit(state.copyWith(
+        status: ConnectionStatus.connecting, message: null, host: event.host));
     final wsUrl = _normalizeWsUrl(event.host);
     await _storage.write(key: _hostKey, value: event.host.trim());
     await _storage.write(key: _tokenKey, value: event.token);
@@ -166,28 +175,29 @@ class ConnectionBloc extends Bloc<ConnectionEvent, EmConnectionState> {
       );
       switch (result) {
         case ServiceRequestFailure(:final error):
-          emit(state.copyWith(status: ConnectionStatus.error, message: error.toString()));
+          emit(state.copyWith(
+              status: ConnectionStatus.error, message: error.toString()));
         case ServiceRequestSuccess():
           break;
       }
     }
   }
 
-  Future<void> _onDisconnect(ConnectionDisconnectRequested event, Emitter<EmConnectionState> emit) async {
-    FlutterForegroundTask.sendDataToTask(<String, Object?>{'action': 'em_disconnect'});
+  Future<void> _onDisconnect(ConnectionDisconnectRequested event,
+      Emitter<EmConnectionState> emit) async {
+    FlutterForegroundTask.sendDataToTask(
+        <String, Object?>{'action': 'em_disconnect'});
     await FlutterForegroundTask.stopService();
     await _storage.delete(key: _hostKey);
     await _storage.delete(key: _tokenKey);
     emit(const EmConnectionState(status: ConnectionStatus.disconnected));
   }
 
-  Future<void> _onReconnect(ConnectionReconnectRequested event, Emitter<EmConnectionState> emit) async {
+  Future<void> _onReconnect(ConnectionReconnectRequested event,
+      Emitter<EmConnectionState> emit) async {
     final host = await _storage.read(key: _hostKey);
     final token = await _storage.read(key: _tokenKey);
-    if (host == null ||
-        host.trim().isEmpty ||
-        token == null ||
-        token.isEmpty) {
+    if (host == null || host.trim().isEmpty || token == null || token.isEmpty) {
       emit(state.copyWith(
         status: ConnectionStatus.disconnected,
         message: 'No saved session. Use Connect to sign in again.',
@@ -197,12 +207,15 @@ class ConnectionBloc extends Bloc<ConnectionEvent, EmConnectionState> {
     add(ConnectionConnectRequested(host: host.trim(), token: token));
   }
 
-  void _onPingMeasure(ConnectionPingMeasureRequested event, Emitter<EmConnectionState> emit) {
+  void _onPingMeasure(
+      ConnectionPingMeasureRequested event, Emitter<EmConnectionState> emit) {
     emit(state.copyWith(clearPingTest: true));
-    FlutterForegroundTask.sendDataToTask(<String, Object?>{'action': 'em_measure_ping'});
+    FlutterForegroundTask.sendDataToTask(
+        <String, Object?>{'action': 'em_measure_ping'});
   }
 
-  void _onTaskMessage(ConnectionTaskMessage event, Emitter<EmConnectionState> emit) {
+  void _onTaskMessage(
+      ConnectionTaskMessage event, Emitter<EmConnectionState> emit) {
     final t = event.raw['type']?.toString();
     if (t == 'ping_rtt') {
       final ok = event.raw['ok'] == true;
@@ -228,7 +241,8 @@ class ConnectionBloc extends Bloc<ConnectionEvent, EmConnectionState> {
             message: null,
             connectedAt: DateTime.now(),
           ));
-          FlutterForegroundTask.sendDataToTask(jsonEncode({'type': 'get_system_info'}));
+          FlutterForegroundTask.sendDataToTask(
+              jsonEncode({'type': 'get_system_info'}));
           break;
         case 'connecting':
           emit(state.copyWith(status: ConnectionStatus.connecting));
@@ -236,7 +250,9 @@ class ConnectionBloc extends Bloc<ConnectionEvent, EmConnectionState> {
         case 'disconnected':
         case 'error':
           emit(state.copyWith(
-            status: s == 'error' ? ConnectionStatus.error : ConnectionStatus.disconnected,
+            status: s == 'error'
+                ? ConnectionStatus.error
+                : ConnectionStatus.disconnected,
             message: msg,
             clearConnectedAt: true,
           ));
@@ -250,9 +266,40 @@ class ConnectionBloc extends Bloc<ConnectionEvent, EmConnectionState> {
   static String _normalizeWsUrl(String host) {
     final t = host.trim();
     if (t.startsWith('ws://') || t.startsWith('wss://')) {
-      return t.endsWith('/ws') ? t : (t.endsWith('/') ? '${t}ws' : '$t/ws');
+      final uri = Uri.parse(t);
+      final normalizedUri = uri.hasPort
+          ? uri
+          : uri.replace(port: _defaultMonitorPort);
+      final normalized = normalizedUri.toString();
+      return normalized.endsWith('/ws')
+          ? normalized
+          : (normalized.endsWith('/') ? '${normalized}ws' : '$normalized/ws');
     }
-    return 'ws://$t/ws';
+    final withPort = _appendDefaultPortIfMissing(t);
+    return 'ws://$withPort/ws';
+  }
+
+  static String _appendDefaultPortIfMissing(String host) {
+    final trimmed = host.trim();
+    if (trimmed.isEmpty) return trimmed;
+    if (trimmed.startsWith('[') && trimmed.contains(']:')) return trimmed;
+    if (trimmed.contains('/') || trimmed.contains('?') || trimmed.contains('#')) {
+      final uri = Uri.parse(trimmed.startsWith('http://') || trimmed.startsWith('https://')
+          ? trimmed
+          : 'http://$trimmed');
+      if (uri.hasPort) return trimmed;
+      final replaced = uri.replace(port: _defaultMonitorPort).toString();
+      return trimmed.startsWith('http://') || trimmed.startsWith('https://')
+          ? replaced
+          : replaced.replaceFirst(RegExp(r'^http://'), '');
+    }
+    if (trimmed.contains(':') && !trimmed.contains('.')) return trimmed;
+    final lastColon = trimmed.lastIndexOf(':');
+    if (lastColon > -1) {
+      final suffix = trimmed.substring(lastColon + 1);
+      if (int.tryParse(suffix) != null) return trimmed;
+    }
+    return '$trimmed:$_defaultMonitorPort';
   }
 
   @override

@@ -1,7 +1,9 @@
 Endpoint Monitor Windows service
 
-1. Copy appsettings.example.json to appsettings.json and set Auth:Token and Auth:JwtSigningKey (32+ chars).
+1. Copy appsettings.example.json to appsettings.json and set Auth:DeviceTokenPepper (32+ random characters; used to hash paired device tokens).
 2. Run as Administrator (required for WMI, Sysmon, firewall, process actions).
 3. From this folder: dotnet run
 4. Listen port: Server:Port in appsettings (default 5000).
-5. WebSocket: ws://<host>:<port>/ws with header Authorization: Bearer <token>
+5. Pair a phone: tray icon → Generate pairing code, then complete pairing in the Flutter app.
+6. Tray: “Start with Windows (Windows Service)” registers or sets the EndpointMonitor service to start automatically (UAC). See BUILD-SINGLE-EXE.md to publish a single self-contained exe (runs elevated when launched interactively via app.manifest).
+7. WebSocket: ws://<host>:<port>/ws with header Authorization: Bearer <device token from pairing>

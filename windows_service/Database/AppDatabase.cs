@@ -27,6 +27,7 @@ public sealed class AppDatabase(ILogger<AppDatabase> logger)
         await _db.CreateTableAsync<AlertHistoryRow>().ConfigureAwait(false);
         await _db.CreateTableAsync<AlertAckRow>().ConfigureAwait(false);
         await _db.CreateTableAsync<InstalledSoftwareStateRow>().ConfigureAwait(false);
+        await _db.CreateTableAsync<DeviceAuthTokenRow>().ConfigureAwait(false);
 
         var iso = await _db.Table<IsolationStateRow>().FirstOrDefaultAsync().ConfigureAwait(false);
         if (iso == null)
@@ -430,5 +431,44 @@ public sealed class AppDatabase(ILogger<AppDatabase> logger)
     public async Task ExportSysmonRowsAsync(DateTime from, DateTime to, CancellationToken cancellationToken = default)
     {
         await Task.CompletedTask;
+    }
+
+    public async Task AddDeviceTokenAsync(DeviceAuthTokenRow row, CancellationToken cancellationToken = default)
+    {
+        if (_db == null) return;
+        await _db.InsertOrReplaceAsync(row).ConfigureAwait(false);
+    }
+
+    public async Task<DeviceAuthTokenRow?> FindActiveDeviceTokenByHashAsync(string tokenHash, CancellationToken cancellationToken = default)
+    {
+        if (_db == null) return null;
+        return await _db.Table<DeviceAuthTokenRow>()
+            .Where(x => x.TokenHash == tokenHash && !x.Revoked)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+    }
+
+    public async Task TouchDeviceTokenAsync(string id, CancellationToken cancellationToken = default)
+    {
+        if (_db == null) return;
+        var row = await _db.Table<DeviceAuthTokenRow>().Where(x => x.Id == id).FirstOrDefaultAsync().ConfigureAwait(false);
+        if (row == null) return;
+        row.LastUsedAt = DateTime.UtcNow.ToString("O");
+        await _db.UpdateAsync(row).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<DeviceAuthTokenRow>> ListDeviceTokensAsync(CancellationToken cancellationToken = default)
+    {
+        if (_db == null) return [];
+        return await _db.Table<DeviceAuthTokenRow>().OrderByDescending(x => x.LastUsedAt).ToListAsync().ConfigureAwait(false);
+    }
+
+    public async Task RevokeDeviceTokenAsync(string id, CancellationToken cancellationToken = default)
+    {
+        if (_db == null) return;
+        var row = await _db.Table<DeviceAuthTokenRow>().Where(x => x.Id == id).FirstOrDefaultAsync().ConfigureAwait(false);
+        if (row == null) return;
+        row.Revoked = true;
+        await _db.UpdateAsync(row).ConfigureAwait(false);
     }
 }
