@@ -7,6 +7,7 @@ import '../bloc/browser_bloc.dart';
 import '../models/ws_models.dart';
 import '../theme/em_design_system.dart';
 import '../widgets/em_brand_app_bar.dart';
+import '../widgets/em_loading_states.dart';
 
 class BrowserScreen extends StatefulWidget {
   const BrowserScreen({super.key});
@@ -86,93 +87,47 @@ class _BrowserScreenState extends State<BrowserScreen>
       body: BlocBuilder<BrowserBloc, BrowserState>(
         builder: (context, state) {
           if (state.loading && state.items.isEmpty) {
-            return Center(
-              child: CircularProgressIndicator(
-                color: scheme.primary,
-                strokeWidth: 2,
-              ),
-            );
+            return const EmListSkeleton();
           }
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-                child: Row(
-                  children: [
-                    Icon(Icons.travel_explore_rounded,
-                        size: 20, color: scheme.primary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Browsing activity',
-                        style: GoogleFonts.manrope(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: scheme.onSurface,
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-                    ),
-                    if (!state.loading)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: scheme.tertiary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '${state.items.length} entries',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: scheme.tertiary,
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: EmPageIntro(
+                  title: 'Browser history',
+                  subtitle: 'Recent visits from Chrome, Edge, and Firefox profiles.',
+                  padding: EdgeInsets.zero,
+                  trailing: !state.loading
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
                           ),
-                        ),
-                      ),
-                  ],
+                          decoration: BoxDecoration(
+                            color: scheme.tertiary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '${state.items.length} entries',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: scheme.tertiary,
+                            ),
+                          ),
+                        )
+                      : null,
                 ),
               ),
               Expanded(
                 child: state.items.isEmpty
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.history_toggle_off_rounded,
-                                size: 48,
-                                color: scheme.outlineVariant,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No history for this profile',
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.manrope(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: scheme.onSurface,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Pull to refresh or pick another browser tab.',
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  color: scheme.onSurfaceVariant,
-                                  height: 1.4,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                    ? EmEmptyState(
+                        icon: Icons.history_toggle_off_rounded,
+                        title: 'No history for this profile',
+                        message:
+                            'Pull to refresh or switch browser tabs above.',
                       )
                     : RefreshIndicator(
                         color: scheme.primary,

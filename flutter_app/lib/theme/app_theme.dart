@@ -303,5 +303,11 @@ ThemeData _buildEndpointMonitorTheme(ColorScheme scheme) {
       linearTrackColor: scheme.surfaceContainerHighest,
     ),
     iconTheme: IconThemeData(color: scheme.onSurfaceVariant),
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+      },
+    ),
   );
 }

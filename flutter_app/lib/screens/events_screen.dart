@@ -12,6 +12,7 @@ import '../models/ws_models.dart';
 import '../settings/app_settings_keys.dart';
 import '../theme/em_design_system.dart';
 import '../widgets/em_brand_app_bar.dart';
+import '../widgets/em_loading_states.dart';
 
 /// Sysmon event types we filter on — matches [SysmonEvent.type] from the agent.
 const _kTypeTerminate = 'ProcessTerminate';
@@ -681,10 +682,15 @@ class _EventsScreenState extends State<EventsScreen>
             elevation: 3,
             shadowColor: Colors.black.withValues(alpha: 0.35),
           child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                const EmPageIntro(
+                  title: 'Events',
+                  subtitle: 'Sysmon timeline with filters, noise reduction, and export.',
+                  padding: EdgeInsets.zero,
+                ),
                 TextField(
                   controller: _search,
                     style: theme.textTheme.bodySmall?.copyWith(
@@ -810,25 +816,21 @@ class _EventsScreenState extends State<EventsScreen>
                 final list = filtered;
 
                 if (state.loading && state.items.isEmpty) {
-                  return Center(
-                    child: CircularProgressIndicator(
-                      color: scheme.primary,
-                      strokeWidth: 2,
-                    ),
-                  );
+                  return const EmListSkeleton();
                 }
 
                 if (list.isEmpty) {
-                  final msg = state.items.isEmpty
-                      ? 'No events yet'
-                      : 'No events match the current filters';
-                  return Center(
-                    child: Text(
-                      msg,
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium
-                          ?.copyWith(color: scheme.onSurfaceVariant),
-                    ),
+                  final filtered = state.items.isNotEmpty;
+                  return EmEmptyState(
+                    icon: filtered
+                        ? Icons.filter_alt_off_rounded
+                        : Icons.event_note_outlined,
+                    title: filtered
+                        ? 'No events match filters'
+                        : 'No events yet',
+                    message: filtered
+                        ? 'Broaden type, time range, or search to see more activity.'
+                        : 'Events appear as Sysmon records arrive from the endpoint.',
                   );
                 }
 

@@ -16,6 +16,9 @@ abstract final class AppSettingsKeys {
   static const pinLockEnabled = 'em_pin_lock_enabled';
   static const autoLockTimeout = 'em_auto_lock_timeout';
 
+  /// FlutterSecureStorage key for optional Groq API key (process AI explain).
+  static const groqApiKey = 'groq_api_key';
+
   /// Comma-separated default noise list (lowercase .exe names).
   static const defaultNoiseCsv =
       'svchost.exe,msmpeng.exe,wmiprvse.exe,runtimebroker.exe,searchindexer.exe';

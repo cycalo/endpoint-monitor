@@ -9,6 +9,7 @@ import '../models/ws_models.dart';
 import '../settings/app_settings_keys.dart';
 import '../theme/em_design_system.dart';
 import '../widgets/em_brand_app_bar.dart';
+import '../widgets/em_loading_states.dart';
 
 class ProcessesScreen extends StatefulWidget {
   const ProcessesScreen({super.key, this.initialWatchFilter});
@@ -151,10 +152,15 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
         children: [
           Container(
             color: scheme.surfaceContainerLow,
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                const EmPageIntro(
+                  title: 'Processes',
+                  subtitle: 'Live and recently terminated processes on the endpoint.',
+                  padding: EdgeInsets.zero,
+                ),
                 TextField(
                   controller: _search,
                   focusNode: _searchFocus,
@@ -207,15 +213,7 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Text(
-                      'SORT',
-                      style: GoogleFonts.manrope(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.2,
-                        color: scheme.outline,
-                      ),
-                    ),
+                    Text('SORT', style: EmDesign.labelCaps(context, scheme)),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Align(
@@ -282,16 +280,21 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
                   if (state.loading &&
                       state.items.isEmpty &&
                       state.killedGhosts.isEmpty) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const EmListSkeleton();
                   }
                   final rows = _buildDisplayRows(state);
                   if (rows.isEmpty) {
-                    return Center(
-                      child: Text(
-                        'No processes match',
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(color: scheme.outline),
-                      ),
+                    final hasSearch = _search.text.trim().isNotEmpty;
+                    return EmEmptyState(
+                      icon: hasSearch
+                          ? Icons.search_off_rounded
+                          : Icons.memory_outlined,
+                      title: hasSearch
+                          ? 'No matching processes'
+                          : 'No processes yet',
+                      message: hasSearch
+                          ? 'Try a different name, PID, or command line.'
+                          : 'Waiting for the process list from the endpoint.',
                     );
                   }
                   return NotificationListener<ScrollStartNotification>(
@@ -304,11 +307,7 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
                     child: ListView.separated(
                       padding: const EdgeInsets.fromLTRB(0, 0, 0, 96),
                       itemCount: rows.length,
-                      separatorBuilder: (_, __) => Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: scheme.outlineVariant.withValues(alpha: 0.1),
-                      ),
+                      separatorBuilder: (_, __) => const SizedBox.shrink(),
                       itemBuilder: (context, i) {
                         final row = rows[i];
                         final p = row.snapshot;

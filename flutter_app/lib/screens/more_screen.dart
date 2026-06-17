@@ -9,6 +9,7 @@ import '../bloc/system_info_bloc.dart';
 import '../models/ws_models.dart';
 import '../theme/em_design_system.dart';
 import '../widgets/em_brand_app_bar.dart';
+import '../widgets/em_loading_states.dart';
 
 class MoreScreen extends StatelessWidget {
   const MoreScreen({super.key});
@@ -21,7 +22,7 @@ class MoreScreen extends StatelessWidget {
       backgroundColor: scheme.surface,
       appBar: const EmBrandAppBar(),
       body: ListView(
-        padding: const EdgeInsets.only(bottom: 96),
+        padding: const EdgeInsets.only(bottom: EmDesign.scrollBottomInset),
         children: [
           BlocBuilder<SystemInfoBloc, SystemInfoState>(
             builder: (context, si) {
@@ -31,14 +32,22 @@ class MoreScreen extends StatelessWidget {
               );
             },
           ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: EmPageIntro(
+              title: 'More',
+              subtitle: 'Tools, security, and settings for this endpoint.',
+              padding: EdgeInsets.zero,
+            ),
+          ),
           Column(
             children: [
               _MoreMenuRow(
+                index: 0,
                 icon: Icons.history_rounded,
                 iconColor: scheme.primary,
                 title: 'Browser history',
                 subtitle: 'View endpoint web activity',
-                showDivider: true,
                 onTap: () => context.pushNamed('browser'),
               ),
               BlocBuilder<AlertsBloc, AlertsState>(
@@ -49,6 +58,7 @@ class MoreScreen extends StatelessWidget {
                           a.type == AlertsBloc.softwareInstallDetectedType)
                       .length;
                   return _MoreMenuRow(
+                    index: 1,
                     icon: Icons.apps_rounded,
                     iconColor: scheme.primary,
                     title: 'Installed software',
@@ -57,7 +67,6 @@ class MoreScreen extends StatelessWidget {
                         : 'Manage applications and versions',
                     subtitleIsAlert: softwareNewCount > 0,
                     badge: softwareNewCount > 0 ? '$softwareNewCount' : null,
-                    showDivider: true,
                     onTap: () => context.pushNamed('software'),
                   );
                 },
@@ -68,6 +77,7 @@ class MoreScreen extends StatelessWidget {
                       .where((a) => !alerts.acked.contains(a.id))
                       .length;
                   return _MoreMenuRow(
+                    index: 2,
                     icon: Icons.notifications_active_outlined,
                     iconColor: scheme.error,
                     title: 'Alerts',
@@ -76,41 +86,40 @@ class MoreScreen extends StatelessWidget {
                         : 'Thresholds and notifications',
                     subtitleIsAlert: n > 0,
                     badge: n > 0 ? '$n' : null,
-                    showDivider: true,
                     onTap: () => context.pushNamed('alerts'),
                   );
                 },
               ),
               _MoreMenuRow(
+                index: 3,
                 icon: Icons.shield_outlined,
                 iconColor: scheme.tertiary,
                 title: 'Firewall',
                 subtitle: 'Network security and rule sets',
-                showDivider: true,
                 onTap: () => context.pushNamed('firewall'),
               ),
               _MoreMenuRow(
+                index: 4,
                 icon: Icons.computer_rounded,
                 iconColor: scheme.primary,
                 title: 'Controls',
                 subtitle: 'Remote system controls',
-                showDivider: true,
                 onTap: () => context.pushNamed('controls'),
               ),
               _MoreMenuRow(
+                index: 5,
                 icon: Icons.visibility_outlined,
                 iconColor: scheme.primary,
                 title: 'Watchlist',
                 subtitle: 'Monitor priority endpoints',
-                showDivider: true,
                 onTap: () => context.pushNamed('watchlist'),
               ),
               _MoreMenuRow(
+                index: 6,
                 icon: Icons.settings_outlined,
                 iconColor: scheme.onSurfaceVariant,
                 title: 'Settings',
                 subtitle: 'HTTP base, tokens, PIN',
-                showDivider: false,
                 onTap: () => context.pushNamed('settings'),
               ),
             ],
@@ -269,48 +278,57 @@ class _IdentityLine extends StatelessWidget {
 
 class _MoreMenuRow extends StatelessWidget {
   const _MoreMenuRow({
+    required this.index,
     required this.icon,
     required this.iconColor,
     required this.title,
     required this.subtitle,
     required this.onTap,
-    required this.showDivider,
     this.subtitleIsAlert = false,
     this.badge,
   });
 
+  final int index;
   final IconData icon;
   final Color iconColor;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-  final bool showDivider;
   final bool subtitleIsAlert;
   final String? badge;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final tile = Material(
-      color: scheme.surface,
+    final zebra = index.isEven
+        ? scheme.surface
+        : scheme.surfaceContainerLowest;
+
+    return Material(
+      color: zebra,
       child: InkWell(
         onTap: onTap,
-        hoverColor: scheme.surfaceContainerHigh.withValues(alpha: 0.35),
+        splashColor: scheme.primary.withValues(alpha: 0.06),
+        highlightColor: scheme.surfaceContainerHigh.withValues(alpha: 0.35),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          padding: const EdgeInsets.symmetric(
+            horizontal: EmDesign.spaceMd,
+            vertical: EmDesign.spaceMd,
+          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
-                width: 40,
-                height: 40,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(8),
+                  color: scheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+                  border: EmDesign.ghostBorder(scheme),
                 ),
-                child: Icon(icon, color: iconColor, size: 24),
+                child: Icon(icon, color: iconColor, size: 22),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: EmDesign.spaceMd),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -352,6 +370,12 @@ class _MoreMenuRow extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: scheme.errorContainer,
                     borderRadius: BorderRadius.circular(999),
+                    boxShadow: [
+                      BoxShadow(
+                        color: scheme.error.withValues(alpha: 0.2),
+                        blurRadius: 8,
+                      ),
+                    ],
                   ),
                   child: Text(
                     badge!,
@@ -372,22 +396,6 @@ class _MoreMenuRow extends StatelessWidget {
           ),
         ),
       ),
-    );
-
-    if (!showDivider) return tile;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        tile,
-        Divider(
-          height: 1,
-          thickness: 1,
-          indent: 72,
-          endIndent: 0,
-          color: scheme.outlineVariant.withValues(alpha: 0.08),
-        ),
-      ],
     );
   }
 }

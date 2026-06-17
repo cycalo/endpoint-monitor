@@ -14,6 +14,7 @@ import '../bloc/controls_bloc.dart';
 import '../bloc/system_info_bloc.dart';
 import '../theme/em_design_system.dart';
 import '../widgets/em_brand_app_bar.dart';
+import '../widgets/em_loading_states.dart';
 
 const _borderSession = Color(0xFF00838F);
 const _borderPowerAmber = Color(0xFFFF8F00);
@@ -67,14 +68,6 @@ class ControlsScreen extends StatelessWidget {
             onPressed: () => context.pop(),
             icon: Icon(Icons.arrow_back_rounded, color: scheme.primary),
           ),
-          title: Text(
-            'Controls',
-            style: GoogleFonts.manrope(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: scheme.primary,
-            ),
-          ),
         ),
         body: BlocBuilder<ConnectionBloc, EmConnectionState>(
           builder: (context, conn) {
@@ -83,8 +76,26 @@ class ControlsScreen extends StatelessWidget {
               builder: (context, si) {
                 final host = _hostLabel(si);
                 return ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
                   children: [
+                    EmPageIntro(
+                      title: 'Controls',
+                      subtitle: connected
+                          ? 'Remote actions for $host.'
+                          : 'Connect to the endpoint to use remote controls.',
+                      padding: const EdgeInsets.only(bottom: 16),
+                    ),
+                    if (!connected)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: EmDesign.spaceMd),
+                        child: EmEmptyState(
+                          compact: true,
+                          icon: Icons.link_off_rounded,
+                          title: 'Not connected',
+                          message:
+                              'Establish a connection from the Dashboard or Connect screen.',
+                        ),
+                      ),
                     _sectionTitle(context, scheme, 'SESSION'),
                     _ControlCard(
                       borderColor: _borderSession,

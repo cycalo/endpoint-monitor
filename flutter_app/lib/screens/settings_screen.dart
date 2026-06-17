@@ -17,13 +17,13 @@ import '../bloc/events_bloc.dart';
 import '../bloc/system_info_bloc.dart';
 import '../bloc/threat_intel_bloc.dart';
 import '../settings/app_settings_keys.dart';
-import '../settings/groq_testing_defaults.dart';
 import '../theme/em_design_system.dart';
 import '../theme/theme_cubit.dart';
 import '../utils/export_http_base.dart';
 import '../utils/jwt_expiry.dart';
 import '../utils/relative_time.dart';
 import '../widgets/em_brand_app_bar.dart';
+import '../widgets/em_loading_states.dart';
 import '../widgets/pin_unlock_gate.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -85,11 +85,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     const s = FlutterSecureStorage();
     final host = await s.read(key: 'em_host') ?? '';
     final token = await s.read(key: 'em_token') ?? '';
-    final groqKeyStored = await s.read(key: 'groq_api_key') ?? '';
-    final groqKey = groqKeyStored.trim().isNotEmpty ? groqKeyStored : kDefaultGroqApiKeyForTesting;
-    if (groqKeyStored.trim().isEmpty) {
-      await s.write(key: 'groq_api_key', value: groqKey);
-    }
+    final groqKey = (await s.read(key: AppSettingsKeys.groqApiKey) ?? '').trim();
     _endpoint.text = host;
     _jwt.text = token;
     _groqApiKey.text = groqKey;
@@ -116,7 +112,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _saveGroqApiKey() async {
     const s = FlutterSecureStorage();
     final key = _groqApiKey.text.trim();
-    await s.write(key: 'groq_api_key', value: key);
+    await s.write(key: AppSettingsKeys.groqApiKey, value: key);
     _savedGroqApi = key;
     if (!mounted) return;
     setState(() {});
@@ -339,8 +335,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         body: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
           children: [
-            Text('SETTINGS', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
-            const SizedBox(height: 16),
+            const EmPageIntro(
+              title: 'Settings',
+              subtitle: 'Connection, security, notifications, and display preferences.',
+              padding: EdgeInsets.only(bottom: 16),
+            ),
             if (_connectionDirty)
               Container(
                 margin: const EdgeInsets.only(bottom: 12),

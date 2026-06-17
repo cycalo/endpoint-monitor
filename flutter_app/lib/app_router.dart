@@ -21,6 +21,7 @@ import 'screens/software_detail_screen.dart';
 import 'screens/software_screen.dart';
 import 'screens/watchlist_screen.dart';
 import 'utils/pop_transient_overlay_routes.dart';
+import 'widgets/em_loading_states.dart';
 
 GoRouter createAppRouter(ConnectionBloc connectionBloc) {
   final refresh = GoRouterRefreshStream(connectionBloc.stream);
@@ -103,8 +104,11 @@ GoRouter createAppRouter(ConnectionBloc connectionBloc) {
                     builder: (context, state) {
                       final extra = state.extra;
                       if (extra is! NetworkConnection) {
-                        return const Scaffold(
-                          body: Center(child: Text('Missing connection')),
+                        return EmRouteErrorBody(
+                          title: 'Connection unavailable',
+                          message:
+                              'Open a connection from the Network tab, then try again.',
+                          onBack: () => context.pop(),
                         );
                       }
                       return NetworkConnectionDetailScreen(connection: extra);
@@ -152,8 +156,9 @@ GoRouter createAppRouter(ConnectionBloc connectionBloc) {
             builder: (context, state) {
               final extra = state.extra;
               if (extra is! InstalledSoftwareItem) {
-                return const Scaffold(
-                  body: Center(child: Text('Missing software entry')),
+                return EmRouteErrorBody(
+                  title: 'Software entry unavailable',
+                  onBack: () => context.pop(),
                 );
               }
               return SoftwareDetailScreen(item: extra);
@@ -218,6 +223,8 @@ class ScaffoldWithNavBar extends StatelessWidget {
           ],
         ),
         child: NavigationBar(
+          animationDuration: const Duration(milliseconds: 280),
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
           selectedIndex: shell.currentIndex,
           destinations: const [
             NavigationDestination(

@@ -12,6 +12,7 @@ import '../bloc/process_bloc.dart';
 import '../models/ws_models.dart';
 import '../theme/em_design_system.dart';
 import '../widgets/em_brand_app_bar.dart';
+import '../widgets/em_loading_states.dart';
 
 class FirewallScreen extends StatefulWidget {
   const FirewallScreen({super.key});
@@ -407,6 +408,12 @@ class _FirewallScreenState extends State<FirewallScreen>
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
                         sliver: SliverList(
                           delegate: SliverChildListDelegate([
+                            const EmPageIntro(
+                              title: 'Firewall',
+                              subtitle:
+                                  'Network isolation, IP/port blocks, and process rules.',
+                              padding: EdgeInsets.only(bottom: 16),
+                            ),
                             if (!connected) ...[
                               _OfflineBanner(scheme: scheme, theme: theme),
                               const SizedBox(height: 16),
@@ -464,8 +471,12 @@ class _FirewallScreenState extends State<FirewallScreen>
                               if (showSkeleton)
                                 const _BlocksSkeleton()
                               else if (fw.ipAndPortBlocks.isEmpty)
-                                _EmptyBlocksState(
-                                    scheme: scheme, theme: theme)
+                                EmEmptyState(
+                                  icon: Icons.shield_outlined,
+                                  title: 'No active blocks',
+                                  message:
+                                      'Connections are unrestricted on this endpoint.',
+                                )
                               else
                                 ...fw.ipAndPortBlocks.map(
                                   (e) => Padding(
@@ -533,8 +544,12 @@ class _FirewallScreenState extends State<FirewallScreen>
                               if (showSkeleton)
                                 const _BlocksSkeleton()
                               else if (fw.processBlocks.isEmpty)
-                                _EmptyProcessBlocksState(
-                                    scheme: scheme, theme: theme)
+                                EmEmptyState(
+                                  icon: Icons.apps_outlined,
+                                  title: 'No process rules',
+                                  message:
+                                      'No process-based firewall rules are configured.',
+                                )
                               else
                                 ...fw.processBlocks.map(
                                   (e) => Padding(
@@ -832,68 +847,6 @@ class _BlocksSkeleton extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _EmptyBlocksState extends StatelessWidget {
-  const _EmptyBlocksState({required this.scheme, required this.theme});
-
-  final ColorScheme scheme;
-  final ThemeData theme;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
-      decoration: EmDesign.cardShell(scheme),
-      child: Column(
-        children: [
-          Icon(
-            Icons.shield_outlined,
-            size: 40,
-            color: scheme.outline,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'No active blocks — connections are unrestricted',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: scheme.onSurfaceVariant,
-              height: 1.45,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EmptyProcessBlocksState extends StatelessWidget {
-  const _EmptyProcessBlocksState({required this.scheme, required this.theme});
-
-  final ColorScheme scheme;
-  final ThemeData theme;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
-      decoration: EmDesign.cardShell(scheme),
-      child: Column(
-        children: [
-          Icon(Icons.apps_outlined, size: 40, color: scheme.outline),
-          const SizedBox(height: 12),
-          Text(
-            'No process-based firewall rules',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: scheme.onSurfaceVariant,
-              height: 1.45,
-            ),
-          ),
-        ],
       ),
     );
   }

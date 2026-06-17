@@ -9,6 +9,7 @@ import '../models/ws_models.dart';
 import '../theme/em_design_system.dart';
 import '../utils/software_display.dart';
 import '../widgets/em_brand_app_bar.dart';
+import '../widgets/em_loading_states.dart';
 
 enum _SoftwareSort {
   nameAZ,
@@ -115,7 +116,15 @@ class _SoftwareScreenState extends State<SoftwareScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: const EmPageIntro(
+              title: 'Installed software',
+              subtitle: 'Inventory from the endpoint with install alerts.',
+              padding: EdgeInsets.only(bottom: 10),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: TextField(
               controller: _search,
               onChanged: (_) => setState(() {}),
@@ -280,9 +289,7 @@ class _SoftwareScreenState extends State<SoftwareScreen> {
           BlocBuilder<SoftwareBloc, SoftwareState>(
             builder: (context, state) {
               if (state.loading && state.items.isEmpty) {
-                return const Expanded(
-                  child: Center(child: CircularProgressIndicator()),
-                );
+                return const Expanded(child: EmListSkeleton());
               }
 
               final list = _filteredAndSorted(state.items);
@@ -340,7 +347,17 @@ class _SoftwareScreenState extends State<SoftwareScreen> {
                     ),
                     Expanded(
                       child: list.isEmpty
-                          ? _EmptyState(hasAnyData: state.items.isNotEmpty)
+                          ? EmEmptyState(
+                              icon: state.items.isNotEmpty
+                                  ? Icons.search_off_rounded
+                                  : Icons.apps_outlined,
+                              title: state.items.isNotEmpty
+                                  ? 'No matching software'
+                                  : 'No software loaded yet',
+                              message: state.items.isNotEmpty
+                                  ? 'Try a different search or clear the filter.'
+                                  : 'Pull to refresh after connecting.',
+                            )
                           : ListView.separated(
                               primary: true,
                               padding:
@@ -362,54 +379,6 @@ class _SoftwareScreenState extends State<SoftwareScreen> {
             },
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.hasAnyData});
-
-  final bool hasAnyData;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              hasAnyData ? Icons.search_off_rounded : Icons.apps_outlined,
-              size: 72,
-              color: scheme.outlineVariant.withValues(alpha: 0.65),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              hasAnyData ? 'No matching software' : 'No software loaded yet',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.manrope(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: scheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              hasAnyData
-                  ? 'Try a different search or clear the filter.'
-                  : 'Pull to refresh after connecting, or open this screen again.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                color: scheme.onSurfaceVariant,
-                height: 1.45,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

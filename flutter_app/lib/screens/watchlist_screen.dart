@@ -9,6 +9,7 @@ import '../models/ws_models.dart';
 import '../bloc/watchlist_bloc.dart';
 import '../theme/em_design_system.dart';
 import '../widgets/em_brand_app_bar.dart';
+import '../widgets/em_loading_states.dart';
 
 class WatchlistScreen extends StatefulWidget {
   const WatchlistScreen({super.key});
@@ -107,13 +108,13 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
           }
 
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
             children: [
-              Text(
-                'Watchlist',
-                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+              const EmPageIntro(
+                title: 'Watchlist',
+                subtitle: 'Get alerted when priority processes start on the endpoint.',
+                padding: EdgeInsets.only(bottom: 16),
               ),
-              const SizedBox(height: 16),
               Text('ADD PROCESS', style: EmDesign.labelCaps(context, scheme)),
               const SizedBox(height: 8),
               Container(
@@ -128,9 +129,10 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                     TextField(
                       controller: _name,
                       style: GoogleFonts.jetBrainsMono(fontSize: 14),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText: 'Process name e.g. malware.exe',
-                        border: OutlineInputBorder(),
+                        filled: true,
+                        fillColor: scheme.surfaceContainerLowest,
                       ),
                       onChanged: (_) => context.read<WatchlistBloc>().clearAddError(),
                     ),
@@ -156,25 +158,16 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
               ),
               const SizedBox(height: 8),
               if (wl.serverListLoading && wl.entries.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 32),
-                  child: Center(child: CircularProgressIndicator()),
+                const EmStatusPanel(
+                  loading: true,
+                  message: 'Loading watchlist…',
                 )
               else if (wl.entries.isEmpty)
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: EmDesign.cardShell(scheme),
-                  child: Column(
-                    children: [
-                      Icon(Icons.visibility_outlined, size: 40, color: scheme.outline),
-                      const SizedBox(height: 12),
-                      Text(
-                        'No processes on watchlist — add a process name above to be alerted when it starts',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant, height: 1.4),
-                      ),
-                    ],
-                  ),
+                EmEmptyState(
+                  icon: Icons.visibility_outlined,
+                  title: 'Watchlist is empty',
+                  message:
+                      'Add a process name above to be alerted when it starts.',
                 )
               else
                 BlocBuilder<ProcessBloc, ProcessState>(

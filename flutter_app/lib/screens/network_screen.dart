@@ -17,6 +17,7 @@ import '../utils/ip_normalize.dart';
 import '../utils/network_endpoint_display.dart';
 import '../utils/throughput_format.dart';
 import '../widgets/em_brand_app_bar.dart';
+import '../widgets/em_loading_states.dart';
 
 class NetworkScreen extends StatefulWidget {
   const NetworkScreen({super.key, this.highlightThreats = false});
@@ -393,7 +394,7 @@ class _NetworkScreenState extends State<NetworkScreen>
                 return BlocBuilder<NetworkBloc, NetworkState>(
                   builder: (context, state) {
                 if (state.loading && state.items.isEmpty) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const EmListSkeleton();
                 }
 
                 final merged =
@@ -465,6 +466,17 @@ class _NetworkScreenState extends State<NetworkScreen>
                   slivers: [
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      sliver: SliverToBoxAdapter(
+                        child: const EmPageIntro(
+                          title: 'Network',
+                          subtitle:
+                              'Active sockets, geo context, blocks, and threat matches.',
+                          padding: EdgeInsets.only(bottom: 12),
+                        ),
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
                       sliver: SliverToBoxAdapter(
                         child: BlocBuilder<SystemInfoBloc, SystemInfoState>(
                           builder: (context, si) {
@@ -650,12 +662,15 @@ class _NetworkScreenState extends State<NetworkScreen>
                     if (list.isEmpty)
                       SliverFillRemaining(
                         hasScrollBody: false,
-                        child: Center(
-                          child: Text(
-                            'No matching connections',
-                            style: theme.textTheme.bodyMedium
-                                ?.copyWith(color: scheme.onSurfaceVariant),
-                          ),
+                        child: EmEmptyState(
+                          icon: _search.text.trim().isNotEmpty ||
+                                  _hasActiveFilters
+                              ? Icons.search_off_rounded
+                              : Icons.lan_outlined,
+                          title: 'No matching connections',
+                          message: _hasActiveFilters || _search.text.trim().isNotEmpty
+                              ? 'Adjust filters or clear search to see more sockets.'
+                              : 'Connections will appear when the endpoint reports network activity.',
                         ),
                       )
                     else

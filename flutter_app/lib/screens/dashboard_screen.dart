@@ -13,6 +13,8 @@ import '../models/ws_models.dart';
 import '../theme/em_design_system.dart';
 import '../widgets/activity_heatmap_card.dart';
 import '../widgets/em_brand_app_bar.dart';
+import '../widgets/em_gradient_button.dart';
+import '../widgets/em_loading_states.dart';
 
 /// Dashboard aligned with [flutter_design/dashboard_with_system_identity/code.html].
 class DashboardScreen extends StatelessWidget {
@@ -43,7 +45,7 @@ class DashboardScreen extends StatelessWidget {
                   _looksLikeIpv4(hostDisplay) ? hostDisplay : '—';
 
               return SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -56,38 +58,36 @@ class DashboardScreen extends StatelessWidget {
                         theme: theme,
                       ),
                     ] else ...[
-                      const SizedBox(height: 20),
+                      const EmPageIntro(
+                        title: 'Dashboard',
+                        subtitle:
+                            'Live endpoint health, activity, and system identity.',
+                        padding: EdgeInsets.only(top: 8, bottom: 16),
+                      ),
                       const _DashboardActivityHeatmap(),
                       const SizedBox(height: 16),
                       const _DashboardThreatIntelCard(),
                       const SizedBox(height: 24),
-                      if (i == null)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 32),
-                          child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                SizedBox(
-                                  width: 26,
-                                  height: 26,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    color: scheme.primary,
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 320),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        child: i == null
+                            ? Column(
+                                key: const ValueKey('metrics-loading'),
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  EmStatusPanel(
+                                    loading: true,
+                                    message: 'Syncing system metrics…',
                                   ),
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  'Waiting for system metrics…',
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: scheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      else ...[
+                                  const EmDashboardMetricsSkeleton(),
+                                ],
+                              )
+                            : Column(
+                                key: const ValueKey('metrics-loaded'),
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
                         BlocBuilder<AlertsBloc, AlertsState>(
                           builder: (context, alerts) {
                             final unacked = alerts.items
@@ -167,7 +167,9 @@ class DashboardScreen extends StatelessWidget {
                             );
                           },
                         ),
-                      ],
+                                ],
+                              ),
+                      ),
                     ],
                   ],
                 ),
@@ -240,7 +242,9 @@ class _DashboardConnectionHero extends StatelessWidget {
             border: EmDesign.ghostBorder(scheme),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.35),
+                color: scheme.onSurface.withValues(
+                  alpha: scheme.brightness == Brightness.dark ? 0.18 : 0.08,
+                ),
                 blurRadius: 24,
                 offset: const Offset(0, 12),
               ),
@@ -369,34 +373,13 @@ class _DashboardDisconnectedMetrics extends StatelessWidget {
     return BlocBuilder<ConnectionBloc, EmConnectionState>(
       builder: (context, c) {
         if (c.status == ConnectionStatus.connecting) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 40),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: scheme.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    'Reconnecting…',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          return EmStatusPanel(
+            loading: true,
+            message: 'Reconnecting to the secure channel…',
           );
         }
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 24),
+          padding: const EdgeInsets.symmetric(vertical: 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -419,15 +402,22 @@ class _DashboardDisconnectedMetrics extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
+              ] else ...[
+                EmStatusPanel(
+                  icon: Icons.cloud_off_rounded,
+                  message:
+                      'Connection lost. Reconnect to resume live monitoring.',
+                ),
+                const SizedBox(height: 8),
               ],
-              FilledButton.icon(
+              EmGradientButton(
+                label: 'Reconnect',
+                icon: Icons.link_rounded,
                 onPressed: () {
                   context.read<ConnectionBloc>().add(
                         const ConnectionReconnectRequested(),
                       );
                 },
-                icon: const Icon(Icons.link_rounded),
-                label: const Text('Reconnect'),
               ),
             ],
           ),
@@ -561,12 +551,7 @@ class _CpuLoadCard extends StatelessWidget {
                   children: [
                     Text(
                       'CPU LOAD',
-                      style: mono.copyWith(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 2,
-                        color: scheme.outline,
-                      ),
+                      style: EmDesign.labelCaps(context, scheme),
                     ),
                     const SizedBox(height: 4),
                     Text.rich(
@@ -600,7 +585,18 @@ class _CpuLoadCard extends StatelessWidget {
               painter: _CpuChartPainter(tertiary: scheme.tertiary),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              'Illustrative trend',
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontSize: 9,
+                color: scheme.outline.withValues(alpha: 0.75),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -1194,36 +1190,56 @@ class _SummaryMetricsPair extends StatelessWidget {
     // Rounded rects cannot use [Border] with different colors per side (Flutter asserts).
     // Uniform ghost edge + a solid left accent strip matches the mock without breaking paint.
     // [Stack] avoids Row+stretch under unbounded height (scroll Column → Expanded → ∞).
-    Widget tile(String value, String label, Color accent) {
-      return Container(
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainer,
+    Widget tile(
+      String value,
+      String label,
+      Color accent,
+      VoidCallback onTap,
+    ) {
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(radiusCard),
-          border: EmDesign.ghostBorder(scheme),
-        ),
-        child: Stack(
-          children: [
-            Positioned(
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: 4,
-              child: ColoredBox(color: accent),
+          child: Ink(
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainer,
+              borderRadius: BorderRadius.circular(radiusCard),
+              border: EmDesign.ghostBorder(scheme),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(22, 22, 22, 22),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(value, style: big),
-                  const SizedBox(height: 4),
-                  Text(label.toUpperCase(), style: sub),
-                ],
-              ),
+            child: Stack(
+              children: [
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: 4,
+                  child: ColoredBox(color: accent),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 22, 22, 22),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(value, style: big),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Expanded(child: Text(label.toUpperCase(), style: sub)),
+                          Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 16,
+                            color: accent.withValues(alpha: 0.65),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       );
     }
@@ -1236,6 +1252,7 @@ class _SummaryMetricsPair extends StatelessWidget {
             '$processCount',
             'Processes',
             scheme.primary,
+            () => context.goNamed('processes'),
           ),
         ),
         const SizedBox(width: 16),
@@ -1244,6 +1261,7 @@ class _SummaryMetricsPair extends StatelessWidget {
             '$networkCount',
             'Net Conns',
             scheme.tertiary,
+            () => context.goNamed('network'),
           ),
         ),
       ],
@@ -1274,26 +1292,36 @@ class _AlertsStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: scheme.error.withValues(alpha: 0.12),
+    return Material(
+      color: scheme.error.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+      child: InkWell(
+        onTap: () => context.pushNamed('alerts'),
         borderRadius: BorderRadius.circular(EmDesign.radiusMd),
-        border: Border.all(color: scheme.error.withValues(alpha: 0.35)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.warning_amber_rounded, color: scheme.error, size: 22),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              '$count unread alert${count == 1 ? '' : 's'} — open Alerts for details.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+            border: Border.all(color: scheme.error.withValues(alpha: 0.35)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: scheme.error, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '$count unread alert${count == 1 ? '' : 's'} — tap to review.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: scheme.error),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1430,6 +1458,35 @@ class _DashboardThreatIntelCard extends StatelessWidget {
     final theme = Theme.of(context);
     return BlocBuilder<ThreatIntelBloc, ThreatIntelState>(
       builder: (context, ti) {
+        if (ti.loading &&
+            ti.entryCount == 0 &&
+            (ti.lastError == null || ti.lastError!.isEmpty)) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: EmDesign.cardShell(scheme),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: scheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Loading threat intelligence…',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
         if (ti.entryCount == 0 &&
             (ti.lastError == null || ti.lastError!.isEmpty)) {
           return const SizedBox.shrink();

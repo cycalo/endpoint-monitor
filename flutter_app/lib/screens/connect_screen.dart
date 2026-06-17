@@ -13,6 +13,7 @@ import '../theme/em_design_system.dart';
 import '../utils/export_http_base.dart';
 import '../widgets/em_brand_app_bar.dart';
 import '../widgets/em_gradient_button.dart';
+import '../widgets/em_loading_states.dart';
 import '../widgets/em_technical_grid.dart';
 
 /// Same keys as [ConnectionBloc] for host and paired device token.
@@ -103,16 +104,40 @@ class _ConnectScreenState extends State<ConnectScreen> {
         context: context,
         builder: (ctx) {
           final theme = Theme.of(ctx);
+          final scheme = theme.colorScheme;
           return AlertDialog(
-            title: const Text('Pairing code'),
-            content: TextField(
-              controller: codeController,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              decoration: const InputDecoration(
-                hintText: 'Code from Windows tray',
-                counterText: '',
-              ),
+            title: Text(
+              'Pairing code',
+              style: theme.textTheme.titleLarge,
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Enter the six-digit code shown in the Windows tray app.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: EmDesign.spaceMd),
+                TextField(
+                  controller: codeController,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.jetBrainsMono(
+                    fontSize: 22,
+                    letterSpacing: 8,
+                    color: scheme.onSurface,
+                  ),
+                  decoration: const InputDecoration(
+                    hintText: '000000',
+                    counterText: '',
+                  ),
+                ),
+              ],
             ),
             actions: [
               TextButton(
@@ -121,10 +146,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
               ),
               FilledButton(
                 onPressed: () => Navigator.of(ctx).pop(codeController.text.trim()),
-                child: Text(
-                  'Pair',
-                  style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary),
-                ),
+                child: const Text('Pair device'),
               ),
             ],
           );
@@ -286,6 +308,12 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 22),
+                                  if (_hasDeviceToken == null)
+                                    const EmStatusPanel(
+                                      loading: true,
+                                      message: 'Checking device pairing…',
+                                    )
+                                  else ...[
                                   if (_recent.isNotEmpty) ...[
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -512,6 +540,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                       padding: const EdgeInsets.symmetric(vertical: 14),
                                     ),
                                   ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -588,15 +617,7 @@ class _LabeledField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label.toUpperCase(),
-          style: GoogleFonts.inter(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 1,
-            color: scheme.onSurfaceVariant,
-          ),
-        ),
+        Text(label.toUpperCase(), style: EmDesign.labelCaps(context, scheme)),
         const SizedBox(height: 8),
         child,
       ],

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -15,8 +16,9 @@ import '../bloc/network_bloc.dart';
 import '../bloc/process_bloc.dart';
 import '../bloc/watchlist_bloc.dart';
 import '../models/ws_models.dart';
-import '../settings/groq_testing_defaults.dart';
+import '../settings/app_settings_keys.dart';
 import '../theme/em_design_system.dart';
+import '../widgets/em_loading_states.dart';
 import '../widgets/process_control_buttons.dart';
 import '../widgets/process_virus_total_sheet.dart';
 import '../widgets/process_watchlist_flag_action.dart';
@@ -463,7 +465,10 @@ class _OverviewTabState extends State<_OverviewTab> {
           s.loading && _snapshotForPid(s, pid, isKilledGhost) == null,
       builder: (context, showSpinner) {
         if (showSpinner) {
-          return const Center(child: CircularProgressIndicator());
+          return const EmStatusPanel(
+            loading: true,
+            message: 'Loading process snapshot…',
+          );
         }
         return BlocSelector<ProcessBloc, ProcessState, bool>(
           selector: (s) {
@@ -476,18 +481,15 @@ class _OverviewTabState extends State<_OverviewTab> {
           },
           builder: (context, exists) {
             if (!exists) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Text(
-                    isKilledGhost
-                        ? 'This killed-process entry is no longer available. It may have been dismissed or the list refreshed.'
-                        : 'This process is not in the current snapshot. It may have exited.',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
+              return EmEmptyState(
+                icon: Icons.memory_outlined,
+                title: isKilledGhost ? 'Entry removed' : 'Process ended',
+                message: isKilledGhost
+                    ? 'This killed-process entry was dismissed or the list refreshed.'
+                    : 'This process is not in the current snapshot — it may have exited.',
+                action: FilledButton(
+                  onPressed: () => context.pop(),
+                  child: const Text('Back to processes'),
                 ),
               );
             }
@@ -1063,8 +1065,18 @@ class _ExplainProcessSectionState extends State<_ExplainProcessSection> {
   Future<void> _explain() async {
     final netBloc = context.read<NetworkBloc>();
     const storage = FlutterSecureStorage();
-    final stored = (await storage.read(key: 'groq_api_key') ?? '').trim();
-    final key = stored.isNotEmpty ? stored : kDefaultGroqApiKeyForTesting;
+    final key = (await storage.read(key: AppSettingsKeys.groqApiKey) ?? '').trim();
+    if (key.isEmpty) {
+      _explainCache[widget.pid] = ExplainResult(
+        rawError:
+            'No Groq API key configured — add your key in Settings → GROQ AI',
+        timestamp: DateTime.now(),
+        isError: true,
+      );
+      _persistExplainCache();
+      if (mounted) setState(() {});
+      return;
+    }
 
     setState(() => _loading = true);
 

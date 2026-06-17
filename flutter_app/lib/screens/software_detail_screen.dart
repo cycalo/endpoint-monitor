@@ -119,15 +119,7 @@ class _SoftwareDetailScreenState extends State<SoftwareDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              label,
-              style: GoogleFonts.inter(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.2,
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
+            Text(label.toUpperCase(), style: EmDesign.labelCaps(context, scheme)),
             const SizedBox(height: 6),
             SelectableText(
               v,
@@ -164,6 +156,13 @@ class _SoftwareDetailScreenState extends State<SoftwareDetailScreen> {
               fontWeight: FontWeight.w800,
               color: scheme.onSurface,
               height: 1.2,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Installed application details',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 20),
