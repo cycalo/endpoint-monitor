@@ -18,6 +18,21 @@ abstract final class EmDesign {
   /// Screen content padding above bottom nav safe area.
   static const double scrollBottomInset = 96;
 
+  /// Control screen left-accent colors derived from the active [ColorScheme].
+  static Color controlSession(ColorScheme scheme) => scheme.tertiary;
+
+  static Color controlPowerWarn(ColorScheme scheme) =>
+      Color.lerp(scheme.error, scheme.tertiary, 0.42)!;
+
+  static Color controlPowerCritical(ColorScheme scheme) => scheme.error;
+
+  static Color controlDisplay(ColorScheme scheme) => scheme.primary;
+
+  static Color controlCancel(ColorScheme scheme) => scheme.onSurfaceVariant;
+
+  static Color controlAudio(ColorScheme scheme) =>
+      Color.lerp(scheme.primary, scheme.tertiary, 0.35)!;
+
   /// "Ghost border" — outline_variant @ ~15% (DESIGN.md §2 / §4).
   static Color ghostLine(ColorScheme scheme) =>
       scheme.outlineVariant.withValues(alpha: 0.15);

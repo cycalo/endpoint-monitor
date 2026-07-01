@@ -4,10 +4,12 @@ using System.Drawing.Imaging;
 using System.Linq;
 using System.Diagnostics;
 using System.Management;
+using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using EndpointMonitorService.Collectors;
 using EndpointMonitorService.Database;
@@ -60,6 +62,42 @@ public sealed class ResponseCommandService(
         "winlogon.exe", "fontdrvhost.exe", "sihost.exe"
     };
 
+    private static readonly Regex SafeProcessName = new(
+        @"^[\w\s\-\.]+\.exe$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    private static readonly HashSet<string> NetshIpKeywords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "any", "localsubnet", "dns", "dhcp", "wins", "defaultgateway"
+    };
+
+    private static CommandResult Fail(ILogger logger, string command, string code, Exception? ex = null)
+    {
+        if (ex != null)
+            logger.LogWarning(ex, "Command {Command} failed ({Code})", command, code);
+        return new CommandResult(false, command, code);
+    }
+
+    private static bool TryValidateFirewallIp(string? ip, out string normalized)
+    {
+        normalized = "";
+        if (string.IsNullOrWhiteSpace(ip)) return false;
+        var trimmed = ip.Trim();
+        if (NetshIpKeywords.Contains(trimmed)) return false;
+        if (trimmed.Contains(' ') || trimmed.Contains('%')) return false;
+        if (!IPAddress.TryParse(trimmed, out var addr)) return false;
+        normalized = addr.ToString();
+        return true;
+    }
+
+    private static bool IsSafeProcessName(string name) => SafeProcessName.IsMatch(name);
+
+    private static bool IsProtectedPid(int pid, out string? processName)
+    {
+        processName = GetProcessName(pid);
+        return processName != null && ProtectedNames.Contains(processName);
+    }
+
     public async Task<CommandResult> HandleAsync(string type, JsonElement root, string? clientIp, CancellationToken cancellationToken)
     {
         try
@@ -106,8 +144,7 @@ public sealed class ResponseCommandService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Command {Type} failed", type);
-            return new CommandResult(false, type, ex.Message);
+            return Fail(logger, type, "command_failed", ex);
         }
     }
 
@@ -151,8 +188,7 @@ public sealed class ResponseCommandService(
         if (!root.TryGetProperty("pid", out var pidEl) || !pidEl.TryGetInt32(out var pid))
             return new CommandResult(false, "kill_process", "invalid_pid");
 
-        var name = GetProcessName(pid);
-        if (name != null && ProtectedNames.Contains(name))
+        if (IsProtectedPid(pid, out _))
             return new CommandResult(false, "kill_process", "protected_process");
 
         try
@@ -164,7 +200,7 @@ public sealed class ResponseCommandService(
         }
         catch (Exception ex)
         {
-            return new CommandResult(false, "kill_process", ex.Message, null, pid);
+            return Fail(logger, "kill_process", "kill_failed", ex);
         }
     }
 
@@ -215,7 +251,9 @@ public sealed class ResponseCommandService(
 
     private async Task<CommandResult> BlockIpAsync(JsonElement root, string? clientIp, CancellationToken cancellationToken)
     {
-        var ip = root.GetProperty("ip").GetString() ?? "";
+        var ipRaw = root.GetProperty("ip").GetString();
+        if (!TryValidateFirewallIp(ipRaw, out var ip))
+            return new CommandResult(false, "block_ip", "invalid_ip");
         var dirRaw = root.TryGetProperty("direction", out var d) ? d.GetString() : null;
         var dir = NormalizeFirewallDirection(dirRaw);
         var sourceProcess = root.TryGetProperty("sourceProcess", out var sp) ? sp.GetString() : null;
@@ -256,6 +294,8 @@ public sealed class ResponseCommandService(
 
     private static string? TryGetExecutablePathForProcessName(string processName)
     {
+        if (!IsSafeProcessName(processName))
+            return null;
         try
         {
             var n = processName.Replace("'", "''", StringComparison.Ordinal);
@@ -290,6 +330,8 @@ public sealed class ResponseCommandService(
             return new CommandResult(false, "block_process", "invalid_name");
         if (!name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
             name += ".exe";
+        if (!IsSafeProcessName(name))
+            return new CommandResult(false, "block_process", "invalid_name");
         var dir = NormalizeFirewallDirection(root.TryGetProperty("direction", out var d) ? d.GetString() : null);
         var path = TryGetExecutablePathForProcessName(name);
         if (string.IsNullOrWhiteSpace(path))
@@ -330,16 +372,18 @@ public sealed class ResponseCommandService(
 
     private async Task<CommandResult> UnblockIpAsync(JsonElement root, string? clientIp, CancellationToken cancellationToken)
     {
-        var ip = root.GetProperty("ip").GetString() ?? "";
-        if (ip.StartsWith("port:", StringComparison.OrdinalIgnoreCase) &&
-            int.TryParse(ip.AsSpan(5), out var p) && p is >= 1 and <= 65535)
+        var ipRaw = root.GetProperty("ip").GetString() ?? "";
+        if (ipRaw.StartsWith("port:", StringComparison.OrdinalIgnoreCase) &&
+            int.TryParse(ipRaw.AsSpan(5), out var p) && p is >= 1 and <= 65535)
         {
             RunNetsh($"advfirewall firewall delete rule name=\"EM_BLOCK_PORT_{p}_out\"");
-            await database.RemoveFirewallBlockAsync(ip, cancellationToken).ConfigureAwait(false);
-            await database.AppendAuditAsync("unblock_ip", ip, clientIp, cancellationToken).ConfigureAwait(false);
+            await database.RemoveFirewallBlockAsync(ipRaw, cancellationToken).ConfigureAwait(false);
+            await database.AppendAuditAsync("unblock_ip", ipRaw, clientIp, cancellationToken).ConfigureAwait(false);
             await BroadcastFirewallAsync(cancellationToken).ConfigureAwait(false);
             return new CommandResult(true, "unblock_ip", "ok");
         }
+        if (!TryValidateFirewallIp(ipRaw, out var ip))
+            return new CommandResult(false, "unblock_ip", "invalid_ip");
         var ruleSan = SanitizeIpForRuleName(ip);
         var outRule = $"EM_BLOCK_{ruleSan}";
         var inRule = $"{outRule}_in";
@@ -456,6 +500,8 @@ public sealed class ResponseCommandService(
     {
         if (!root.TryGetProperty("pid", out var pidEl) || !pidEl.TryGetInt32(out var pid))
             return new CommandResult(false, "suspend_process", "invalid_pid");
+        if (IsProtectedPid(pid, out _))
+            return new CommandResult(false, "suspend_process", "protected_process");
         if (!NativeMethods.TryOpenProcess(pid, out var handle))
             return new CommandResult(false, "suspend_process", "open_failed", null, pid);
         try
@@ -476,6 +522,8 @@ public sealed class ResponseCommandService(
     {
         if (!root.TryGetProperty("pid", out var pidEl) || !pidEl.TryGetInt32(out var pid))
             return new CommandResult(false, "resume_process", "invalid_pid");
+        if (IsProtectedPid(pid, out _))
+            return new CommandResult(false, "resume_process", "protected_process");
         if (!NativeMethods.TryOpenProcess(pid, out var handle))
             return new CommandResult(false, "resume_process", "open_failed", null, pid);
         try
@@ -549,11 +597,15 @@ public sealed class ResponseCommandService(
 
         try
         {
+            if (!TryParseUninstallCommand(uninstallCmd, out var exePath, out var arguments))
+                return new CommandResult(false, "uninstall_software", "invalid_uninstall_string");
+
             using var p = Process.Start(new ProcessStartInfo
             {
-                FileName = "cmd.exe",
-                Arguments = "/c " + uninstallCmd,
-                UseShellExecute = true,
+                FileName = exePath,
+                Arguments = arguments,
+                UseShellExecute = false,
+                CreateNoWindow = true,
             });
             if (p == null)
                 return new CommandResult(false, "uninstall_software", "start_failed");
@@ -563,8 +615,96 @@ public sealed class ResponseCommandService(
         }
         catch (Exception ex)
         {
-            return new CommandResult(false, "uninstall_software", ex.Message);
+            return Fail(logger, "uninstall_software", "uninstall_failed", ex);
         }
+    }
+
+    /// <summary>Parses a registry UninstallString into executable + args without invoking cmd.exe.</summary>
+    private static bool TryParseUninstallCommand(string cmd, out string exePath, out string arguments)
+    {
+        exePath = "";
+        arguments = "";
+        cmd = cmd.Trim();
+        if (cmd.Length == 0) return false;
+
+        foreach (var ch in new[] { '&', '|', ';', '\r', '\n', '`', '%' })
+        {
+            if (cmd.Contains(ch, StringComparison.Ordinal))
+                return false;
+        }
+
+        string fileName;
+        string args;
+        if (cmd.StartsWith('"'))
+        {
+            var end = cmd.IndexOf('"', 1);
+            if (end < 0) return false;
+            fileName = cmd[1..end];
+            args = end + 1 < cmd.Length ? cmd[(end + 1)..].TrimStart() : "";
+        }
+        else
+        {
+            var sp = cmd.IndexOf(' ');
+            if (sp < 0)
+            {
+                fileName = cmd;
+                args = "";
+            }
+            else
+            {
+                fileName = cmd[..sp];
+                args = cmd[(sp + 1)..];
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(fileName)) return false;
+
+        try
+        {
+            fileName = Path.GetFullPath(fileName.Trim('"'));
+        }
+        catch
+        {
+            return false;
+        }
+
+        if (!File.Exists(fileName)) return false;
+
+        var exeName = Path.GetFileName(fileName);
+        if (exeName.Equals("msiexec.exe", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!Regex.IsMatch(args, @"^/(?i)(x|i|uninstall|quiet|qn|passive|norestart)(\s|$|[\{])"))
+                return false;
+        }
+        else if (!IsUnderAllowedUninstallRoot(fileName))
+        {
+            return false;
+        }
+
+        exePath = fileName;
+        arguments = args;
+        return true;
+    }
+
+    private static bool IsUnderAllowedUninstallRoot(string fullPath)
+    {
+        string[] roots =
+        [
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Installer"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System)),
+        ];
+        foreach (var root in roots)
+        {
+            if (string.IsNullOrEmpty(root)) continue;
+            var normalizedRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                + Path.DirectorySeparatorChar;
+            var normalizedPath = Path.GetFullPath(fullPath);
+            if (normalizedPath.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
     }
 
     private static RegistryKey? OpenUninstallSubKey(string subKeyName)
@@ -696,7 +836,9 @@ public sealed class ResponseCommandService(
             entryCount = active.Count,
             lastRunUtc = intel.LastSuccessfulRunUtc?.UtcDateTime.ToString("O"),
             lastEntriesWritten = intel.LastEntriesWritten,
-            lastError = intel.LastError,
+            lastError = string.IsNullOrEmpty(intel.LastError)
+                ? null
+                : (intel.LastError == "disabled" ? "disabled" : "feed_update_failed"),
             feeds
         }, AppJson.Options);
     }
@@ -747,7 +889,7 @@ public sealed class ResponseCommandService(
         }
         catch (Exception ex)
         {
-            return new CommandResult(false, "lock_screen", ex.Message);
+            return Fail(logger, "lock_screen", "lock_failed", ex);
         }
     }
 
@@ -768,7 +910,7 @@ public sealed class ResponseCommandService(
         }
         catch (Exception ex)
         {
-            return new CommandResult(false, "logoff_user", ex.Message);
+            return Fail(logger, "logoff_user", "logoff_failed", ex);
         }
     }
 
@@ -794,7 +936,7 @@ public sealed class ResponseCommandService(
         }
         catch (Exception ex)
         {
-            return new CommandResult(false, "restart_machine", ex.Message);
+            return Fail(logger, "restart_machine", "restart_failed", ex);
         }
     }
 
@@ -820,7 +962,7 @@ public sealed class ResponseCommandService(
         }
         catch (Exception ex)
         {
-            return new CommandResult(false, "shutdown_machine", ex.Message);
+            return Fail(logger, "shutdown_machine", "shutdown_failed", ex);
         }
     }
 
@@ -839,7 +981,7 @@ public sealed class ResponseCommandService(
         }
         catch (Exception ex)
         {
-            return new CommandResult(false, "sleep_machine", ex.Message);
+            return Fail(logger, "sleep_machine", "sleep_failed", ex);
         }
     }
 
@@ -867,7 +1009,7 @@ public sealed class ResponseCommandService(
         }
         catch (Exception ex)
         {
-            return new CommandResult(false, "cancel_shutdown", ex.Message);
+            return Fail(logger, "cancel_shutdown", "cancel_failed", ex);
         }
     }
 
@@ -882,7 +1024,7 @@ public sealed class ResponseCommandService(
         }
         catch (Exception ex)
         {
-            return new CommandResult(false, "turn_off_display", ex.Message);
+            return Fail(logger, "turn_off_display", "display_failed", ex);
         }
     }
 
@@ -903,7 +1045,7 @@ public sealed class ResponseCommandService(
         }
         catch (Exception ex)
         {
-            return new CommandResult(false, "set_volume", ex.Message);
+            return Fail(logger, "set_volume", "volume_failed", ex);
         }
     }
 
@@ -917,7 +1059,7 @@ public sealed class ResponseCommandService(
         }
         catch (Exception ex)
         {
-            return new CommandResult(false, "toggle_mute", ex.Message);
+            return Fail(logger, "toggle_mute", "mute_failed", ex);
         }
     }
 
@@ -935,7 +1077,7 @@ public sealed class ResponseCommandService(
         }
         catch (Exception ex)
         {
-            return new CommandResult(false, "capture_desktop_screenshot", ex.Message);
+            return Fail(logger, "capture_desktop_screenshot", "screenshot_failed", ex);
         }
     }
 

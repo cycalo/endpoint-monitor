@@ -734,6 +734,26 @@ class _EventsScreenState extends State<EventsScreen>
                   onChanged: (_) => setState(() {}),
                 ),
                   const SizedBox(height: 10),
+                  LayoutBuilder(
+                    builder: (context, c) {
+                      if (c.maxWidth >= 460) return const SizedBox.shrink();
+                      return Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          onPressed: _openFiltersSheet,
+                          icon: Icon(
+                            Icons.tune_rounded,
+                            size: 18,
+                            color: scheme.primary,
+                          ),
+                          label: Text(
+                            _hasActiveFilters ? 'Edit filters' : 'Filters',
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 4),
                   if (widget.focusHourUtc != null &&
                       widget.focusHourUtc!.isNotEmpty)
                     Padding(

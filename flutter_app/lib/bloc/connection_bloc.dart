@@ -7,6 +7,7 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../task/task_entry.dart';
+import '../utils/ws_url.dart';
 
 enum ConnectionStatus { disconnected, connecting, connected, error }
 
@@ -102,8 +103,6 @@ class ConnectionTaskMessage extends ConnectionEvent {
 }
 
 class ConnectionBloc extends Bloc<ConnectionEvent, EmConnectionState> {
-  static const _defaultMonitorPort = 5000;
-
   ConnectionBloc(this._storage)
       : super(const EmConnectionState(status: ConnectionStatus.disconnected)) {
     on<ConnectionStarted>(_onStarted);
@@ -149,11 +148,9 @@ class ConnectionBloc extends Bloc<ConnectionEvent, EmConnectionState> {
       ConnectionConnectRequested event, Emitter<EmConnectionState> emit) async {
     emit(state.copyWith(
         status: ConnectionStatus.connecting, message: null, host: event.host));
-    final wsUrl = _normalizeWsUrl(event.host);
+    final wsUrl = normalizeMonitorWsUrl(event.host);
     await _storage.write(key: _hostKey, value: event.host.trim());
     await _storage.write(key: _tokenKey, value: event.token);
-    await FlutterForegroundTask.saveData(key: 'ws_host', value: wsUrl);
-    await FlutterForegroundTask.saveData(key: 'ws_token', value: event.token);
 
     final running = await FlutterForegroundTask.isRunningService;
     if (running) {
@@ -178,6 +175,11 @@ class ConnectionBloc extends Bloc<ConnectionEvent, EmConnectionState> {
           emit(state.copyWith(
               status: ConnectionStatus.error, message: error.toString()));
         case ServiceRequestSuccess():
+          FlutterForegroundTask.sendDataToTask(<String, Object?>{
+            'action': 'em_connect',
+            'host': wsUrl,
+            'token': event.token,
+          });
           break;
       }
     }
@@ -214,6 +216,18 @@ class ConnectionBloc extends Bloc<ConnectionEvent, EmConnectionState> {
         <String, Object?>{'action': 'em_measure_ping'});
   }
 
+  /// Pull one-shot dashboard payloads after the secure channel is up.
+  void _requestInitialSnapshots() {
+    FlutterForegroundTask.sendDataToTask(
+        jsonEncode({'type': 'get_system_info'}));
+    FlutterForegroundTask.sendDataToTask(
+        jsonEncode({'type': 'get_timeline', 'hours': 24}));
+    FlutterForegroundTask.sendDataToTask(
+        jsonEncode({'type': 'get_threat_intel_status'}));
+    FlutterForegroundTask.sendDataToTask(
+        jsonEncode({'type': 'get_threat_intel_entries'}));
+  }
+
   void _onTaskMessage(
       ConnectionTaskMessage event, Emitter<EmConnectionState> emit) {
     final t = event.raw['type']?.toString();
@@ -241,8 +255,7 @@ class ConnectionBloc extends Bloc<ConnectionEvent, EmConnectionState> {
             message: null,
             connectedAt: DateTime.now(),
           ));
-          FlutterForegroundTask.sendDataToTask(
-              jsonEncode({'type': 'get_system_info'}));
+          _requestInitialSnapshots();
           break;
         case 'connecting':
           emit(state.copyWith(status: ConnectionStatus.connecting));
@@ -261,45 +274,6 @@ class ConnectionBloc extends Bloc<ConnectionEvent, EmConnectionState> {
           break;
       }
     }
-  }
-
-  static String _normalizeWsUrl(String host) {
-    final t = host.trim();
-    if (t.startsWith('ws://') || t.startsWith('wss://')) {
-      final uri = Uri.parse(t);
-      final normalizedUri = uri.hasPort
-          ? uri
-          : uri.replace(port: _defaultMonitorPort);
-      final normalized = normalizedUri.toString();
-      return normalized.endsWith('/ws')
-          ? normalized
-          : (normalized.endsWith('/') ? '${normalized}ws' : '$normalized/ws');
-    }
-    final withPort = _appendDefaultPortIfMissing(t);
-    return 'ws://$withPort/ws';
-  }
-
-  static String _appendDefaultPortIfMissing(String host) {
-    final trimmed = host.trim();
-    if (trimmed.isEmpty) return trimmed;
-    if (trimmed.startsWith('[') && trimmed.contains(']:')) return trimmed;
-    if (trimmed.contains('/') || trimmed.contains('?') || trimmed.contains('#')) {
-      final uri = Uri.parse(trimmed.startsWith('http://') || trimmed.startsWith('https://')
-          ? trimmed
-          : 'http://$trimmed');
-      if (uri.hasPort) return trimmed;
-      final replaced = uri.replace(port: _defaultMonitorPort).toString();
-      return trimmed.startsWith('http://') || trimmed.startsWith('https://')
-          ? replaced
-          : replaced.replaceFirst(RegExp(r'^http://'), '');
-    }
-    if (trimmed.contains(':') && !trimmed.contains('.')) return trimmed;
-    final lastColon = trimmed.lastIndexOf(':');
-    if (lastColon > -1) {
-      final suffix = trimmed.substring(lastColon + 1);
-      if (int.tryParse(suffix) != null) return trimmed;
-    }
-    return '$trimmed:$_defaultMonitorPort';
   }
 
   @override

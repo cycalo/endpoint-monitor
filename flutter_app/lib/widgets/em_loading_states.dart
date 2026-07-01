@@ -420,3 +420,182 @@ class EmDashboardMetricsSkeleton extends StatelessWidget {
     );
   }
 }
+
+/// Banner when showing cached data while disconnected from the live channel.
+class EmStaleSnapshotBanner extends StatelessWidget {
+  const EmStaleSnapshotBanner({
+    super.key,
+    this.cachedAt,
+    this.compact = false,
+  });
+
+  final DateTime? cachedAt;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final age = cachedAt != null
+        ? _ageLabel(DateTime.now().toUtc().difference(cachedAt!.toUtc()))
+        : null;
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+        horizontal: EmDesign.spaceMd,
+        vertical: compact ? EmDesign.spaceSm : EmDesign.spaceSm + 2,
+      ),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHigh.withValues(alpha: 0.65),
+        borderRadius: BorderRadius.circular(EmDesign.radiusMd),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.history_rounded, size: 18, color: scheme.onSurfaceVariant),
+          const SizedBox(width: EmDesign.spaceSm),
+          Expanded(
+            child: Text(
+              age != null
+                  ? 'Offline snapshot · last updated $age'
+                  : 'Offline snapshot · reconnect for live data',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+                height: 1.35,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _ageLabel(Duration d) {
+    if (d.inMinutes < 1) return 'just now';
+    if (d.inHours < 1) return '${d.inMinutes}m ago';
+    if (d.inDays < 1) return '${d.inHours}h ago';
+    return '${d.inDays}d ago';
+  }
+}
+
+/// Settings / grouped form section with optional unsaved indicator.
+class EmSettingsSection extends StatelessWidget {
+  const EmSettingsSection({
+    super.key,
+    required this.title,
+    required this.child,
+    this.dirty = false,
+    this.trailing,
+  });
+
+  final String title;
+  final Widget child;
+  final bool dirty;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: EmDesign.spaceXs),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(title, style: EmDesign.labelCaps(context, scheme)),
+              ),
+              if (dirty)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: scheme.primaryContainer.withValues(alpha: 0.45),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    'UNSAVED',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: scheme.onPrimaryContainer,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 9,
+                          letterSpacing: 0.8,
+                        ),
+                  ),
+                ),
+              if (trailing != null) trailing!,
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.all(EmDesign.spaceMd),
+          decoration: EmDesign.cardShell(scheme),
+          child: child,
+        ),
+      ],
+    );
+  }
+}
+
+/// Collapsible list for long rule/block collections (Firewall, etc.).
+class EmCollapsibleBlockList<T> extends StatefulWidget {
+  const EmCollapsibleBlockList({
+    super.key,
+    required this.items,
+    required this.itemBuilder,
+    this.initialVisible = 3,
+    this.empty,
+  });
+
+  final List<T> items;
+  final Widget Function(BuildContext context, T item) itemBuilder;
+  final int initialVisible;
+  final Widget? empty;
+
+  @override
+  State<EmCollapsibleBlockList<T>> createState() =>
+      _EmCollapsibleBlockListState<T>();
+}
+
+class _EmCollapsibleBlockListState<T> extends State<EmCollapsibleBlockList<T>> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.items.isEmpty) {
+      return widget.empty ?? const SizedBox.shrink();
+    }
+    final showAll = _expanded || widget.items.length <= widget.initialVisible;
+    final visible = showAll
+        ? widget.items
+        : widget.items.take(widget.initialVisible).toList();
+    final hidden = widget.items.length - visible.length;
+    final scheme = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final item in visible)
+          Padding(
+            padding: const EdgeInsets.only(bottom: EmDesign.spaceSm),
+            child: widget.itemBuilder(context, item),
+          ),
+        if (!showAll && hidden > 0)
+          TextButton.icon(
+            onPressed: () => setState(() => _expanded = true),
+            icon: Icon(Icons.unfold_more_rounded, color: scheme.primary),
+            label: Text('Show $hidden more'),
+          )
+        else if (_expanded && widget.items.length > widget.initialVisible)
+          TextButton.icon(
+            onPressed: () => setState(() => _expanded = false),
+            icon: Icon(Icons.unfold_less_rounded, color: scheme.primary),
+            label: const Text('Show less'),
+          ),
+      ],
+    );
+  }
+}

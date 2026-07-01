@@ -470,29 +470,26 @@ class _FirewallScreenState extends State<FirewallScreen>
                               const SizedBox(height: 10),
                               if (showSkeleton)
                                 const _BlocksSkeleton()
-                              else if (fw.ipAndPortBlocks.isEmpty)
-                                EmEmptyState(
-                                  icon: Icons.shield_outlined,
-                                  title: 'No active blocks',
-                                  message:
-                                      'Connections are unrestricted on this endpoint.',
-                                )
                               else
-                                ...fw.ipAndPortBlocks.map(
-                                  (e) => Padding(
-                                    padding: const EdgeInsets.only(bottom: 10),
-                                    child: _BlockTile(
-                                      entry: e,
-                                      scheme: scheme,
-                                      theme: theme,
-                                      relative: _relativeTime(e.createdAt),
-                                      directionLabel:
-                                          _directionLabel(e.direction),
-                                      enabled: connected &&
-                                          fw.errorMessage == null,
-                                      onUnblock: () =>
-                                          _confirmUnblock(context, e),
-                                    ),
+                                EmCollapsibleBlockList(
+                                  items: fw.ipAndPortBlocks,
+                                  empty: EmEmptyState(
+                                    icon: Icons.shield_outlined,
+                                    title: 'No active blocks',
+                                    message:
+                                        'Connections are unrestricted on this endpoint.',
+                                  ),
+                                  itemBuilder: (context, e) => _BlockTile(
+                                    entry: e,
+                                    scheme: scheme,
+                                    theme: theme,
+                                    relative: _relativeTime(e.createdAt),
+                                    directionLabel:
+                                        _directionLabel(e.direction),
+                                    enabled:
+                                        connected && fw.errorMessage == null,
+                                    onUnblock: () =>
+                                        _confirmUnblock(context, e),
                                   ),
                                 ),
                               const SizedBox(height: 20),
@@ -543,29 +540,26 @@ class _FirewallScreenState extends State<FirewallScreen>
                               const SizedBox(height: 10),
                               if (showSkeleton)
                                 const _BlocksSkeleton()
-                              else if (fw.processBlocks.isEmpty)
-                                EmEmptyState(
-                                  icon: Icons.apps_outlined,
-                                  title: 'No process rules',
-                                  message:
-                                      'No process-based firewall rules are configured.',
-                                )
                               else
-                                ...fw.processBlocks.map(
-                                  (e) => Padding(
-                                    padding: const EdgeInsets.only(bottom: 10),
-                                    child: _BlockTile(
-                                      entry: e,
-                                      scheme: scheme,
-                                      theme: theme,
-                                      relative: _relativeTime(e.createdAt),
-                                      directionLabel:
-                                          _directionLabel(e.direction),
-                                      enabled: connected &&
-                                          fw.errorMessage == null,
-                                      onUnblock: () =>
-                                          _confirmUnblock(context, e),
-                                    ),
+                                EmCollapsibleBlockList(
+                                  items: fw.processBlocks,
+                                  empty: EmEmptyState(
+                                    icon: Icons.apps_outlined,
+                                    title: 'No process rules',
+                                    message:
+                                        'No process-based firewall rules are configured.',
+                                  ),
+                                  itemBuilder: (context, e) => _BlockTile(
+                                    entry: e,
+                                    scheme: scheme,
+                                    theme: theme,
+                                    relative: _relativeTime(e.createdAt),
+                                    directionLabel:
+                                        _directionLabel(e.direction),
+                                    enabled:
+                                        connected && fw.errorMessage == null,
+                                    onUnblock: () =>
+                                        _confirmUnblock(context, e),
                                   ),
                                 ),
                               const SizedBox(height: 16),

@@ -16,13 +16,6 @@ import '../theme/em_design_system.dart';
 import '../widgets/em_brand_app_bar.dart';
 import '../widgets/em_loading_states.dart';
 
-const _borderSession = Color(0xFF00838F);
-const _borderPowerAmber = Color(0xFFFF8F00);
-const _borderPowerRed = Color(0xFFC62828);
-const _borderDisplay = Color(0xFF1565C0);
-const _borderCancel = Color(0xFF757575);
-const _borderAudio = Color(0xFF7B1FA2);
-
 class ControlsScreen extends StatelessWidget {
   const ControlsScreen({super.key});
 
@@ -98,7 +91,7 @@ class ControlsScreen extends StatelessWidget {
                       ),
                     _sectionTitle(context, scheme, 'SESSION'),
                     _ControlCard(
-                      borderColor: _borderSession,
+                      borderColor: EmDesign.controlSession(scheme),
                       muted: false,
                       enabled: connected,
                       commandType: 'lock_screen',
@@ -112,7 +105,7 @@ class ControlsScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     _ControlCard(
-                      borderColor: _borderSession,
+                      borderColor: EmDesign.controlSession(scheme),
                       muted: false,
                       enabled: connected,
                       commandType: 'logoff_user',
@@ -128,7 +121,7 @@ class ControlsScreen extends StatelessWidget {
                     const SizedBox(height: 20),
                     _sectionTitle(context, scheme, 'POWER'),
                     _ControlCard(
-                      borderColor: _borderPowerAmber,
+                      borderColor: EmDesign.controlPowerWarn(scheme),
                       muted: false,
                       enabled: connected,
                       commandType: 'restart_machine',
@@ -140,7 +133,7 @@ class ControlsScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     _ControlCard(
-                      borderColor: _borderPowerRed,
+                      borderColor: EmDesign.controlPowerCritical(scheme),
                       muted: false,
                       enabled: connected,
                       commandType: 'shutdown_machine',
@@ -152,7 +145,7 @@ class ControlsScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     _ControlCard(
-                      borderColor: _borderPowerAmber,
+                      borderColor: EmDesign.controlPowerWarn(scheme),
                       muted: false,
                       enabled: connected,
                       commandType: 'sleep_machine',
@@ -165,7 +158,7 @@ class ControlsScreen extends StatelessWidget {
                     const SizedBox(height: 20),
                     _sectionTitle(context, scheme, 'DISPLAY'),
                     _ControlCard(
-                      borderColor: _borderDisplay,
+                      borderColor: EmDesign.controlDisplay(scheme),
                       muted: false,
                       enabled: connected,
                       commandType: 'turn_off_display',
@@ -179,7 +172,7 @@ class ControlsScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     _ControlCard(
-                      borderColor: _borderDisplay,
+                      borderColor: EmDesign.controlDisplay(scheme),
                       muted: false,
                       enabled: connected,
                       commandType: 'capture_desktop_screenshot',
@@ -195,7 +188,7 @@ class ControlsScreen extends StatelessWidget {
                     const SizedBox(height: 20),
                     _sectionTitle(context, scheme, 'CANCEL'),
                     _ControlCard(
-                      borderColor: _borderCancel,
+                      borderColor: EmDesign.controlCancel(scheme),
                       muted: true,
                       enabled: connected,
                       commandType: 'cancel_shutdown',
@@ -742,7 +735,7 @@ class _SystemVolumeCardState extends State<_SystemVolumeCard> {
               Container(
                 width: 4,
                 decoration: BoxDecoration(
-                  color: _borderAudio.withValues(alpha: 0.95),
+                  color: EmDesign.controlAudio(scheme).withValues(alpha: 0.95),
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(EmDesign.radiusLg),
                     bottomLeft: Radius.circular(EmDesign.radiusLg),

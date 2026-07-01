@@ -4,10 +4,12 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../bloc/connection_bloc.dart';
 import '../bloc/process_bloc.dart';
 import '../models/ws_models.dart';
 import '../settings/app_settings_keys.dart';
 import '../theme/em_design_system.dart';
+import '../utils/em_snapshot_cache.dart';
 import '../widgets/em_brand_app_bar.dart';
 import '../widgets/em_loading_states.dart';
 
@@ -275,60 +277,117 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
           Expanded(
             child: ColoredBox(
               color: scheme.surfaceContainerLow,
-              child: BlocBuilder<ProcessBloc, ProcessState>(
-                builder: (context, state) {
-                  if (state.loading &&
-                      state.items.isEmpty &&
-                      state.killedGhosts.isEmpty) {
-                    return const EmListSkeleton();
-                  }
-                  final rows = _buildDisplayRows(state);
-                  if (rows.isEmpty) {
-                    final hasSearch = _search.text.trim().isNotEmpty;
-                    return EmEmptyState(
-                      icon: hasSearch
-                          ? Icons.search_off_rounded
-                          : Icons.memory_outlined,
-                      title: hasSearch
-                          ? 'No matching processes'
-                          : 'No processes yet',
-                      message: hasSearch
-                          ? 'Try a different name, PID, or command line.'
-                          : 'Waiting for the process list from the endpoint.',
-                    );
-                  }
-                  return NotificationListener<ScrollStartNotification>(
-                    onNotification: (n) {
-                      if (n.dragDetails != null) {
-                        _searchFocus.unfocus();
-                      }
-                      return false;
-                    },
-                    child: ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(0, 0, 0, 96),
-                      itemCount: rows.length,
-                      separatorBuilder: (_, __) => const SizedBox.shrink(),
-                      itemBuilder: (context, i) {
-                        final row = rows[i];
-                        final p = row.snapshot;
-                        return _ProcessRow(
-                          key: ValueKey<String>(
-                            '${row.isKilledGhost ? 'g' : 'l'}-${p.pid}',
-                          ),
-                          p: p,
-                          index: i,
-                          isKilledGhost: row.isKilledGhost,
-                          killedAt: row.killedAt,
-                          compact: _compactCards,
-                          onRowTap: () => _openProcessDetail(context, row),
-                          onDismissGhost: row.isKilledGhost
-                              ? () => context
-                                  .read<ProcessBloc>()
-                                  .dismissKilledGhost(p.pid)
-                              : null,
+              child: BlocBuilder<ConnectionBloc, EmConnectionState>(
+                builder: (context, conn) {
+                  return BlocBuilder<ProcessBloc, ProcessState>(
+                    builder: (context, state) {
+                      Future<void> onRefresh() async {
+                        if (!conn.isConnected) return;
+                        context.read<ProcessBloc>().requestRefresh();
+                        await Future<void>.delayed(
+                          const Duration(milliseconds: 900),
                         );
-                      },
-                    ),
+                      }
+
+                      if (state.loading &&
+                          state.items.isEmpty &&
+                          state.killedGhosts.isEmpty) {
+                        return const EmListSkeleton();
+                      }
+
+                      final rows = _buildDisplayRows(state);
+                      if (rows.isEmpty) {
+                        final hasSearch = _search.text.trim().isNotEmpty;
+                        return EmEmptyState(
+                          icon: hasSearch
+                              ? Icons.search_off_rounded
+                              : Icons.memory_outlined,
+                          title: hasSearch
+                              ? 'No matching processes'
+                              : 'No processes yet',
+                          message: hasSearch
+                              ? 'Try a different name, PID, or command line.'
+                              : conn.isConnected
+                                  ? 'Waiting for the process list from the endpoint.'
+                                  : 'Reconnect to refresh the process list.',
+                        );
+                      }
+
+                      return RefreshIndicator(
+                        color: scheme.primary,
+                        onRefresh: onRefresh,
+                        child: NotificationListener<ScrollStartNotification>(
+                          onNotification: (n) {
+                            if (n.dragDetails != null) {
+                              _searchFocus.unfocus();
+                            }
+                            return false;
+                          },
+                          child: ListView.separated(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.fromLTRB(
+                              0,
+                              0,
+                              0,
+                              EmDesign.scrollBottomInset,
+                            ),
+                            itemCount: rows.length +
+                                (!conn.isConnected && state.items.isNotEmpty
+                                    ? 1
+                                    : 0),
+                            separatorBuilder: (_, __) =>
+                                const SizedBox.shrink(),
+                            itemBuilder: (context, i) {
+                              if (!conn.isConnected &&
+                                  state.items.isNotEmpty &&
+                                  i == 0) {
+                                return FutureBuilder<DateTime?>(
+                                  future:
+                                      EmSnapshotCache.processesCachedAt(),
+                                  builder: (context, snap) {
+                                    return Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        16,
+                                        8,
+                                        16,
+                                        8,
+                                      ),
+                                      child: EmStaleSnapshotBanner(
+                                        cachedAt: snap.data,
+                                        compact: true,
+                                      ),
+                                    );
+                                  },
+                                );
+                              }
+                              final rowIndex = !conn.isConnected &&
+                                      state.items.isNotEmpty
+                                  ? i - 1
+                                  : i;
+                              final row = rows[rowIndex];
+                              final p = row.snapshot;
+                              return _ProcessRow(
+                                key: ValueKey<String>(
+                                  '${row.isKilledGhost ? 'g' : 'l'}-${p.pid}',
+                                ),
+                                p: p,
+                                index: rowIndex,
+                                isKilledGhost: row.isKilledGhost,
+                                killedAt: row.killedAt,
+                                compact: _compactCards,
+                                onRowTap: () =>
+                                    _openProcessDetail(context, row),
+                                onDismissGhost: row.isKilledGhost
+                                    ? () => context
+                                        .read<ProcessBloc>()
+                                        .dismissKilledGhost(p.pid)
+                                    : null,
+                              );
+                            },
+                          ),
+                        ),
+                      );
+                    },
                   );
                 },
               ),

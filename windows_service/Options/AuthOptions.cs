@@ -15,9 +15,25 @@ public sealed class AuthOptions
     /// </summary>
     public string JwtSigningKey { get; set; } = "";
 
+    public const string ExamplePepperPlaceholder =
+        "CHANGE_THIS_TO_A_LONG_RANDOM_SECRET_AT_LEAST_32_CHARS";
+
     public string ResolvePepper()
     {
         if (!string.IsNullOrWhiteSpace(DeviceTokenPepper)) return DeviceTokenPepper;
         return JwtSigningKey ?? "";
+    }
+
+    /// <summary>Returns null when pepper is configured; otherwise a startup-blocking error message.</summary>
+    public string? ValidatePepper()
+    {
+        var p = ResolvePepper();
+        if (string.IsNullOrWhiteSpace(p))
+            return "DeviceTokenPepper (or legacy JwtSigningKey) must be set in configuration.";
+        if (p.Length < 32)
+            return "DeviceTokenPepper must be at least 32 characters.";
+        if (string.Equals(p, ExamplePepperPlaceholder, StringComparison.Ordinal))
+            return "DeviceTokenPepper must be changed from the example placeholder.";
+        return null;
     }
 }

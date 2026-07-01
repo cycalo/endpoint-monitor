@@ -3,8 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../bloc/alerts_bloc.dart';
 import '../bloc/connection_bloc.dart';
+import '../bloc/alerts_bloc.dart';
 import '../bloc/process_bloc.dart';
 import '../bloc/system_info_bloc.dart';
 import '../bloc/threat_intel_bloc.dart';
@@ -15,6 +15,7 @@ import '../widgets/activity_heatmap_card.dart';
 import '../widgets/em_brand_app_bar.dart';
 import '../widgets/em_gradient_button.dart';
 import '../widgets/em_loading_states.dart';
+import '../utils/em_snapshot_cache.dart';
 
 /// Dashboard aligned with [flutter_design/dashboard_with_system_identity/code.html].
 class DashboardScreen extends StatelessWidget {
@@ -53,6 +54,25 @@ class DashboardScreen extends StatelessWidget {
                     const _DashboardConnectionHero(),
                     if (!conn.isConnected) ...[
                       const SizedBox(height: 24),
+                      if (i != null) ...[
+                        FutureBuilder<DateTime?>(
+                          future: EmSnapshotCache.systemInfoCachedAt(),
+                          builder: (context, snap) {
+                            return EmStaleSnapshotBanner(cachedAt: snap.data);
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        _DashboardOfflineMetrics(
+                          info: i,
+                          scheme: scheme,
+                          theme: theme,
+                          radiusCard: radiusCard,
+                          mono: mono,
+                          hostDisplay: hostDisplay,
+                          ipLine: ipLine,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
                       _DashboardDisconnectedMetrics(
                         scheme: scheme,
                         theme: theme,
@@ -106,7 +126,7 @@ class DashboardScreen extends StatelessWidget {
                                 const SizedBox(height: 24),
                                 LayoutBuilder(
                                   builder: (context, c) {
-                                    final twoCol = c.maxWidth >= 600;
+                                    final twoCol = c.maxWidth >= 480;
                                     final cpu = _CpuLoadCard(
                                       info: i,
                                       mono: mono,
@@ -355,6 +375,93 @@ class _DashboardConnectionHero extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Read-only metrics from cache while disconnected.
+class _DashboardOfflineMetrics extends StatelessWidget {
+  const _DashboardOfflineMetrics({
+    required this.info,
+    required this.scheme,
+    required this.theme,
+    required this.radiusCard,
+    required this.mono,
+    required this.hostDisplay,
+    required this.ipLine,
+  });
+
+  final SystemInfo info;
+  final ColorScheme scheme;
+  final ThemeData theme;
+  final double radiusCard;
+  final TextStyle mono;
+  final String hostDisplay;
+  final String ipLine;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: 0.88,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _SummaryMetricsPair(
+            processCount: info.processCount,
+            networkCount: info.networkConnectionCount,
+            scheme: scheme,
+            theme: theme,
+            radiusCard: radiusCard,
+          ),
+          const SizedBox(height: 16),
+          LayoutBuilder(
+            builder: (context, c) {
+              final twoCol = c.maxWidth >= 480;
+              final cpu = _CpuLoadCard(
+                info: info,
+                mono: mono,
+                scheme: scheme,
+                theme: theme,
+                radiusCard: radiusCard,
+              );
+              final ramDisk = _RamDiskCard(
+                info: info,
+                scheme: scheme,
+                theme: theme,
+                radiusCard: radiusCard,
+              );
+              if (twoCol) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: cpu),
+                    const SizedBox(width: 16),
+                    Expanded(child: ramDisk),
+                  ],
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  cpu,
+                  const SizedBox(height: 16),
+                  ramDisk,
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+          _SystemInformationCard(
+            info: info,
+            hostDisplay: hostDisplay,
+            ipLine: ipLine,
+            mono: mono,
+            scheme: scheme,
+            theme: theme,
+            radiusCard: radiusCard,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1412,23 +1519,32 @@ class _DashboardDataBootstrap extends StatefulWidget {
 }
 
 class _DashboardDataBootstrapState extends State<_DashboardDataBootstrap> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      context.read<SystemInfoBloc>().requestLatest();
-      final hm = context.read<ActivityHeatmapBloc>();
-      hm.refresh();
-      hm.startAutoRefresh();
-      context.read<ThreatIntelBloc>()
-        ..refreshStatus()
-        ..refreshEntries();
-    });
+  bool _autoRefreshStarted = false;
+
+  void _onConnected() {
+    if (!_autoRefreshStarted) {
+      _autoRefreshStarted = true;
+      context.read<ActivityHeatmapBloc>().startAutoRefresh();
+    }
   }
 
   @override
-  Widget build(BuildContext context) => const SizedBox.shrink();
+  Widget build(BuildContext context) {
+    return BlocListener<ConnectionBloc, EmConnectionState>(
+      listenWhen: (prev, curr) => curr.isConnected && !prev.isConnected,
+      listener: (context, _) => _onConnected(),
+      child: BlocBuilder<ConnectionBloc, EmConnectionState>(
+        builder: (context, conn) {
+          if (conn.isConnected && !_autoRefreshStarted) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _onConnected();
+            });
+          }
+          return const SizedBox.shrink();
+        },
+      ),
+    );
+  }
 }
 
 class _DashboardActivityHeatmap extends StatelessWidget {
@@ -1441,6 +1557,7 @@ class _DashboardActivityHeatmap extends StatelessWidget {
         return ActivityHeatmapCard(
           loading: st.loading,
           buckets: st.buckets,
+          loadError: st.loadError,
           onRefresh: () =>
               context.read<ActivityHeatmapBloc>().refresh(hours: 24),
         );
@@ -1459,7 +1576,7 @@ class _DashboardThreatIntelCard extends StatelessWidget {
     return BlocBuilder<ThreatIntelBloc, ThreatIntelState>(
       builder: (context, ti) {
         if (ti.loading &&
-            ti.entryCount == 0 &&
+            !ti.statusLoaded &&
             (ti.lastError == null || ti.lastError!.isEmpty)) {
           return Container(
             padding: const EdgeInsets.all(16),
@@ -1487,7 +1604,9 @@ class _DashboardThreatIntelCard extends StatelessWidget {
             ),
           );
         }
-        if (ti.entryCount == 0 &&
+        if (!ti.statusLoaded &&
+            !ti.loading &&
+            ti.entryCount == 0 &&
             (ti.lastError == null || ti.lastError!.isEmpty)) {
           return const SizedBox.shrink();
         }
@@ -1513,7 +1632,11 @@ class _DashboardThreatIntelCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${ti.entryCount} blocklisted IPs loaded\nComparing against network traffic',
+                          ti.entryCount > 0
+                              ? '${ti.entryCount} blocklisted IPs loaded\nComparing against network traffic'
+                              : ti.lastError != null && ti.lastError!.isNotEmpty
+                                  ? 'Threat feeds unavailable'
+                                  : 'No blocklisted IPs loaded yet',
                           style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w700,
                           ),

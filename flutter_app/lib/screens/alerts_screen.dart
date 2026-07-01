@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../bloc/alerts_bloc.dart';
@@ -41,6 +43,33 @@ class AlertsScreen extends StatelessWidget {
       'suspicious_connection' => Icons.travel_explore_rounded,
       _ => Icons.warning_amber_rounded,
     };
+  }
+
+  void _openAlert(BuildContext context, Alert alert) {
+    HapticFeedback.lightImpact();
+    final pid = alert.relatedPid;
+    if (pid != null && pid > 0) {
+      context.push('/processes/$pid');
+      return;
+    }
+    switch (alert.type) {
+      case 'threat_intel_connection':
+      case 'suspicious_connection':
+        context.push('/network?threats=1');
+      case AlertsBloc.softwareInstallDetectedType:
+        context.pushNamed('software');
+      case 'flagged_process':
+        final name = RegExp(r'[\w.-]+\.exe', caseSensitive: false)
+            .firstMatch(alert.message)
+            ?.group(0);
+        if (name != null) {
+          context.push('/processes?watch=${Uri.encodeComponent(name)}');
+        } else {
+          context.pushNamed('processes');
+        }
+      default:
+        break;
+    }
   }
 
   @override
@@ -119,8 +148,11 @@ class AlertsScreen extends StatelessWidget {
                       typeIcon: _typeIcon(alert.type),
                       typeLabel: _typeLabel(alert.type),
                       severityColor: _sevColor(alert.severity, scheme),
-                      onAck: () =>
-                          context.read<AlertsBloc>().acknowledge(alert.id),
+                      onAck: () {
+                        HapticFeedback.lightImpact();
+                        context.read<AlertsBloc>().acknowledge(alert.id);
+                      },
+                      onOpen: () => _openAlert(context, alert),
                     ),
                   );
                 }),
@@ -141,6 +173,7 @@ class _AlertTile extends StatelessWidget {
     required this.typeLabel,
     required this.severityColor,
     required this.onAck,
+    required this.onOpen,
   });
 
   final Alert alert;
@@ -150,6 +183,7 @@ class _AlertTile extends StatelessWidget {
   final String typeLabel;
   final Color severityColor;
   final VoidCallback onAck;
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -170,7 +204,8 @@ class _AlertTile extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(EmDesign.radiusLg),
-        onTap: acked ? null : onAck,
+        onTap: onOpen,
+        onLongPress: acked ? null : onAck,
         child: Padding(
           padding: const EdgeInsets.all(EmDesign.spaceMd),
           child: Row(

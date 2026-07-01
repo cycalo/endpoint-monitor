@@ -3,13 +3,20 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:web_socket_channel/io.dart';
+
+import '../utils/ws_url.dart';
 
 class EndpointMonitorTaskHandler extends TaskHandler {
   IOWebSocketChannel? _channel;
   StreamSubscription<dynamic>? _sub;
   Timer? _pingTimer;
   bool _stopping = false;
+
+  static const _secureStorage = FlutterSecureStorage();
+  static const _hostKey = 'em_host';
+  static const _tokenKey = 'em_token';
 
   static const _kConnect = 'em_connect';
   static const _kDisconnect = 'em_disconnect';
@@ -21,11 +28,22 @@ class EndpointMonitorTaskHandler extends TaskHandler {
         if (message != null) 'message': message,
       };
 
+  Future<(String?, String?)> _loadStoredCredentials() async {
+    final host = await _secureStorage.read(key: _hostKey);
+    final token = await _secureStorage.read(key: _tokenKey);
+    if (host == null ||
+        host.trim().isEmpty ||
+        token == null ||
+        token.isEmpty) {
+      return (null, null);
+    }
+    return (normalizeMonitorWsUrl(host), token);
+  }
+
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
     _stopping = false;
-    final host = await FlutterForegroundTask.getData<String>(key: 'ws_host');
-    final token = await FlutterForegroundTask.getData<String>(key: 'ws_token');
+    final (host, token) = await _loadStoredCredentials();
     if (host == null || token == null) {
       FlutterForegroundTask.sendDataToMain(
           _connectionPayload('error', message: 'missing_credentials'));
@@ -59,10 +77,6 @@ class EndpointMonitorTaskHandler extends TaskHandler {
         final host = m['host'] as String?;
         final token = m['token'] as String?;
         if (host != null && token != null) {
-          unawaited(
-              FlutterForegroundTask.saveData(key: 'ws_host', value: host));
-          unawaited(
-              FlutterForegroundTask.saveData(key: 'ws_token', value: token));
           _stopping = true;
           unawaited(_resetConnection().then((_) {
             _stopping = false;
@@ -118,8 +132,9 @@ class EndpointMonitorTaskHandler extends TaskHandler {
         },
         cancelOnError: true,
       );
-      _startPing();
+
       FlutterForegroundTask.sendDataToMain(_connectionPayload('connected'));
+      _startPingTimer();
       await done.future;
     } catch (e) {
       FlutterForegroundTask.sendDataToMain(
@@ -129,7 +144,7 @@ class EndpointMonitorTaskHandler extends TaskHandler {
     }
   }
 
-  void _startPing() {
+  void _startPingTimer() {
     _pingTimer?.cancel();
     _pingTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       try {
@@ -145,7 +160,7 @@ class EndpointMonitorTaskHandler extends TaskHandler {
       final t = DateTime.now().millisecondsSinceEpoch;
       _channel?.sink.add(jsonEncode({'type': 'ping', 'clientTs': t}));
     } catch (_) {
-      FlutterForegroundTask.sendDataToMain({
+      FlutterForegroundTask.sendDataToMain(<String, Object?>{
         'type': 'ping_rtt',
         'ok': false,
         'message': 'WebSocket not connected',
@@ -162,7 +177,7 @@ class EndpointMonitorTaskHandler extends TaskHandler {
           final sent = raw is int ? raw : int.tryParse(raw.toString()) ?? 0;
           if (sent > 0) {
             final ms = DateTime.now().millisecondsSinceEpoch - sent;
-            FlutterForegroundTask.sendDataToMain({
+            FlutterForegroundTask.sendDataToMain(<String, Object?>{
               'type': 'ping_rtt',
               'ok': true,
               'ms': ms < 0 ? 0 : ms,
@@ -170,9 +185,11 @@ class EndpointMonitorTaskHandler extends TaskHandler {
           }
         }
         FlutterForegroundTask.sendDataToMain(map);
+      } else if (map is Map) {
+        FlutterForegroundTask.sendDataToMain(Map<String, dynamic>.from(map));
       }
     } catch (_) {
-      // ignore malformed
+      // ignore malformed payloads
     }
   }
 
@@ -181,11 +198,15 @@ class EndpointMonitorTaskHandler extends TaskHandler {
     _pingTimer = null;
     await _sub?.cancel();
     _sub = null;
-    await _channel?.sink.close();
+    try {
+      await _channel?.sink.close();
+    } catch (_) {
+      // ignore
+    }
     _channel = null;
   }
 
-  String _sanitizeConnectionError(Object error) {
+  static String _sanitizeConnectionError(Object error) {
     final text = error.toString().toLowerCase();
     if (text.contains('timed out')) {
       return 'Connection timed out.';

@@ -16,7 +16,7 @@ public sealed class PairingAuthService(AppDatabase db, IOptions<AuthOptions> opt
 
     public (string Code, DateTime ExpiresAtUtc) CreatePairingCode(TimeSpan? ttl = null)
     {
-        var pepperErr = PepperValidationError();
+        var pepperErr = _authOptions.ValidatePepper();
         if (pepperErr != null)
             throw new InvalidOperationException(pepperErr);
 
@@ -33,7 +33,7 @@ public sealed class PairingAuthService(AppDatabase db, IOptions<AuthOptions> opt
         string? deviceName,
         CancellationToken cancellationToken = default)
     {
-        var pepperErr = PepperValidationError();
+        var pepperErr = _authOptions.ValidatePepper();
         if (pepperErr != null)
             return (false, null, "pepper_invalid");
 
@@ -59,7 +59,7 @@ public sealed class PairingAuthService(AppDatabase db, IOptions<AuthOptions> opt
         await db.AddDeviceTokenAsync(new DeviceAuthTokenRow
         {
             Id = id,
-            DeviceName = string.IsNullOrWhiteSpace(deviceName) ? "Unknown device" : deviceName.Trim(),
+            DeviceName = SanitizeDeviceName(deviceName),
             TokenHash = tokenHash,
             CreatedAt = now,
             LastUsedAt = now,
@@ -105,14 +105,12 @@ public sealed class PairingAuthService(AppDatabase db, IOptions<AuthOptions> opt
         return Convert.ToHexString(hash);
     }
 
-    private string? PepperValidationError()
+    private static string SanitizeDeviceName(string? deviceName)
     {
-        var p = _authOptions.ResolvePepper();
-        if (string.IsNullOrWhiteSpace(p))
-            return "DeviceTokenPepper (or legacy JwtSigningKey) must be set in configuration.";
-        if (p.Length < 32)
-            return "DeviceTokenPepper must be at least 32 characters.";
-        return null;
+        if (string.IsNullOrWhiteSpace(deviceName)) return "Unknown device";
+        var trimmed = new string(deviceName.Trim().Where(c => !char.IsControl(c)).ToArray());
+        if (trimmed.Length == 0) return "Unknown device";
+        return trimmed.Length <= 128 ? trimmed : trimmed[..128];
     }
 
     private void CleanupExpiredCodes(DateTime nowUtc)

@@ -20,7 +20,6 @@ import '../settings/app_settings_keys.dart';
 import '../theme/em_design_system.dart';
 import '../theme/theme_cubit.dart';
 import '../utils/export_http_base.dart';
-import '../utils/jwt_expiry.dart';
 import '../utils/relative_time.dart';
 import '../widgets/em_brand_app_bar.dart';
 import '../widgets/em_loading_states.dart';
@@ -52,10 +51,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _showIpv6 = false;
   bool _compactProc = false;
 
+  String? _storedToken;
+  bool _replacingToken = false;
+
+  String _maskToken(String token) {
+    if (token.length <= 12) return '••••••••';
+    return '${token.substring(0, 4)}…${token.substring(token.length - 4)}';
+  }
+
   String _savedEndpoint = '';
   String _savedJwt = '';
   String _savedHttp = '';
   String _savedGroqApi = '';
+  bool _savedNotifyHigh = true;
+  bool _savedNotifyWatch = true;
+  bool _savedNotifyIso = true;
+  bool _savedNotifySoft = true;
+  String _savedEventsRange = '1h';
+  int _savedEventsMax = 100;
+  bool _savedShowIpv6 = false;
+  bool _savedCompactProc = false;
 
   @override
   void initState() {
@@ -74,10 +89,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   bool get _connectionDirty =>
       _endpoint.text.trim() != _savedEndpoint ||
-      _jwt.text.trim() != _savedJwt ||
+      (_replacingToken && _jwt.text.trim() != _savedJwt) ||
       _httpBase.text.trim() != _savedHttp;
 
   bool get _groqDirty => _groqApiKey.text.trim() != _savedGroqApi;
+
+  bool get _notificationsDirty =>
+      _notifyHigh != _savedNotifyHigh ||
+      _notifyWatch != _savedNotifyWatch ||
+      _notifyIso != _savedNotifyIso ||
+      _notifySoft != _savedNotifySoft;
+
+  bool get _eventsDirty =>
+      _eventsRange != _savedEventsRange || _eventsMax != _savedEventsMax;
+
+  bool get _displayDirty =>
+      _showIpv6 != _savedShowIpv6 || _compactProc != _savedCompactProc;
 
   Future<void> _load() async {
     final p = await SharedPreferences.getInstance();
@@ -85,9 +112,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     const s = FlutterSecureStorage();
     final host = await s.read(key: 'em_host') ?? '';
     final token = await s.read(key: 'em_token') ?? '';
+    _storedToken = token.isEmpty ? null : token;
+    _replacingToken = false;
     final groqKey = (await s.read(key: AppSettingsKeys.groqApiKey) ?? '').trim();
     _endpoint.text = host;
-    _jwt.text = token;
+    _jwt.text = token.isEmpty ? '' : _maskToken(token);
     _groqApiKey.text = groqKey;
     _httpBase.text = p.getString(AppSettingsKeys.httpBase) ?? 'http://192.168.1.10:5000';
     _rememberEndpoint =
@@ -106,6 +135,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _savedJwt = token;
     _savedGroqApi = groqKey.trim();
     _savedHttp = _httpBase.text.trim();
+    _savedNotifyHigh = _notifyHigh;
+    _savedNotifyWatch = _notifyWatch;
+    _savedNotifyIso = _notifyIso;
+    _savedNotifySoft = _notifySoft;
+    _savedEventsRange = _eventsRange;
+    _savedEventsMax = _eventsMax;
+    _savedShowIpv6 = _showIpv6;
+    _savedCompactProc = _compactProc;
     if (mounted) setState(() {});
   }
 
@@ -134,14 +171,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await p.setBool(AppSettingsKeys.showIpv6Network, _showIpv6);
     await p.setBool(AppSettingsKeys.compactProcessCards, _compactProc);
     await p.setString(AppSettingsKeys.httpBase, _httpBase.text.trim());
+    _savedNotifyHigh = _notifyHigh;
+    _savedNotifyWatch = _notifyWatch;
+    _savedNotifyIso = _notifyIso;
+    _savedNotifySoft = _notifySoft;
+    _savedEventsRange = _eventsRange;
+    _savedEventsMax = _eventsMax;
+    _savedShowIpv6 = _showIpv6;
+    _savedCompactProc = _compactProc;
   }
 
   Future<void> _saveConnection() async {
     const s = FlutterSecureStorage();
     final ep = _endpoint.text.trim();
-    final tok = _jwt.text.trim();
+    final tok = _replacingToken ? _jwt.text.trim() : (_storedToken ?? '');
+    if (tok.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Device token required. Pair on Connect or replace token.')),
+      );
+      return;
+    }
     await s.write(key: 'em_host', value: ep);
     await s.write(key: 'em_token', value: tok);
+    _storedToken = tok;
+    _replacingToken = false;
+    _jwt.text = _maskToken(tok);
     await _persistNonConnection();
     _savedEndpoint = ep;
     _savedJwt = tok;
@@ -340,7 +395,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               subtitle: 'Connection, security, notifications, and display preferences.',
               padding: EdgeInsets.only(bottom: 16),
             ),
-            if (_connectionDirty)
+            if (_connectionDirty || _notificationsDirty || _eventsDirty || _displayDirty || _groqDirty)
               Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(10),
@@ -349,14 +404,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   borderRadius: BorderRadius.circular(EmDesign.radiusMd),
                 ),
                 child: Text(
-                  'Unsaved changes in Connection',
+                  'You have unsaved changes',
                   style: theme.textTheme.labelLarge?.copyWith(color: scheme.onPrimaryContainer),
                 ),
               ),
-            _sectionLabel(context, 'CONNECTION'),
-            _card(
-              scheme,
-              Column(
+            EmSettingsSection(
+              title: 'CONNECTION',
+              dirty: _connectionDirty,
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   TextField(
@@ -367,13 +422,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 10),
                   TextField(
                     controller: _jwt,
+                    readOnly: !_replacingToken,
                     obscureText: _hideJwt,
                     style: GoogleFonts.jetBrainsMono(fontSize: 13),
                     decoration: InputDecoration(
-                      labelText: 'Device token (from pairing)',
-                      suffixIcon: IconButton(
-                        onPressed: () => setState(() => _hideJwt = !_hideJwt),
-                        icon: Icon(_hideJwt ? Icons.visibility : Icons.visibility_off),
+                      labelText: _replacingToken
+                          ? 'New device token'
+                          : 'Device token (masked)',
+                      suffixIcon: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (!_replacingToken)
+                            TextButton(
+                              onPressed: () => setState(() {
+                                _replacingToken = true;
+                                _jwt.clear();
+                              }),
+                              child: const Text('Replace'),
+                            ),
+                          IconButton(
+                            onPressed: () => setState(() => _hideJwt = !_hideJwt),
+                            icon: Icon(_hideJwt ? Icons.visibility : Icons.visibility_off),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -405,10 +476,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            _sectionLabel(context, 'SECURITY'),
-            _card(
-              scheme,
-              Column(
+            EmSettingsSection(
+              title: 'SECURITY',
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   SwitchListTile(
@@ -455,9 +525,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       final t = snap.data;
                       final line = t == null || t.isEmpty
                           ? 'No device token saved'
-                          : (t.split('.').length == 3
-                              ? formatJwtExpiryLine(t)
-                              : 'Device token saved (pair on Connect to replace)');
+                          : 'Device token configured (${_maskToken(t)})';
                       return Text(line, style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant));
                     },
                   ),
@@ -465,10 +533,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            _sectionLabel(context, 'NOTIFICATIONS'),
-            _card(
-              scheme,
-              Column(
+            EmSettingsSection(
+              title: 'NOTIFICATIONS',
+              dirty: _notificationsDirty,
+              child: Column(
                 children: [
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
@@ -498,6 +566,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onPressed: () async {
                       await _persistNonConnection();
                       if (!context.mounted) return;
+                      setState(() {});
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Notification prefs saved')));
                     },
                     child: const Text('Save notification prefs'),
@@ -506,10 +575,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            _sectionLabel(context, 'EVENTS'),
-            _card(
-              scheme,
-              Column(
+            EmSettingsSection(
+              title: 'EVENTS',
+              dirty: _eventsDirty,
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   ListTile(
@@ -567,10 +636,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            _sectionLabel(context, 'DISPLAY'),
-            _card(
-              scheme,
-              Column(
+            EmSettingsSection(
+              title: 'DISPLAY',
+              dirty: _displayDirty,
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   BlocBuilder<ThemeCubit, ThemeMode>(
@@ -611,10 +680,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            _sectionLabel(context, 'GROQ AI'),
-            _card(
-              scheme,
-              Column(
+            EmSettingsSection(
+              title: 'GROQ AI',
+              dirty: _groqDirty,
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   TextField(
@@ -643,10 +712,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            _sectionLabel(context, 'THREAT INTEL'),
-            _card(
-              scheme,
-              BlocBuilder<ThreatIntelBloc, ThreatIntelState>(
+            EmSettingsSection(
+              title: 'THREAT INTEL',
+              child: BlocBuilder<ThreatIntelBloc, ThreatIntelState>(
                 builder: (context, ti) {
                   final rel = formatRelativeSinceUtcIso(ti.lastRunUtc);
                   return Column(
@@ -727,10 +795,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            _sectionLabel(context, 'DATA'),
-            _card(
-              scheme,
-              Column(
+            EmSettingsSection(
+              title: 'DATA',
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   OutlinedButton(
@@ -784,10 +851,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            _sectionLabel(context, 'ABOUT'),
-            _card(
-              scheme,
-              Column(
+            EmSettingsSection(
+              title: 'ABOUT',
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('App version: $kAppVersion'),
@@ -824,24 +890,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _sectionLabel(BuildContext context, String t) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        t,
-        style: EmDesign.labelCaps(context, Theme.of(context).colorScheme),
-      ),
-    );
-  }
-
-  Widget _card(ColorScheme scheme, Widget child) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: EmDesign.cardShell(scheme),
-      child: child,
     );
   }
 }

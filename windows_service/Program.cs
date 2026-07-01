@@ -12,6 +12,7 @@ using EndpointMonitorService.Options;
 using EndpointMonitorService.Services;
 using EndpointMonitorService.Sysmon;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseWindowsService();
@@ -79,7 +80,37 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
 });
 
+app.Use(async (ctx, next) =>
+{
+    ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    ctx.Response.Headers["X-Frame-Options"] = "DENY";
+    ctx.Response.Headers["Referrer-Policy"] = "no-referrer";
+    ctx.Response.Headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'";
+    await next();
+});
+
+app.Use(async (ctx, next) =>
+{
+    var allowed = ctx.RequestServices.GetRequiredService<IConfiguration>()
+        .GetSection("AllowedIpAddresses").Get<string[]>() ?? [];
+    if (allowed.Length > 0)
+    {
+        var ip = ctx.Connection.RemoteIpAddress?.ToString();
+        if (ip != null && !allowed.Contains(ip))
+        {
+            ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return;
+        }
+    }
+    await next();
+});
+
 app.UseIpRateLimiting();
+
+var authOptions = app.Services.GetRequiredService<IOptions<AuthOptions>>().Value;
+var pepperError = authOptions.ValidatePepper();
+if (pepperError != null)
+    throw new InvalidOperationException(pepperError);
 
 var db = app.Services.GetRequiredService<AppDatabase>();
 await db.InitializeAsync();
@@ -88,11 +119,15 @@ app.UseWebSockets();
 
 app.MapPost("/api/auth/pairing/complete", async (HttpContext ctx, PairingCompleteRequest body) =>
 {
-    if (string.IsNullOrWhiteSpace(body.Code))
+    if (string.IsNullOrWhiteSpace(body.Code) || body.Code.Length > 32)
         return Results.BadRequest(new { error = "pairing_code_required" });
 
+    var deviceName = body.DeviceName;
+    if (deviceName != null && deviceName.Length > 128)
+        deviceName = deviceName[..128];
+
     var pairing = ctx.RequestServices.GetRequiredService<PairingAuthService>();
-    var result = await pairing.ExchangePairingCodeAsync(body.Code, body.DeviceName, ctx.RequestAborted).ConfigureAwait(false);
+    var result = await pairing.ExchangePairingCodeAsync(body.Code, deviceName, ctx.RequestAborted).ConfigureAwait(false);
     if (!result.Success || string.IsNullOrEmpty(result.DeviceToken))
         return Results.Unauthorized();
     return Results.Json(new { token = result.DeviceToken });
@@ -162,17 +197,6 @@ app.Map("/ws", async context =>
         return;
     }
 
-    var allowed = context.RequestServices.GetRequiredService<IConfiguration>().GetSection("AllowedIpAddresses").Get<string[]>() ?? [];
-    if (allowed.Length > 0)
-    {
-        var ip = context.Connection.RemoteIpAddress?.ToString();
-        if (ip != null && !allowed.Contains(ip))
-        {
-            context.Response.StatusCode = StatusCodes.Status403Forbidden;
-            return;
-        }
-    }
-
     var auth = context.RequestServices.GetRequiredService<AuthTokenValidator>();
     if (!(await auth.TryValidateAuthorizationAsync(context.Request.Headers.Authorization, context.RequestAborted).ConfigureAwait(false)).Valid)
     {
@@ -187,6 +211,7 @@ app.Map("/ws", async context =>
     manager.Add(id, ws);
 
     var buffer = new byte[1024 * 128];
+    var jsonOptions = new JsonDocumentOptions { MaxDepth = 32, AllowTrailingCommas = false };
     try
     {
         while (ws.State == WebSocketState.Open)
@@ -196,9 +221,11 @@ app.Map("/ws", async context =>
                 break;
             if (result.MessageType != WebSocketMessageType.Text)
                 continue;
+            if (result.Count <= 0 || result.Count > buffer.Length)
+                continue;
 
             var json = Encoding.UTF8.GetString(buffer.AsSpan(0, result.Count));
-            using var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json, jsonOptions);
             var root = doc.RootElement;
             if (!root.TryGetProperty("type", out var typeEl))
                 continue;

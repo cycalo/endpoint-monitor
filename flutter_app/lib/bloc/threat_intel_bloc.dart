@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:equatable/equatable.dart';
@@ -37,6 +38,7 @@ class ThreatIntelState extends Equatable {
     this.lastError,
     this.loading = false,
     this.feeds = const [],
+    this.statusLoaded = false,
   });
 
   final Map<String, ThreatIntelEntry> entriesByIp;
@@ -45,6 +47,9 @@ class ThreatIntelState extends Equatable {
   final String? lastError;
   final bool loading;
   final List<ThreatIntelFeedCount> feeds;
+
+  /// True after at least one [threat_intel_status] response.
+  final bool statusLoaded;
 
   ThreatIntelEntry? lookupIp(String? remoteIp) {
     if (remoteIp == null || remoteIp.isEmpty) return null;
@@ -60,6 +65,7 @@ class ThreatIntelState extends Equatable {
     String? lastError,
     bool? loading,
     List<ThreatIntelFeedCount>? feeds,
+    bool? statusLoaded,
   }) =>
       ThreatIntelState(
         entriesByIp: entriesByIp ?? this.entriesByIp,
@@ -68,11 +74,19 @@ class ThreatIntelState extends Equatable {
         lastError: lastError ?? this.lastError,
         loading: loading ?? this.loading,
         feeds: feeds ?? this.feeds,
+        statusLoaded: statusLoaded ?? this.statusLoaded,
       );
 
   @override
-  List<Object?> get props =>
-      [entriesByIp, entryCount, lastRunUtc, lastError, loading, feeds];
+  List<Object?> get props => [
+        entriesByIp,
+        entryCount,
+        lastRunUtc,
+        lastError,
+        loading,
+        feeds,
+        statusLoaded,
+      ];
 }
 
 class ThreatIntelBloc extends Cubit<ThreatIntelState> {
@@ -80,12 +94,51 @@ class ThreatIntelBloc extends Cubit<ThreatIntelState> {
     FlutterForegroundTask.addTaskDataCallback(_onData);
   }
 
+  Timer? _loadTimeout;
+  static const _loadTimeoutDuration = Duration(seconds: 20);
+
+  void _armLoadTimeout() {
+    _loadTimeout?.cancel();
+    _loadTimeout = Timer(_loadTimeoutDuration, () {
+      if (isClosed || !state.loading) return;
+      emit(state.copyWith(
+        loading: false,
+        lastError: state.lastError ?? 'Threat intel request timed out.',
+        statusLoaded: state.statusLoaded || state.entryCount > 0,
+      ));
+    });
+  }
+
+  void _clearLoadTimeout() {
+    _loadTimeout?.cancel();
+    _loadTimeout = null;
+  }
+
   void _onData(Object data) {
     if (data is! Map) return;
     final m = Map<String, dynamic>.from(data);
     final t = m['type']?.toString();
 
+    if (t == 'command_result') {
+      final cmd = m['command']?.toString();
+      if (cmd == null) return;
+      if (cmd != 'get_threat_intel_status' &&
+          cmd != 'get_threat_intel_entries' &&
+          cmd != 'refresh_threat_intel') {
+        return;
+      }
+      if (m['success'] == true) return;
+      _clearLoadTimeout();
+      emit(state.copyWith(
+        loading: false,
+        lastError: m['message']?.toString() ?? 'Threat intel unavailable.',
+        statusLoaded: true,
+      ));
+      return;
+    }
+
     if (t == 'threat_intel_entries') {
+      _clearLoadTimeout();
       final raw = m['data'];
       if (raw is! Map) return;
       final items = raw['items'];
@@ -102,15 +155,19 @@ class ThreatIntelBloc extends Cubit<ThreatIntelState> {
           source: row['source']?.toString() ?? '',
         );
       }
-      emit(state.copyWith(entriesByIp: map, loading: false));
+      emit(state.copyWith(
+        entriesByIp: map,
+        loading: false,
+        statusLoaded: true,
+      ));
       return;
     }
 
     if (t == 'threat_intel_status') {
+      _clearLoadTimeout();
       final raw = m['data'];
       if (raw is! Map) return;
       final row = Map<String, dynamic>.from(raw);
-      final wasLoading = state.loading;
       final feeds = <ThreatIntelFeedCount>[];
       final fr = row['feeds'];
       if (fr is List) {
@@ -129,21 +186,22 @@ class ThreatIntelBloc extends Cubit<ThreatIntelState> {
         lastError: row['lastError']?.toString(),
         loading: false,
         feeds: feeds,
+        statusLoaded: true,
       ));
-      if (wasLoading) {
-        Future.microtask(() => refreshEntries());
-      }
     }
   }
 
   void refreshEntries() {
     emit(state.copyWith(loading: true));
+    _armLoadTimeout();
     FlutterForegroundTask.sendDataToTask(
       jsonEncode({'type': 'get_threat_intel_entries'}),
     );
   }
 
   void refreshStatus() {
+    emit(state.copyWith(loading: true));
+    _armLoadTimeout();
     FlutterForegroundTask.sendDataToTask(
       jsonEncode({'type': 'get_threat_intel_status'}),
     );
@@ -151,6 +209,7 @@ class ThreatIntelBloc extends Cubit<ThreatIntelState> {
 
   void requestRefreshFeeds() {
     emit(state.copyWith(loading: true));
+    _armLoadTimeout();
     FlutterForegroundTask.sendDataToTask(
       jsonEncode({'type': 'refresh_threat_intel'}),
     );
@@ -158,6 +217,7 @@ class ThreatIntelBloc extends Cubit<ThreatIntelState> {
 
   @override
   Future<void> close() {
+    _clearLoadTimeout();
     FlutterForegroundTask.removeTaskDataCallback(_onData);
     return super.close();
   }

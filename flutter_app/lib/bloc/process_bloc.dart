@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 import '../models/ws_models.dart';
+import '../utils/em_snapshot_cache.dart';
 
 /// Snapshot shown after a successful kill until TTL / PID reuse / dismiss.
 class KilledProcessGhost extends Equatable {
@@ -30,10 +31,12 @@ class ProcessState extends Equatable {
     this.killedGhosts = const [],
     this.vtByPid = const {},
     this.vtLoadingPid,
+    this.fromCache = false,
   });
 
   final List<ProcessInfo> items;
   final bool loading;
+  final bool fromCache;
 
   /// PIDs we have suspended from this app session (WMI does not report suspension).
   final Set<int> suspendedPids;
@@ -54,6 +57,7 @@ class ProcessState extends Equatable {
     Map<int, Map<String, dynamic>>? vtByPid,
     int? vtLoadingPid,
     bool clearVtLoadingPid = false,
+    bool? fromCache,
   }) =>
       ProcessState(
         items: items ?? this.items,
@@ -63,12 +67,14 @@ class ProcessState extends Equatable {
         vtByPid: vtByPid ?? this.vtByPid,
         vtLoadingPid:
             clearVtLoadingPid ? null : (vtLoadingPid ?? this.vtLoadingPid),
+        fromCache: fromCache ?? this.fromCache,
       );
 
   @override
   List<Object?> get props => [
         items,
         loading,
+        fromCache,
         _sorted(suspendedPids),
         _ghostKey(killedGhosts),
         _vtKey(vtByPid),
@@ -89,6 +95,14 @@ class ProcessState extends Equatable {
 class ProcessBloc extends Cubit<ProcessState> {
   ProcessBloc() : super(const ProcessState()) {
     FlutterForegroundTask.addTaskDataCallback(_onData);
+    _loadCache();
+  }
+
+  Future<void> _loadCache() async {
+    final cached = await EmSnapshotCache.loadProcesses();
+    if (cached.isNotEmpty && !isClosed) {
+      emit(state.copyWith(items: cached, loading: false, fromCache: true));
+    }
   }
 
   static const _ghostTtl = Duration(minutes: 2);
@@ -131,11 +145,26 @@ class ProcessBloc extends Cubit<ProcessState> {
     if (t != 'processes') return;
     final raw = m['data'];
     if (raw is! List) return;
+    EmSnapshotCache.saveProcessesRaw(raw);
     final list = raw.map((e) => ProcessInfo.fromJson(Map<String, dynamic>.from(e as Map))).toList();
     final alive = list.map((e) => e.pid).toSet();
     final prunedSuspended = state.suspendedPids.where(alive.contains).toSet();
     final prunedGhosts = _pruneGhosts(state.killedGhosts, alive);
-    emit(state.copyWith(items: list, loading: false, suspendedPids: prunedSuspended, killedGhosts: prunedGhosts));
+    emit(state.copyWith(
+      items: list,
+      loading: false,
+      fromCache: false,
+      suspendedPids: prunedSuspended,
+      killedGhosts: prunedGhosts,
+    ));
+  }
+
+  /// Nudge the agent for fresh data (next broadcast + system info ping).
+  void requestRefresh() {
+    if (state.items.isEmpty) {
+      emit(state.copyWith(loading: true));
+    }
+    FlutterForegroundTask.sendDataToTask(jsonEncode({'type': 'get_system_info'}));
   }
 
   void _onKillSucceeded(int pid) {

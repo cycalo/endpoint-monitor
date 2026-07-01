@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../bloc/connection_bloc.dart';
 import '../bloc/blocked_remote_ips_cubit.dart';
 import '../bloc/network_bloc.dart';
 import '../bloc/system_info_bloc.dart';
@@ -16,6 +17,7 @@ import '../utils/country_flag_emoji.dart';
 import '../utils/ip_normalize.dart';
 import '../utils/network_endpoint_display.dart';
 import '../utils/throughput_format.dart';
+import '../utils/em_snapshot_cache.dart';
 import '../widgets/em_brand_app_bar.dart';
 import '../widgets/em_loading_states.dart';
 
@@ -56,7 +58,9 @@ class _NetworkScreenState extends State<NetworkScreen>
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      context.read<ThreatIntelBloc>().refreshEntries();
+      if (context.read<ConnectionBloc>().state.isConnected) {
+        context.read<ThreatIntelBloc>().refreshEntries();
+      }
     });
   }
 
@@ -462,8 +466,36 @@ class _NetworkScreenState extends State<NetworkScreen>
                   list.sort((a, b) => b.remoteAddress.compareTo(a.remoteAddress));
                 }
 
-                return CustomScrollView(
+                return BlocBuilder<ConnectionBloc, EmConnectionState>(
+                  builder: (context, conn) {
+                return RefreshIndicator(
+                  color: scheme.primary,
+                  onRefresh: () async {
+                    if (!conn.isConnected) return;
+                    context.read<NetworkBloc>().requestRefresh();
+                    context.read<SystemInfoBloc>().requestLatest();
+                    await Future<void>.delayed(
+                      const Duration(milliseconds: 900),
+                    );
+                  },
+                  child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   slivers: [
+                    if (!conn.isConnected && state.items.isNotEmpty)
+                      SliverToBoxAdapter(
+                        child: FutureBuilder<DateTime?>(
+                          future: EmSnapshotCache.networkCachedAt(),
+                          builder: (context, snap) {
+                            return Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                              child: EmStaleSnapshotBanner(
+                                cachedAt: snap.data,
+                                compact: true,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                       sliver: SliverToBoxAdapter(
@@ -1201,6 +1233,9 @@ class _NetworkScreenState extends State<NetworkScreen>
                         ),
                       ),
                   ],
+                ),
+                );
+                  },
                 );
                   },
                 );

@@ -49,11 +49,13 @@ class ActivityHeatmapCard extends StatefulWidget {
     required this.loading,
     required this.buckets,
     required this.onRefresh,
+    this.loadError,
   });
 
   final bool loading;
   final List<ActivityHeatmapBucket> buckets;
   final VoidCallback onRefresh;
+  final String? loadError;
 
   @override
   State<ActivityHeatmapCard> createState() => _ActivityHeatmapCardState();
@@ -215,6 +217,16 @@ class _ActivityHeatmapCardState extends State<ActivityHeatmapCard>
             ],
           ),
           const SizedBox(height: 6),
+          if (widget.loadError != null && !widget.loading) ...[
+            Text(
+              widget.loadError!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.error,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           LayoutBuilder(
             builder: (context, c) {
               final w = c.maxWidth;
@@ -270,7 +282,9 @@ class _ActivityHeatmapCardState extends State<ActivityHeatmapCard>
                     Padding(
                       padding: const EdgeInsets.only(top: 2),
                       child: Text(
-                        'No activity recorded yet',
+                        widget.loadError != null
+                            ? 'Tap refresh to try again'
+                            : 'No Sysmon activity in the last 24 hours',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: scheme.onSurfaceVariant.withValues(alpha: 0.75),

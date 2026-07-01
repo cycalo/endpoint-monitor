@@ -35,6 +35,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
   List<String> _recent = const [];
   bool _rememberDetails = false;
   bool _pairing = false;
+  int _onboardingStep = 0;
   /// True if [em_token] is present in secure storage (pairing already done on this device).
   bool? _hasDeviceToken;
 
@@ -184,7 +185,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Pairing failed: $e')),
+          const SnackBar(content: Text('Pairing failed. Check the code and endpoint, then try again.')),
         );
       }
     } finally {
@@ -314,231 +315,113 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                       message: 'Checking device pairing…',
                                     )
                                   else ...[
-                                  if (_recent.isNotEmpty) ...[
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          'RECENT ENDPOINTS',
-                                          style: EmDesign.labelCaps(context, scheme),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Wrap(
-                                      spacing: 8,
-                                      runSpacing: 8,
-                                      children: _recent.map((h) {
-                                        return Material(
-                                          color: scheme.surfaceContainerHigh,
-                                          borderRadius: BorderRadius.circular(999),
-                                          child: InkWell(
-                                            onTap: () {
+                                  _ConnectStepIndicator(
+                                    step: _onboardingStep,
+                                    includePairing: !hasToken,
+                                  ),
+                                  const SizedBox(height: 20),
+                                  AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 280),
+                                    switchInCurve: Curves.easeOutCubic,
+                                    child: _onboardingStep == 0
+                                        ? _ConnectAddressStep(
+                                            key: const ValueKey('addr'),
+                                            scheme: scheme,
+                                            theme: theme,
+                                            mono: mono,
+                                            recent: _recent,
+                                            host: _host,
+                                            rememberDetails: _rememberDetails,
+                                            onRecentTap: (h) {
                                               _host.text = h
                                                   .replaceFirst(RegExp(r'^https?://'), '')
                                                   .replaceFirst(RegExp(r'^wss?://'), '');
                                               setState(() {});
                                             },
-                                            borderRadius: BorderRadius.circular(999),
-                                            child: Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 12,
-                                                vertical: 8,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                borderRadius: BorderRadius.circular(999),
-                                                border: EmDesign.ghostBorder(scheme),
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Container(
-                                                    width: 6,
-                                                    height: 6,
-                                                    decoration: BoxDecoration(
-                                                      shape: BoxShape.circle,
-                                                      color: scheme.tertiary,
-                                                      boxShadow: [
-                                                        BoxShadow(
-                                                          color: scheme.tertiary.withValues(alpha: 0.4),
-                                                          blurRadius: 6,
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  Text(
-                                                    h,
-                                                    style: GoogleFonts.inter(
-                                                      fontSize: 12,
-                                                      color: scheme.onSurface,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        );
-                                      }).toList(),
-                                    ),
-                                    const SizedBox(height: 22),
-                                  ],
-                                  _LabeledField(
-                                    label: 'IP address',
-                                    child: TextField(
-                                      controller: _host,
-                                      style: mono,
-                                      keyboardType: TextInputType.text,
-                                      decoration: InputDecoration(
-                                        hintText: 'IP address',
-                                        hintStyle: mono.copyWith(
-                                          color: scheme.outline.withValues(alpha: 0.45),
-                                        ),
-                                        prefixIcon: Icon(
-                                          Icons.lan_rounded,
-                                          color: scheme.outline,
-                                          size: 20,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    'Optional: include :port (default 5000).',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                  if (hasToken) ...[
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      children: [
-                                        Icon(Icons.verified_user_outlined, size: 16, color: scheme.tertiary),
-                                        const SizedBox(width: 6),
-                                        Expanded(
-                                          child: Text(
-                                            'This device is paired. Use Connect when the PC is reachable.',
-                                            style: theme.textTheme.bodySmall?.copyWith(
-                                              color: scheme.onSurfaceVariant,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                  const SizedBox(height: 18),
-                                  CheckboxListTile(
-                                    contentPadding: EdgeInsets.zero,
-                                    controlAffinity: ListTileControlAffinity.leading,
-                                    value: _rememberDetails,
-                                    onChanged: (v) async {
-                                      final next = v ?? false;
-                                      if (!next) {
-                                        await _clearRememberedIpOnly();
-                                        if (mounted) {
-                                          setState(() => _rememberDetails = false);
-                                        }
-                                        return;
-                                      }
-                                      if (mounted) {
-                                        setState(() => _rememberDetails = true);
-                                      }
-                                      await _saveRememberedHost();
-                                    },
-                                    title: Text(
-                                      'Remember this IP on this device',
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        color: scheme.onSurfaceVariant,
-                                        height: 1.35,
-                                      ),
-                                    ),
-                                  ),
-                                  if (state.message != null) ...[
-                                    const SizedBox(height: 16),
-                                    Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: scheme.errorContainer.withValues(alpha: 0.2),
-                                        borderRadius: BorderRadius.circular(EmDesign.radiusMd),
-                                        border: Border.all(
-                                          color: scheme.error.withValues(alpha: 0.15),
-                                        ),
-                                      ),
-                                      child: Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Icon(
-                                            Icons.error_outline_rounded,
-                                            color: scheme.error,
-                                            size: 20,
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: Text(
-                                              state.message!,
-                                              style: theme.textTheme.bodySmall?.copyWith(
-                                                color: scheme.onErrorContainer,
-                                                height: 1.35,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                  const SizedBox(height: 22),
-                                  EmGradientButton(
-                                    label: _pairing ? 'Pairing…' : 'Pair with code',
-                                    icon: Icons.phonelink_lock_rounded,
-                                    inProgress: _pairing,
-                                    onPressed: (state.status == ConnectionStatus.connecting || _pairing)
-                                        ? null
-                                        : _pairDeviceWithCode,
-                                  ),
-                                  const SizedBox(height: 10),
-                                  OutlinedButton.icon(
-                                    onPressed: (state.status == ConnectionStatus.connecting || _pairing)
-                                        ? null
-                                        : () async {
-                                            final host = _host.text.trim();
-                                            if (host.isEmpty) {
-                                              if (!context.mounted) return;
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(content: Text('Enter the PC IP address.')),
-                                              );
-                                              return;
-                                            }
-                                            const secure = FlutterSecureStorage();
-                                            var token = await secure.read(key: _kEmToken) ?? '';
-                                            if (token.isEmpty) {
-                                              if (!context.mounted) return;
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text('Pair with a code from the Windows tray first.'),
-                                                ),
-                                              );
-                                              return;
-                                            }
-                                            await _saveRememberedHost();
-                                            if (!context.mounted) return;
-                                            context.read<ConnectionBloc>().add(
-                                                  ConnectionConnectRequested(
-                                                    host: host,
-                                                    token: token,
+                                            onRememberChanged: (next) async {
+                                              if (!next) {
+                                                await _clearRememberedIpOnly();
+                                                if (mounted) {
+                                                  setState(() => _rememberDetails = false);
+                                                }
+                                                return;
+                                              }
+                                              if (mounted) {
+                                                setState(() => _rememberDetails = true);
+                                              }
+                                              await _saveRememberedHost();
+                                            },
+                                            onNext: () {
+                                              if (_host.text.trim().isEmpty) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text('Enter the PC IP address first.'),
                                                   ),
                                                 );
-                                          },
-                                    icon: const Icon(Icons.bolt_rounded),
-                                    label: Text(
-                                      state.status == ConnectionStatus.connecting
-                                          ? 'Connecting…'
-                                          : 'Connect to endpoint',
-                                    ),
-                                    style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(vertical: 14),
-                                    ),
+                                                return;
+                                              }
+                                              setState(() {
+                                                _onboardingStep = hasToken ? 1 : 1;
+                                              });
+                                            },
+                                          )
+                                        : (_onboardingStep == 1 && !hasToken)
+                                            ? _ConnectPairStep(
+                                                key: const ValueKey('pair'),
+                                                scheme: scheme,
+                                                theme: theme,
+                                                pairing: _pairing,
+                                                connecting: state.status == ConnectionStatus.connecting,
+                                                onBack: () => setState(() => _onboardingStep = 0),
+                                                onPair: _pairDeviceWithCode,
+                                                onNext: () => setState(() => _onboardingStep = 2),
+                                                hasToken: hasToken,
+                                              )
+                                            : _ConnectFinalStep(
+                                                key: const ValueKey('connect'),
+                                                scheme: scheme,
+                                                theme: theme,
+                                                state: state,
+                                                hasToken: hasToken,
+                                                pairing: _pairing,
+                                                onBack: () => setState(
+                                                  () => _onboardingStep = hasToken ? 0 : 1,
+                                                ),
+                                                onConnect: () async {
+                                                  final host = _host.text.trim();
+                                                  if (host.isEmpty) {
+                                                    if (!context.mounted) return;
+                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                      const SnackBar(
+                                                        content: Text('Enter the PC IP address.'),
+                                                      ),
+                                                    );
+                                                    return;
+                                                  }
+                                                  const secure = FlutterSecureStorage();
+                                                  var token = await secure.read(key: _kEmToken) ?? '';
+                                                  if (token.isEmpty) {
+                                                    if (!context.mounted) return;
+                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                      const SnackBar(
+                                                        content: Text(
+                                                          'Pair with a code from the Windows tray first.',
+                                                        ),
+                                                      ),
+                                                    );
+                                                    return;
+                                                  }
+                                                  await _saveRememberedHost();
+                                                  if (!context.mounted) return;
+                                                  context.read<ConnectionBloc>().add(
+                                                        ConnectionConnectRequested(
+                                                          host: host,
+                                                          token: token,
+                                                        ),
+                                                      );
+                                                },
+                                                onPair: _pairDeviceWithCode,
+                                              ),
                                   ),
                                   ],
                                 ],
@@ -620,6 +503,289 @@ class _LabeledField extends StatelessWidget {
         Text(label.toUpperCase(), style: EmDesign.labelCaps(context, scheme)),
         const SizedBox(height: 8),
         child,
+      ],
+    );
+  }
+}
+
+class _ConnectStepIndicator extends StatelessWidget {
+  const _ConnectStepIndicator({
+    required this.step,
+    required this.includePairing,
+  });
+
+  final int step;
+  final bool includePairing;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final labels = includePairing
+        ? const ['Address', 'Pair', 'Connect']
+        : const ['Address', 'Connect'];
+
+    return Row(
+      children: [
+        for (var i = 0; i < labels.length; i++) ...[
+          if (i > 0)
+            Expanded(
+              child: Container(
+                height: 2,
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                color: i <= step
+                    ? scheme.primary.withValues(alpha: 0.55)
+                    : scheme.outlineVariant.withValues(alpha: 0.2),
+              ),
+            ),
+          Column(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: i <= step
+                      ? scheme.primary.withValues(alpha: i == step ? 0.22 : 0.12)
+                      : scheme.surfaceContainerHigh,
+                  border: Border.all(
+                    color: i <= step
+                        ? scheme.primary
+                        : scheme.outlineVariant.withValues(alpha: 0.25),
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '${i + 1}',
+                  style: GoogleFonts.manrope(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: i <= step ? scheme.primary : scheme.outline,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                labels[i].toUpperCase(),
+                style: EmDesign.labelCaps(context, scheme).copyWith(
+                  fontSize: 8,
+                  color: i == step ? scheme.primary : scheme.outline,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ConnectAddressStep extends StatelessWidget {
+  const _ConnectAddressStep({
+    super.key,
+    required this.scheme,
+    required this.theme,
+    required this.mono,
+    required this.recent,
+    required this.host,
+    required this.rememberDetails,
+    required this.onRecentTap,
+    required this.onRememberChanged,
+    required this.onNext,
+  });
+
+  final ColorScheme scheme;
+  final ThemeData theme;
+  final TextStyle mono;
+  final List<String> recent;
+  final TextEditingController host;
+  final bool rememberDetails;
+  final ValueChanged<String> onRecentTap;
+  final ValueChanged<bool> onRememberChanged;
+  final VoidCallback onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (recent.isNotEmpty) ...[
+          Text('RECENT ENDPOINTS', style: EmDesign.labelCaps(context, scheme)),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: recent.map((h) {
+              return Material(
+                color: scheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(999),
+                child: InkWell(
+                  onTap: () => onRecentTap(h),
+                  borderRadius: BorderRadius.circular(999),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      border: EmDesign.ghostBorder(scheme),
+                    ),
+                    child: Text(h, style: GoogleFonts.inter(fontSize: 12)),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 18),
+        ],
+        _LabeledField(
+          label: 'IP address',
+          child: TextField(
+            controller: host,
+            style: mono,
+            decoration: InputDecoration(
+              hintText: 'IP address',
+              prefixIcon: Icon(Icons.lan_rounded, color: scheme.outline, size: 20),
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Optional: include :port (default 5000).',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+            fontSize: 11,
+          ),
+        ),
+        const SizedBox(height: 14),
+        CheckboxListTile(
+          contentPadding: EdgeInsets.zero,
+          controlAffinity: ListTileControlAffinity.leading,
+          value: rememberDetails,
+          onChanged: (v) => onRememberChanged(v ?? false),
+          title: Text(
+            'Remember this IP on this device',
+            style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        ),
+        const SizedBox(height: 12),
+        EmGradientButton(label: 'Continue', icon: Icons.arrow_forward_rounded, onPressed: onNext),
+      ],
+    );
+  }
+}
+
+class _ConnectPairStep extends StatelessWidget {
+  const _ConnectPairStep({
+    super.key,
+    required this.scheme,
+    required this.theme,
+    required this.pairing,
+    required this.connecting,
+    required this.onBack,
+    required this.onPair,
+    required this.onNext,
+    required this.hasToken,
+  });
+
+  final ColorScheme scheme;
+  final ThemeData theme;
+  final bool pairing;
+  final bool connecting;
+  final VoidCallback onBack;
+  final VoidCallback onPair;
+  final VoidCallback onNext;
+  final bool hasToken;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Pair this phone with your PC using the six-digit code from the Windows tray.',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: scheme.onSurfaceVariant,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 16),
+        EmGradientButton(
+          label: pairing ? 'Pairing…' : 'Pair with code',
+          icon: Icons.phonelink_lock_rounded,
+          inProgress: pairing,
+          onPressed: (connecting || pairing) ? null : onPair,
+        ),
+        if (hasToken) ...[
+          const SizedBox(height: 12),
+          FilledButton.tonal(onPressed: onNext, child: const Text('Already paired — continue')),
+        ],
+        const SizedBox(height: 10),
+        OutlinedButton(onPressed: onBack, child: const Text('Back')),
+      ],
+    );
+  }
+}
+
+class _ConnectFinalStep extends StatelessWidget {
+  const _ConnectFinalStep({
+    super.key,
+    required this.scheme,
+    required this.theme,
+    required this.state,
+    required this.hasToken,
+    required this.pairing,
+    required this.onBack,
+    required this.onConnect,
+    required this.onPair,
+  });
+
+  final ColorScheme scheme;
+  final ThemeData theme;
+  final EmConnectionState state;
+  final bool hasToken;
+  final bool pairing;
+  final VoidCallback onBack;
+  final VoidCallback onConnect;
+  final VoidCallback onPair;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (hasToken)
+          Row(
+            children: [
+              Icon(Icons.verified_user_outlined, size: 16, color: scheme.tertiary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Device paired. Connect when the PC is reachable on your network.',
+                  style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                ),
+              ),
+            ],
+          )
+        else
+          Text(
+            'Pair first, then connect to start live monitoring.',
+            style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        if (state.message != null) ...[
+          const SizedBox(height: 12),
+          EmStatusPanel(icon: Icons.error_outline_rounded, message: state.message!),
+        ],
+        const SizedBox(height: 16),
+        EmGradientButton(
+          label: state.status == ConnectionStatus.connecting ? 'Connecting…' : 'Connect',
+          icon: Icons.bolt_rounded,
+          inProgress: state.status == ConnectionStatus.connecting,
+          onPressed: (state.status == ConnectionStatus.connecting || pairing) ? null : onConnect,
+        ),
+        if (!hasToken) ...[
+          const SizedBox(height: 10),
+          OutlinedButton(onPressed: onPair, child: const Text('Pair with code instead')),
+        ],
+        const SizedBox(height: 10),
+        OutlinedButton(onPressed: onBack, child: const Text('Back')),
       ],
     );
   }
