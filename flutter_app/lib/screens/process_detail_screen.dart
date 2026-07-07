@@ -927,6 +927,10 @@ class ExplainResult {
       this.rawError,
       required this.timestamp,
       required this.isError});
+
+  bool get needsGroqApiKeySetup =>
+      isError &&
+      (rawError?.toLowerCase().contains('no groq api key') ?? false);
 }
 
 String _plainTextAiReport(ExplainResult res, ProcessInfo process) {
@@ -1481,15 +1485,24 @@ $connText
                     ],
                   ),
                   const SizedBox(height: 12),
-                  if (res.isError || res.explanation == null)
+                  if (res.isError || res.explanation == null) ...[
                     Text(
                       res.rawError ?? 'Unknown error',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             height: 1.5,
                             color: Colors.amber,
                           ),
-                    )
-                  else ...[
+                    ),
+                    if (res.needsGroqApiKeySetup) ...[
+                      const SizedBox(height: 12),
+                      FilledButton.tonalIcon(
+                        onPressed: () =>
+                            context.push('/settings?section=groq'),
+                        icon: const Icon(Icons.settings_outlined, size: 18),
+                        label: const Text('Add Groq API key in Settings'),
+                      ),
+                    ],
+                  ] else ...[
                     _buildVerdictBanner(res.explanation!, scheme),
                     const SizedBox(height: 20),
                     Text(

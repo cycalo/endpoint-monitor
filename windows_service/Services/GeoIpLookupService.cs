@@ -23,6 +23,7 @@ public sealed class GeoIpLookupService : IDisposable
     private readonly ILogger<GeoIpLookupService> _logger;
     private readonly DatabaseReader? _reader;
     private readonly ConcurrentDictionary<string, GeoIpResult> _cache = new(StringComparer.Ordinal);
+    private const int MaxCacheEntries = 8192;
 
     public GeoIpLookupService(ILogger<GeoIpLookupService> logger)
     {
@@ -90,6 +91,9 @@ public sealed class GeoIpLookupService : IDisposable
         var key = ipString.Trim();
         if (!IPAddress.TryParse(key, out var ip)) return GeoIpResult.Empty;
         if (IsPrivateOrLocal(ip)) return GeoIpResult.Empty;
+
+        if (_cache.Count >= MaxCacheEntries && !_cache.ContainsKey(key))
+            _cache.Clear();
 
         return _cache.GetOrAdd(key, LookupUncached);
     }

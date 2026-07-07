@@ -87,7 +87,7 @@ class _BrowserScreenState extends State<BrowserScreen>
       body: BlocBuilder<BrowserBloc, BrowserState>(
         builder: (context, state) {
           if (state.loading && state.items.isEmpty) {
-            return const EmListSkeleton();
+            return const EmLoadingSpinner(message: 'Loading browser history…');
           }
 
           return Column(

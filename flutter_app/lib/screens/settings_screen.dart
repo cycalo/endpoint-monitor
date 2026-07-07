@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -15,31 +16,31 @@ import '../bloc/alerts_bloc.dart';
 import '../bloc/connection_bloc.dart';
 import '../bloc/events_bloc.dart';
 import '../bloc/system_info_bloc.dart';
-import '../bloc/threat_intel_bloc.dart';
 import '../settings/app_settings_keys.dart';
 import '../theme/em_design_system.dart';
 import '../theme/theme_cubit.dart';
 import '../utils/export_http_base.dart';
-import '../utils/relative_time.dart';
 import '../widgets/em_brand_app_bar.dart';
 import '../widgets/em_loading_states.dart';
 import '../widgets/pin_unlock_gate.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({super.key, this.focusSection});
+
+  /// When set (e.g. `groq`), scrolls to that section after the first frame.
+  final String? focusSection;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  final _groqSectionKey = GlobalKey();
   final _endpoint = TextEditingController();
   final _jwt = TextEditingController();
-  final _httpBase = TextEditingController();
   final _groqApiKey = TextEditingController();
   bool _hideJwt = true;
   bool _hideGroqApi = true;
-  bool _rememberEndpoint = true;
   bool _pinLock = false;
   String _autoLock = 'never';
   bool _notifyHigh = true;
@@ -61,50 +62,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   String _savedEndpoint = '';
   String _savedJwt = '';
-  String _savedHttp = '';
   String _savedGroqApi = '';
-  bool _savedNotifyHigh = true;
-  bool _savedNotifyWatch = true;
-  bool _savedNotifyIso = true;
-  bool _savedNotifySoft = true;
-  String _savedEventsRange = '1h';
-  int _savedEventsMax = 100;
-  bool _savedShowIpv6 = false;
-  bool _savedCompactProc = false;
 
   @override
   void initState() {
     super.initState();
     _load();
+    if (widget.focusSection == 'groq') {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToGroqSection());
+    }
+  }
+
+  void _scrollToGroqSection() {
+    if (!mounted) return;
+    final ctx = _groqSectionKey.currentContext;
+    if (ctx == null) return;
+    Scrollable.ensureVisible(
+      ctx,
+      alignment: 0.08,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   @override
   void dispose() {
     _endpoint.dispose();
     _jwt.dispose();
-    _httpBase.dispose();
     _groqApiKey.dispose();
     super.dispose();
   }
 
   bool get _connectionDirty =>
       _endpoint.text.trim() != _savedEndpoint ||
-      (_replacingToken && _jwt.text.trim() != _savedJwt) ||
-      _httpBase.text.trim() != _savedHttp;
+      (_replacingToken && _jwt.text.trim() != _savedJwt);
 
   bool get _groqDirty => _groqApiKey.text.trim() != _savedGroqApi;
-
-  bool get _notificationsDirty =>
-      _notifyHigh != _savedNotifyHigh ||
-      _notifyWatch != _savedNotifyWatch ||
-      _notifyIso != _savedNotifyIso ||
-      _notifySoft != _savedNotifySoft;
-
-  bool get _eventsDirty =>
-      _eventsRange != _savedEventsRange || _eventsMax != _savedEventsMax;
-
-  bool get _displayDirty =>
-      _showIpv6 != _savedShowIpv6 || _compactProc != _savedCompactProc;
 
   Future<void> _load() async {
     final p = await SharedPreferences.getInstance();
@@ -118,9 +111,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _endpoint.text = host;
     _jwt.text = token.isEmpty ? '' : _maskToken(token);
     _groqApiKey.text = groqKey;
-    _httpBase.text = p.getString(AppSettingsKeys.httpBase) ?? 'http://192.168.1.10:5000';
-    _rememberEndpoint =
-        p.getBool(AppSettingsKeys.rememberEndpoint) ?? p.getBool('em_remember_connect') ?? true;
     _pinLock = p.getBool(AppSettingsKeys.pinLockEnabled) ?? false;
     _autoLock = p.getString(AppSettingsKeys.autoLockTimeout) ?? 'never';
     _notifyHigh = p.getBool(AppSettingsKeys.notifyHighSeverity) ?? true;
@@ -134,32 +124,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _savedEndpoint = host;
     _savedJwt = token;
     _savedGroqApi = groqKey.trim();
-    _savedHttp = _httpBase.text.trim();
-    _savedNotifyHigh = _notifyHigh;
-    _savedNotifyWatch = _notifyWatch;
-    _savedNotifyIso = _notifyIso;
-    _savedNotifySoft = _notifySoft;
-    _savedEventsRange = _eventsRange;
-    _savedEventsMax = _eventsMax;
-    _savedShowIpv6 = _showIpv6;
-    _savedCompactProc = _compactProc;
     if (mounted) setState(() {});
   }
 
   Future<void> _saveGroqApiKey() async {
     const s = FlutterSecureStorage();
     final key = _groqApiKey.text.trim();
+    if (key == _savedGroqApi) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            key.isEmpty
+                ? 'No Groq API key saved'
+                : 'Groq API key already saved',
+          ),
+        ),
+      );
+      return;
+    }
     await s.write(key: AppSettingsKeys.groqApiKey, value: key);
     _savedGroqApi = key;
     if (!mounted) return;
     setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Groq API Key saved')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          key.isEmpty ? 'Groq API key removed' : 'Groq API key saved',
+        ),
+      ),
+    );
   }
 
-  Future<void> _persistNonConnection() async {
+  Future<void> _persistPreferences() async {
     final p = await SharedPreferences.getInstance();
-    await p.setBool(AppSettingsKeys.rememberEndpoint, _rememberEndpoint);
-    await p.setBool('em_remember_connect', _rememberEndpoint);
     await p.setBool(AppSettingsKeys.pinLockEnabled, _pinLock);
     await p.setString(AppSettingsKeys.autoLockTimeout, _autoLock);
     await p.setBool(AppSettingsKeys.notifyHighSeverity, _notifyHigh);
@@ -170,15 +168,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await p.setInt(AppSettingsKeys.eventsMaxLoad, _eventsMax);
     await p.setBool(AppSettingsKeys.showIpv6Network, _showIpv6);
     await p.setBool(AppSettingsKeys.compactProcessCards, _compactProc);
-    await p.setString(AppSettingsKeys.httpBase, _httpBase.text.trim());
-    _savedNotifyHigh = _notifyHigh;
-    _savedNotifyWatch = _notifyWatch;
-    _savedNotifyIso = _notifyIso;
-    _savedNotifySoft = _notifySoft;
-    _savedEventsRange = _eventsRange;
-    _savedEventsMax = _eventsMax;
-    _savedShowIpv6 = _showIpv6;
-    _savedCompactProc = _compactProc;
   }
 
   Future<void> _saveConnection() async {
@@ -197,10 +186,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _storedToken = tok;
     _replacingToken = false;
     _jwt.text = _maskToken(tok);
-    await _persistNonConnection();
+    await _persistPreferences();
     _savedEndpoint = ep;
     _savedJwt = tok;
-    _savedHttp = _httpBase.text.trim();
     if (!mounted) return;
     if (ep.isNotEmpty && tok.isNotEmpty) {
       context.read<ConnectionBloc>().add(ConnectionConnectRequested(host: ep, token: tok));
@@ -392,10 +380,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             const EmPageIntro(
               title: 'Settings',
-              subtitle: 'Connection, security, notifications, and display preferences.',
+              subtitle: 'Connection, security, notifications, and display.',
               padding: EdgeInsets.only(bottom: 16),
             ),
-            if (_connectionDirty || _notificationsDirty || _eventsDirty || _displayDirty || _groqDirty)
+            if (_connectionDirty || _groqDirty)
               Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(10),
@@ -448,26 +436,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _httpBase,
-                    style: GoogleFonts.jetBrainsMono(fontSize: 13),
-                    decoration: const InputDecoration(
-                      labelText: 'HTTP base (exports / REST)',
-                    ),
-                  ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Remember endpoint'),
-                    value: _rememberEndpoint,
-                    onChanged: (v) => setState(() => _rememberEndpoint = v),
-                  ),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: [
                       OutlinedButton(onPressed: _testPing, child: const Text('Test connection')),
+                      OutlinedButton(
+                        onPressed: () => context.pushNamed('pairedDevices'),
+                        child: const Text('Paired devices'),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -518,58 +496,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       },
                     ),
                   ],
-                  const SizedBox(height: 12),
-                  FutureBuilder<String?>(
-                    future: const FlutterSecureStorage().read(key: 'em_token'),
-                    builder: (context, snap) {
-                      final t = snap.data;
-                      final line = t == null || t.isEmpty
-                          ? 'No device token saved'
-                          : 'Device token configured (${_maskToken(t)})';
-                      return Text(line, style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant));
-                    },
-                  ),
                 ],
               ),
             ),
             const SizedBox(height: 20),
             EmSettingsSection(
               title: 'NOTIFICATIONS',
-              dirty: _notificationsDirty,
               child: Column(
                 children: [
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('High severity alerts'),
                     value: _notifyHigh,
-                    onChanged: (v) => setState(() => _notifyHigh = v),
+                    onChanged: (v) async {
+                      setState(() => _notifyHigh = v);
+                      await _persistPreferences();
+                    },
                   ),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('Watchlist process detected'),
                     value: _notifyWatch,
-                    onChanged: (v) => setState(() => _notifyWatch = v),
+                    onChanged: (v) async {
+                      setState(() => _notifyWatch = v);
+                      await _persistPreferences();
+                    },
                   ),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('Machine isolation changed'),
                     value: _notifyIso,
-                    onChanged: (v) => setState(() => _notifyIso = v),
+                    onChanged: (v) async {
+                      setState(() => _notifyIso = v);
+                      await _persistPreferences();
+                    },
                   ),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('New software installed'),
                     value: _notifySoft,
-                    onChanged: (v) => setState(() => _notifySoft = v),
-                  ),
-                  FilledButton.tonal(
-                    onPressed: () async {
-                      await _persistNonConnection();
-                      if (!context.mounted) return;
-                      setState(() {});
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Notification prefs saved')));
+                    onChanged: (v) async {
+                      setState(() => _notifySoft = v);
+                      await _persistPreferences();
                     },
-                    child: const Text('Save notification prefs'),
                   ),
                 ],
               ),
@@ -577,7 +546,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 20),
             EmSettingsSection(
               title: 'EVENTS',
-              dirty: _eventsDirty,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -605,7 +573,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ButtonSegment(value: 'all', label: Text('All')),
                     ],
                     selected: {_eventsRange},
-                    onSelectionChanged: (s) => setState(() => _eventsRange = s.first),
+                    onSelectionChanged: (s) async {
+                      setState(() => _eventsRange = s.first);
+                      await _persistPreferences();
+                    },
                     showSelectedIcon: false,
                   ),
                   const SizedBox(height: 12),
@@ -618,19 +589,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ButtonSegment(value: 500, label: Text('500')),
                     ],
                     selected: {_eventsMax},
-                    onSelectionChanged: (s) => setState(() => _eventsMax = s.first),
-                    showSelectedIcon: false,
-                  ),
-                  FilledButton.tonal(
-                    onPressed: () async {
-                      final p = await SharedPreferences.getInstance();
-                      await p.setString(AppSettingsKeys.eventsDefaultRange, _eventsRange);
-                      await p.setInt(AppSettingsKeys.eventsMaxLoad, _eventsMax);
-                      await _persistNonConnection();
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Events prefs saved')));
+                    onSelectionChanged: (s) async {
+                      setState(() => _eventsMax = s.first);
+                      await _persistPreferences();
                     },
-                    child: const Text('Save events prefs'),
+                    showSelectedIcon: false,
                   ),
                 ],
               ),
@@ -638,7 +601,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 20),
             EmSettingsSection(
               title: 'DISPLAY',
-              dirty: _displayDirty,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -646,12 +608,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     builder: (context, mode) {
                       return SegmentedButton<ThemeMode>(
                         segments: const [
-                          ButtonSegment(value: ThemeMode.light, label: Text('Light')),
                           ButtonSegment(value: ThemeMode.dark, label: Text('Dark')),
-                          ButtonSegment(value: ThemeMode.system, label: Text('System')),
+                          ButtonSegment(value: ThemeMode.light, label: Text('Light')),
                         ],
-                        selected: {mode},
-                        onSelectionChanged: (s) => context.read<ThemeCubit>().setTheme(s.first),
+                        selected: {mode == ThemeMode.system ? ThemeMode.dark : mode},
+                        onSelectionChanged: (s) =>
+                            context.read<ThemeCubit>().setTheme(s.first),
                       );
                     },
                   ),
@@ -660,27 +622,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: const Text('Show IPv6 addresses'),
                     subtitle: const Text('Network screen'),
                     value: _showIpv6,
-                    onChanged: (v) => setState(() => _showIpv6 = v),
+                    onChanged: (v) async {
+                      setState(() => _showIpv6 = v);
+                      await _persistPreferences();
+                    },
                   ),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('Compact process cards'),
                     value: _compactProc,
-                    onChanged: (v) => setState(() => _compactProc = v),
-                  ),
-                  FilledButton.tonal(
-                    onPressed: () async {
-                      await _persistNonConnection();
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Display prefs saved')));
+                    onChanged: (v) async {
+                      setState(() => _compactProc = v);
+                      await _persistPreferences();
                     },
-                    child: const Text('Save display prefs'),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 20),
-            EmSettingsSection(
+            KeyedSubtree(
+              key: _groqSectionKey,
+              child: EmSettingsSection(
               title: 'GROQ AI',
               dirty: _groqDirty,
               child: Column(
@@ -704,95 +666,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 12),
-                  FilledButton.tonal(
-                    onPressed: _groqDirty ? _saveGroqApiKey : null,
-                    child: const Text('Save'),
+                  FilledButton(
+                    onPressed: _saveGroqApiKey,
+                    child: const Text('Save API key'),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-            EmSettingsSection(
-              title: 'THREAT INTEL',
-              child: BlocBuilder<ThreatIntelBloc, ThreatIntelState>(
-                builder: (context, ti) {
-                  final rel = formatRelativeSinceUtcIso(ti.lastRunUtc);
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        '${ti.entryCount} known threat IPs monitored',
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Connections to these IPs trigger high severity alerts',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                          height: 1.35,
-                        ),
-                      ),
-                      if (rel.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          'Last updated: $rel',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                      if (ti.feeds.isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        for (final f in ti.feeds)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 4),
-                            child: Text(
-                              '${f.name} · ${f.count} IPs',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: scheme.onSurfaceVariant,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                      ],
-                      if (ti.lastError != null && ti.lastError!.isNotEmpty)
-                        Text(
-                          ti.lastError!,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: scheme.error,
-                          ),
-                        ),
-                      const SizedBox(height: 10),
-                      FilledButton.tonal(
-                        onPressed: ti.loading
-                            ? null
-                            : () => context
-                                .read<ThreatIntelBloc>()
-                                .requestRefreshFeeds(),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            if (ti.loading) ...[
-                              SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: scheme.primary,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                            ],
-                            Text(
-                                ti.loading ? 'Updating…' : 'Update feeds now'),
-                          ],
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
             ),
             const SizedBox(height: 20),
             EmSettingsSection(
@@ -846,7 +726,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: const Text('Clear acknowledged alerts'),
                   ),
                   const SizedBox(height: 8),
-                  FilledButton.tonal(onPressed: _exportEvents, child: const Text('Export all data (events JSON)')),
+                  FilledButton.tonal(onPressed: _exportEvents, child: const Text('Export events (JSON)')),
                 ],
               ),
             ),

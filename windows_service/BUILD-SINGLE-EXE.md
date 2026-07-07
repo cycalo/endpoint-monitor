@@ -66,6 +66,10 @@ sc delete EndpointMonitor
 
 Only one process should own the configured HTTP port (see `Server:Port` in `appsettings.json`). If an interactive session is already listening, **`sc start`** may fail or the service may exit until the port is free.
 
+## Pairing when the tray is unavailable
+
+The system tray only runs in **interactive** sessions. After installing as a Windows Service (Session 0), generate pairing codes by opening **`http://localhost:<port>/local/pair`** in a browser **on the monitored PC** (loopback only). The Flutter app can also reach the agent via **`GET /health`** before pairing.
+
 ## Optional: framework-dependent single file
 
 Smaller on disk, but requires the matching .NET runtime installed on the PC:

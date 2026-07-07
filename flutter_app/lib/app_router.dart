@@ -14,6 +14,7 @@ import 'screens/firewall_screen.dart';
 import 'screens/more_screen.dart';
 import 'screens/network_connection_detail_screen.dart';
 import 'screens/network_screen.dart';
+import 'screens/paired_devices_screen.dart';
 import 'screens/process_detail_screen.dart';
 import 'screens/processes_screen.dart';
 import 'screens/settings_screen.dart';
@@ -189,9 +190,16 @@ GoRouter createAppRouter(ConnectionBloc connectionBloc) {
         builder: (context, state) => const WatchlistScreen(),
       ),
       GoRoute(
+        name: 'pairedDevices',
+        path: '/paired-devices',
+        builder: (context, state) => const PairedDevicesScreen(),
+      ),
+      GoRoute(
         name: 'settings',
         path: '/settings',
-        builder: (context, state) => const SettingsScreen(),
+        builder: (context, state) => SettingsScreen(
+          focusSection: state.uri.queryParameters['section'],
+        ),
       ),
     ],
   );

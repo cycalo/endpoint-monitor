@@ -292,7 +292,7 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
                       if (state.loading &&
                           state.items.isEmpty &&
                           state.killedGhosts.isEmpty) {
-                        return const EmListSkeleton();
+                        return const EmLoadingSpinner(message: 'Loading processes…');
                       }
 
                       final rows = _buildDisplayRows(state);

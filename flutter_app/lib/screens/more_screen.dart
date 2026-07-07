@@ -116,6 +116,14 @@ class MoreScreen extends StatelessWidget {
               ),
               _MoreMenuRow(
                 index: 6,
+                icon: Icons.phonelink_setup_rounded,
+                iconColor: scheme.primary,
+                title: 'Paired devices',
+                subtitle: 'Manage phones authorized for this endpoint',
+                onTap: () => context.pushNamed('pairedDevices'),
+              ),
+              _MoreMenuRow(
+                index: 7,
                 icon: Icons.settings_outlined,
                 iconColor: scheme.onSurfaceVariant,
                 title: 'Settings',

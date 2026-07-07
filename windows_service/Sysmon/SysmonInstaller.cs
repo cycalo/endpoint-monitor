@@ -100,6 +100,9 @@ public sealed class SysmonInstaller(
         }
     }
 
+    /// <summary>True when Sysmon64 or Sysmon Windows service is registered.</summary>
+    public bool IsSysmonInstalled() => IsSysmonServiceInstalled();
+
     private static bool IsSysmonServiceInstalled()
     {
         return ServiceExists(ServiceName64) || ServiceExists(ServiceName32);

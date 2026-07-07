@@ -1,4 +1,6 @@
+using System.Net;
 using System.Net.WebSockets;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using AspNetCoreRateLimit;
@@ -13,6 +15,7 @@ using EndpointMonitorService.Services;
 using EndpointMonitorService.Sysmon;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Options;
+using SQLitePCL;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseWindowsService();
@@ -22,6 +25,7 @@ builder.Services.Configure<ServerOptions>(builder.Configuration.GetSection("Serv
 builder.Services.Configure<VirusTotalOptions>(builder.Configuration.GetSection("VirusTotal"));
 builder.Services.Configure<ThreatIntelOptions>(builder.Configuration.GetSection("ThreatIntel"));
 builder.Services.Configure<SoftwareMonitoringOptions>(builder.Configuration.GetSection("SoftwareMonitoring"));
+builder.Services.Configure<MonitoringOptions>(builder.Configuration.GetSection("Monitoring"));
 
 builder.Services.AddMemoryCache();
 builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection("IpRateLimiting"));
@@ -30,6 +34,7 @@ builder.Services.AddInMemoryRateLimiting();
 builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
 
 builder.Services.AddSingleton<AppDatabase>();
+builder.Services.AddSingleton<CollectorSnapshotCache>();
 builder.Services.AddSingleton<WebSocketConnectionManager>();
 builder.Services.AddSingleton<PairingAuthService>();
 builder.Services.AddSingleton<AuthTokenValidator>();
@@ -112,10 +117,33 @@ var pepperError = authOptions.ValidatePepper();
 if (pepperError != null)
     throw new InvalidOperationException(pepperError);
 
+Batteries_V2.Init();
+
 var db = app.Services.GetRequiredService<AppDatabase>();
 await db.InitializeAsync();
 
 app.UseWebSockets();
+
+var agentVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0";
+
+app.MapGet("/health", () => Results.Json(new
+{
+    ok = true,
+    service = "EndpointMonitor",
+    version = agentVersion
+}));
+
+app.MapGet("/local/pair", (HttpContext ctx, PairingAuthService pairing) =>
+{
+    if (!LocalNetworkHelper.IsLoopbackRequest(ctx))
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+
+    var (code, expiresAtUtc) = pairing.CreatePairingCode(TimeSpan.FromMinutes(5));
+    var port = ctx.RequestServices.GetRequiredService<IOptions<ServerOptions>>().Value.Port;
+    var lan = LocalNetworkHelper.GetLanIPv4Addresses();
+    var html = LocalPairPage.Render(code, expiresAtUtc.ToLocalTime(), port, lan);
+    return Results.Content(html, "text/html; charset=utf-8");
+});
 
 app.MapPost("/api/auth/pairing/complete", async (HttpContext ctx, PairingCompleteRequest body) =>
 {
@@ -129,7 +157,10 @@ app.MapPost("/api/auth/pairing/complete", async (HttpContext ctx, PairingComplet
     var pairing = ctx.RequestServices.GetRequiredService<PairingAuthService>();
     var result = await pairing.ExchangePairingCodeAsync(body.Code, deviceName, ctx.RequestAborted).ConfigureAwait(false);
     if (!result.Success || string.IsNullOrEmpty(result.DeviceToken))
-        return Results.Unauthorized();
+    {
+        var code = string.IsNullOrEmpty(result.ErrorCode) ? "pairing_failed" : result.ErrorCode;
+        return Results.Json(new { error = code }, statusCode: StatusCodes.Status401Unauthorized);
+    }
     return Results.Json(new { token = result.DeviceToken });
 });
 

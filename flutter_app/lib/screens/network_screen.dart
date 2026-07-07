@@ -20,6 +20,7 @@ import '../utils/throughput_format.dart';
 import '../utils/em_snapshot_cache.dart';
 import '../widgets/em_brand_app_bar.dart';
 import '../widgets/em_loading_states.dart';
+import '../widgets/em_threat_intel_panel.dart';
 
 class NetworkScreen extends StatefulWidget {
   const NetworkScreen({super.key, this.highlightThreats = false});
@@ -398,7 +399,7 @@ class _NetworkScreenState extends State<NetworkScreen>
                 return BlocBuilder<NetworkBloc, NetworkState>(
                   builder: (context, state) {
                 if (state.loading && state.items.isEmpty) {
-                  return const EmListSkeleton();
+                  return const EmLoadingSpinner(message: 'Loading connections…');
                 }
 
                 final merged =
@@ -505,6 +506,12 @@ class _NetworkScreenState extends State<NetworkScreen>
                               'Active sockets, geo context, blocks, and threat matches.',
                           padding: EdgeInsets.only(bottom: 12),
                         ),
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      sliver: SliverToBoxAdapter(
+                        child: const EmThreatIntelPanel(compact: true),
                       ),
                     ),
                     SliverPadding(

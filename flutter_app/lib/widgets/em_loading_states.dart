@@ -120,6 +120,63 @@ class EmStatusPanel extends StatelessWidget {
   }
 }
 
+/// Centered loading throbber for initial data fetch (replaces skeleton placeholders).
+class EmLoadingSpinner extends StatelessWidget {
+  const EmLoadingSpinner({
+    super.key,
+    this.message,
+    this.expand = true,
+    this.compact = false,
+    this.padding = const EdgeInsets.symmetric(vertical: EmDesign.space2xl),
+  });
+
+  final String? message;
+  final bool expand;
+  final bool compact;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final size = compact ? 22.0 : 32.0;
+
+    final content = Padding(
+      padding: padding,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: size,
+            height: size,
+            child: CircularProgressIndicator(
+              strokeWidth: compact ? 2 : 2.5,
+              color: scheme.primary,
+            ),
+          ),
+          if (message != null) ...[
+            SizedBox(height: compact ? EmDesign.spaceSm : EmDesign.spaceMd),
+            Text(
+              message!,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+
+    if (expand) {
+      return Center(child: content);
+    }
+    return content;
+  }
+}
+
 /// Centered empty state with optional CTA.
 class EmEmptyState extends StatelessWidget {
   const EmEmptyState({
@@ -235,187 +292,6 @@ class EmRouteErrorBody extends StatelessWidget {
           onPressed: onBack,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
         ),
-      ),
-    );
-  }
-}
-
-/// Shimmer sweep used by skeleton placeholders.
-class EmShimmer extends StatefulWidget {
-  const EmShimmer({
-    super.key,
-    required this.child,
-    this.enabled = true,
-  });
-
-  final Widget child;
-  final bool enabled;
-
-  @override
-  State<EmShimmer> createState() => _EmShimmerState();
-}
-
-class _EmShimmerState extends State<EmShimmer>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1400),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!widget.enabled) return widget.child;
-    final scheme = Theme.of(context).colorScheme;
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return ShaderMask(
-          blendMode: BlendMode.srcATop,
-          shaderCallback: (bounds) {
-            final t = _controller.value;
-            return LinearGradient(
-              begin: Alignment(-1.2 + t * 2.4, 0),
-              end: Alignment(-0.2 + t * 2.4, 0),
-              colors: [
-                scheme.surfaceContainer,
-                scheme.surfaceContainerHigh,
-                scheme.surfaceContainer,
-              ],
-              stops: const [0.25, 0.5, 0.75],
-            ).createShader(bounds);
-          },
-          child: child,
-        );
-      },
-      child: widget.child,
-    );
-  }
-}
-
-class _SkeletonBox extends StatelessWidget {
-  const _SkeletonBox({
-    required this.height,
-    this.width,
-    this.radius = EmDesign.radiusMd,
-  });
-
-  final double height;
-  final double? width;
-  final double radius;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(radius),
-      ),
-    );
-  }
-}
-
-/// Generic list loading placeholder (processes, network, events, etc.).
-class EmListSkeleton extends StatelessWidget {
-  const EmListSkeleton({super.key, this.itemCount = 8});
-
-  final int itemCount;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return EmShimmer(
-      child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-        itemCount: itemCount,
-        separatorBuilder: (_, __) => SizedBox(height: EmDesign.spaceSm),
-        itemBuilder: (_, i) {
-          final wide = i % 3 != 1;
-          return Container(
-            padding: const EdgeInsets.all(EmDesign.spaceMd),
-            decoration: EmDesign.cardShell(scheme),
-            child: Row(
-              children: [
-                _SkeletonBox(height: 40, width: 40, radius: EmDesign.radiusSm),
-                const SizedBox(width: EmDesign.spaceMd),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _SkeletonBox(
-                        height: 14,
-                        width: wide ? double.infinity : 160,
-                      ),
-                      const SizedBox(height: EmDesign.spaceXs),
-                      _SkeletonBox(height: 10, width: wide ? 120 : 200),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-/// Dashboard metrics grid while [SystemInfo] is loading.
-class EmDashboardMetricsSkeleton extends StatelessWidget {
-  const EmDashboardMetricsSkeleton({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    Widget card({required double h}) {
-      return Container(
-        height: h,
-        decoration: EmDesign.cardShell(scheme),
-        padding: const EdgeInsets.all(EmDesign.spaceMd),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _SkeletonBox(height: 10, width: 72, radius: EmDesign.radiusSm),
-            const Spacer(),
-            _SkeletonBox(height: 28, width: 100),
-            const SizedBox(height: EmDesign.spaceXs),
-            _SkeletonBox(height: 8, width: 140),
-          ],
-        ),
-      );
-    }
-
-    return EmShimmer(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SizedBox(height: EmDesign.spaceMd),
-          Row(
-            children: [
-              Expanded(child: card(h: 100)),
-              const SizedBox(width: EmDesign.spaceMd),
-              Expanded(child: card(h: 100)),
-            ],
-          ),
-          const SizedBox(height: EmDesign.spaceMd),
-          card(h: 140),
-          const SizedBox(height: EmDesign.spaceMd),
-          card(h: 180),
-        ],
       ),
     );
   }

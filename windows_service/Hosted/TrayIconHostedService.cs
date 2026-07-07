@@ -2,8 +2,10 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Windows.Forms;
 using EndpointMonitorService;
+using EndpointMonitorService.Database;
 using EndpointMonitorService.Options;
 using EndpointMonitorService.Services;
+using EndpointMonitorService.Sysmon;
 using Microsoft.Extensions.Options;
 
 namespace EndpointMonitorService.Hosted;
@@ -12,7 +14,12 @@ public sealed class TrayIconHostedService(
     ILogger<TrayIconHostedService> logger,
     IHostApplicationLifetime appLifetime,
     IOptions<ServerOptions> serverOptions,
-    PairingAuthService pairingAuthService) : IHostedService
+    IOptions<ThreatIntelOptions> threatIntelOptions,
+    PairingAuthService pairingAuthService,
+    WebSocketConnectionManager webSockets,
+    SysmonInstaller sysmonInstaller,
+    ThreatIntelUpdater threatIntelUpdater,
+    AppDatabase database) : IHostedService
 {
     private Thread? _uiThread;
     private NotifyIcon? _notifyIcon;
@@ -33,42 +40,11 @@ public sealed class TrayIconHostedService(
             {
                 Font = new Font("Segoe UI", 9.25f, FontStyle.Regular, GraphicsUnit.Point),
             };
-            menu.Items.Add("Service status", null, (_, _) =>
-            {
-                var s = serverOptions.Value;
-                TrayMessageUi.ShowServiceStatus(s.Port, s.UseHttps, s.HttpsPort);
-            });
-            menu.Items.Add("Pairing code…", null, (_, _) =>
-            {
-                try
-                {
-                    var (code, expiresAtUtc) = pairingAuthService.CreatePairingCode(TimeSpan.FromMinutes(5));
-                    TrayMessageUi.ShowPairingCode(code, expiresAtUtc.ToLocalTime());
-                }
-                catch (InvalidOperationException ex)
-                {
-                    TrayMessageUi.ShowWarning("Pairing unavailable", ex.Message);
-                }
-            });
-            menu.Items.Add("Open logs folder", null, (_, _) =>
-            {
-                try
-                {
-                    var logDir = Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                        "EndpointMonitor");
-                    Directory.CreateDirectory(logDir);
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = logDir,
-                        UseShellExecute = true
-                    });
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "Unable to open logs folder from tray menu.");
-                }
-            });
+            menu.Items.Add("Service status", null, (_, _) => ShowStatus());
+            menu.Items.Add("Diagnostics…", null, (_, _) => ShowDiagnostics());
+            menu.Items.Add("Pairing code…", null, (_, _) => ShowPairingCode());
+            menu.Items.Add("Open pairing page in browser", null, (_, _) => OpenLocalPairPage());
+            menu.Items.Add("Open data folder", null, (_, _) => OpenDataFolder());
             var startWithWindowsItem = new ToolStripMenuItem("Start with Windows (Windows Service)")
             {
                 CheckOnClick = false,
@@ -83,8 +59,9 @@ public sealed class TrayIconHostedService(
                         "Windows startup",
                         "If a UAC prompt appeared, approve it to apply the change.\n\n" +
                         "The tray checks the real service state when you open this menu again.\n\n" +
-                        "Note: the installed service runs without the tray icon. Stop any interactive " +
-                        "copy before starting the service if both would use the same HTTP port.");
+                        "Note: the installed service runs without the tray icon. Use the local pairing " +
+                        "page in a browser on this PC (http://localhost:<port>/local/pair) when the " +
+                        "agent runs as a Windows Service only.");
                 }
                 catch (InvalidOperationException ex)
                 {
@@ -125,17 +102,13 @@ public sealed class TrayIconHostedService(
 
             _notifyIcon = new NotifyIcon
             {
-                Icon = SystemIcons.Application,
+                Icon = SystemIcons.Shield,
                 Text = "Endpoint Monitor — right-click for menu",
                 Visible = true,
                 ContextMenuStrip = menu
             };
 
-            _notifyIcon.DoubleClick += (_, _) =>
-            {
-                var s = serverOptions.Value;
-                TrayMessageUi.ShowServiceStatus(s.Port, s.UseHttps, s.HttpsPort);
-            };
+            _notifyIcon.DoubleClick += (_, _) => ShowStatus();
 
             appLifetime.ApplicationStopping.Register(() =>
             {
@@ -180,5 +153,90 @@ public sealed class TrayIconHostedService(
         }
 
         return Task.CompletedTask;
+    }
+
+    private AgentDiagnostics BuildDiagnostics()
+    {
+        int entryCount;
+        try
+        {
+            entryCount = database.GetActiveBadIpsAsync(CancellationToken.None)
+                .ConfigureAwait(false).GetAwaiter().GetResult().Count;
+        }
+        catch
+        {
+            entryCount = 0;
+        }
+
+        return AgentDiagnosticsBuilder.Build(
+            serverOptions.Value,
+            threatIntelOptions.Value,
+            webSockets,
+            sysmonInstaller,
+            threatIntelUpdater,
+            entryCount);
+    }
+
+    private void ShowStatus()
+    {
+        var lan = LocalNetworkHelper.GetLanIPv4Addresses();
+        TrayMessageUi.ShowServiceStatus(BuildDiagnostics(), lan);
+    }
+
+    private void ShowDiagnostics()
+    {
+        TrayMessageUi.ShowDiagnostics(BuildDiagnostics());
+    }
+
+    private void ShowPairingCode()
+    {
+        try
+        {
+            var (code, expiresAtUtc) = pairingAuthService.CreatePairingCode(TimeSpan.FromMinutes(5));
+            var lan = LocalNetworkHelper.GetLanIPv4Addresses();
+            TrayMessageUi.ShowPairingCode(code, expiresAtUtc.ToLocalTime(), lan);
+        }
+        catch (InvalidOperationException ex)
+        {
+            TrayMessageUi.ShowWarning("Pairing unavailable", ex.Message);
+        }
+    }
+
+    private void OpenLocalPairPage()
+    {
+        try
+        {
+            var port = serverOptions.Value.Port;
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = $"http://localhost:{port}/local/pair",
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Unable to open local pairing page.");
+            TrayMessageUi.ShowWarning("Browser", "Could not open the local pairing page.");
+        }
+    }
+
+    private void OpenDataFolder()
+    {
+        try
+        {
+            var logDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "EndpointMonitor");
+            Directory.CreateDirectory(logDir);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = logDir,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Unable to open data folder from tray menu.");
+        }
     }
 }

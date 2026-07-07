@@ -1,44 +1,47 @@
 using System.Text.Json;
 using EndpointMonitorService.Collectors;
+using EndpointMonitorService.Options;
 using EndpointMonitorService.Services;
+using Microsoft.Extensions.Options;
 
 namespace EndpointMonitorService.Hosted;
 
 public sealed class SystemInfoHostedService(
     ILogger<SystemInfoHostedService> logger,
     WebSocketConnectionManager ws,
+    CollectorSnapshotCache snapshots,
     SystemInfoCollector systemInfoCollector,
-    ProcessCollector processCollector,
-    NetworkCollector networkCollector,
-    Database.AppDatabase database) : BackgroundService
+    Database.AppDatabase database,
+    IOptionsMonitor<MonitoringOptions> options) : BackgroundService
 {
-    /// <summary>Interval between system_info broadcasts (development plan: 10s; slower than process/network by design).</summary>
-    private static readonly TimeSpan SystemInfoInterval = TimeSpan.FromSeconds(10);
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            try
+            var cfg = options.CurrentValue;
+            var interval = TimeSpan.FromSeconds(Math.Clamp(cfg.SystemInfoIntervalSeconds, 5, 300));
+            var idleInterval = TimeSpan.FromSeconds(Math.Clamp(cfg.IdleIntervalSeconds, 5, 600));
+
+            if (ws.ClientCount == 0)
             {
-                var info = systemInfoCollector.Collect();
                 try
                 {
-                    info.ProcessCount = processCollector.Collect().Count;
+                    await Task.Delay(idleInterval, stoppingToken).ConfigureAwait(false);
                 }
-                catch (Exception ex)
+                catch (OperationCanceledException)
                 {
-                    logger.LogDebug(ex, "Process count failed");
+                    break;
                 }
 
-                try
-                {
-                    info.NetworkConnectionCount = networkCollector.Collect().Count;
-                }
-                catch (Exception ex)
-                {
-                    logger.LogDebug(ex, "Network count failed");
-                }
+                continue;
+            }
+
+            try
+            {
+                var snap = snapshots.GetSnapshot();
+                var info = systemInfoCollector.Collect(cacheSeconds: cfg.SystemInfoCacheSeconds);
+                info.ProcessCount = snap.Processes.Count;
+                info.NetworkConnectionCount = snap.Network.Count;
 
                 try
                 {
@@ -59,7 +62,7 @@ public sealed class SystemInfoHostedService(
 
             try
             {
-                await Task.Delay(SystemInfoInterval, stoppingToken).ConfigureAwait(false);
+                await Task.Delay(interval, stoppingToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {

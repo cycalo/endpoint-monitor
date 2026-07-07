@@ -289,7 +289,11 @@ class _SoftwareScreenState extends State<SoftwareScreen> {
           BlocBuilder<SoftwareBloc, SoftwareState>(
             builder: (context, state) {
               if (state.loading && state.items.isEmpty) {
-                return const Expanded(child: EmListSkeleton());
+                return const Expanded(
+                  child: EmLoadingSpinner(
+                    message: 'Loading installed software…',
+                  ),
+                );
               }
 
               final list = _filteredAndSorted(state.items);

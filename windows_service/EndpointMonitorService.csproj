@@ -13,8 +13,7 @@
 
   <!-- Download GeoLite2-City from MaxMind (license required); place GeoLite2-City.mmdb in this folder to copy it next to the built exe. -->
   <ItemGroup>
-    <Content Include="GeoLite2-City.mmdb" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"
-             Condition="Exists('$(MSBuildProjectDirectory)\GeoLite2-City.mmdb')" />
+    <Content Include="GeoLite2-City.mmdb" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(MSBuildProjectDirectory)\GeoLite2-City.mmdb')" />
   </ItemGroup>
 
   <ItemGroup>
@@ -22,7 +21,8 @@
     <PackageReference Include="MaxMind.GeoIP2" Version="5.4.1" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.0" />
-    <PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
+    <PackageReference Include="sqlite-net-base" Version="1.9.172" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
     <PackageReference Include="System.Management" Version="10.0.0" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.0" />
   </ItemGroup>

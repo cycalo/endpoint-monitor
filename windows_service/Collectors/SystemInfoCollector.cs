@@ -14,6 +14,8 @@ public sealed class SystemInfoCollector(
     NetworkThroughputCollector networkThroughput)
 {
     private readonly PerformanceCounter? _cpuCounter = CreateCpuCounter();
+    private SystemInfo? _cachedInfo;
+    private DateTime _cachedAtUtc = DateTime.MinValue;
 
     private static PerformanceCounter? CreateCpuCounter()
     {
@@ -30,7 +32,22 @@ public sealed class SystemInfoCollector(
         }
     }
 
-    public SystemInfo Collect()
+    public SystemInfo Collect(bool forceRefresh = false, int cacheSeconds = 10)
+    {
+        if (!forceRefresh && _cachedInfo != null && _cachedAtUtc != DateTime.MinValue)
+        {
+            var ttl = TimeSpan.FromSeconds(Math.Clamp(cacheSeconds, 2, 120));
+            if (DateTime.UtcNow - _cachedAtUtc < ttl)
+                return _cachedInfo;
+        }
+
+        var info = CollectCore();
+        _cachedInfo = info;
+        _cachedAtUtc = DateTime.UtcNow;
+        return info;
+    }
+
+    private SystemInfo CollectCore()
     {
         var info = new SystemInfo();
         try

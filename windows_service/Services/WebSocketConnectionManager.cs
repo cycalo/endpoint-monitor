@@ -7,6 +7,8 @@ public sealed class WebSocketConnectionManager(ILogger<WebSocketConnectionManage
 {
     private readonly ConcurrentDictionary<Guid, WebSocket> _clients = new();
 
+    public int ClientCount => _clients.Count;
+
     public IReadOnlyCollection<WebSocket> Clients => _clients.Values.ToArray();
 
     public void Add(Guid id, WebSocket socket)
@@ -23,6 +25,9 @@ public sealed class WebSocketConnectionManager(ILogger<WebSocketConnectionManage
 
     public async Task BroadcastAsync(ReadOnlyMemory<byte> payload, CancellationToken cancellationToken = default)
     {
+        if (_clients.IsEmpty)
+            return;
+
         foreach (var kv in _clients)
         {
             var socket = kv.Value;

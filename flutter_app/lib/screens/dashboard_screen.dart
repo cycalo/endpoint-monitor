@@ -42,8 +42,7 @@ class DashboardScreen extends StatelessWidget {
           return BlocBuilder<ConnectionBloc, EmConnectionState>(
             builder: (context, conn) {
               final hostDisplay = emDisplayConnectionHost(conn.host);
-              final ipLine =
-                  _looksLikeIpv4(hostDisplay) ? hostDisplay : '—';
+              final ipLine = _looksLikeIpv4(hostDisplay) ? hostDisplay : '—';
 
               return SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
@@ -101,92 +100,96 @@ class DashboardScreen extends StatelessWidget {
                                     loading: true,
                                     message: 'Syncing system metrics…',
                                   ),
-                                  const EmDashboardMetricsSkeleton(),
                                 ],
                               )
                             : Column(
                                 key: const ValueKey('metrics-loaded'),
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                        BlocBuilder<AlertsBloc, AlertsState>(
-                          builder: (context, alerts) {
-                            final unacked = alerts.items
-                                .where((a) => !alerts.acked.contains(a.id))
-                                .length;
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                _SummaryMetricsPair(
-                                  processCount: i.processCount,
-                                  networkCount: i.networkConnectionCount,
-                                  scheme: scheme,
-                                  theme: theme,
-                                  radiusCard: radiusCard,
-                                ),
-                                const SizedBox(height: 24),
-                                LayoutBuilder(
-                                  builder: (context, c) {
-                                    final twoCol = c.maxWidth >= 480;
-                                    final cpu = _CpuLoadCard(
-                                      info: i,
-                                      mono: mono,
-                                      scheme: scheme,
-                                      theme: theme,
-                                      radiusCard: radiusCard,
-                                    );
-                                    final ramDisk = _RamDiskCard(
-                                      info: i,
-                                      scheme: scheme,
-                                      theme: theme,
-                                      radiusCard: radiusCard,
-                                    );
-                                    if (twoCol) {
-                                      return Row(
+                                  BlocBuilder<AlertsBloc, AlertsState>(
+                                    builder: (context, alerts) {
+                                      final unacked = alerts.items
+                                          .where((a) =>
+                                              !alerts.acked.contains(a.id))
+                                          .length;
+                                      return Column(
                                         crossAxisAlignment:
-                                            CrossAxisAlignment.start,
+                                            CrossAxisAlignment.stretch,
                                         children: [
-                                          Expanded(child: cpu),
-                                          const SizedBox(width: 16),
-                                          Expanded(child: ramDisk),
+                                          _SummaryMetricsPair(
+                                            processCount: i.processCount,
+                                            networkCount:
+                                                i.networkConnectionCount,
+                                            scheme: scheme,
+                                            theme: theme,
+                                            radiusCard: radiusCard,
+                                          ),
+                                          const SizedBox(height: 24),
+                                          LayoutBuilder(
+                                            builder: (context, c) {
+                                              final twoCol = c.maxWidth >= 480;
+                                              final cpu = _CpuLoadCard(
+                                                info: i,
+                                                mono: mono,
+                                                scheme: scheme,
+                                                theme: theme,
+                                                radiusCard: radiusCard,
+                                              );
+                                              final ramDisk = _RamDiskCard(
+                                                info: i,
+                                                scheme: scheme,
+                                                theme: theme,
+                                                radiusCard: radiusCard,
+                                              );
+                                              if (twoCol) {
+                                                return Row(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Expanded(child: cpu),
+                                                    const SizedBox(width: 16),
+                                                    Expanded(child: ramDisk),
+                                                  ],
+                                                );
+                                              }
+                                              return Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.stretch,
+                                                children: [
+                                                  cpu,
+                                                  const SizedBox(height: 16),
+                                                  ramDisk,
+                                                ],
+                                              );
+                                            },
+                                          ),
+                                          const SizedBox(height: 24),
+                                          _SystemInformationCard(
+                                            info: i,
+                                            hostDisplay: hostDisplay,
+                                            ipLine: ipLine,
+                                            mono: mono,
+                                            scheme: scheme,
+                                            theme: theme,
+                                            radiusCard: radiusCard,
+                                          ),
+                                          if (unacked > 0) ...[
+                                            const SizedBox(height: 12),
+                                            _AlertsStrip(
+                                                count: unacked, scheme: scheme),
+                                          ],
+                                          const SizedBox(height: 32),
+                                          _DangerZoneSection(
+                                            scheme: scheme,
+                                            theme: theme,
+                                            radiusCard: radiusCard,
+                                            onIsolate: () =>
+                                                _runIsolateFlow(context),
+                                          ),
                                         ],
                                       );
-                                    }
-                                    return Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        cpu,
-                                        const SizedBox(height: 16),
-                                        ramDisk,
-                                      ],
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: 24),
-                                _SystemInformationCard(
-                                  info: i,
-                                  hostDisplay: hostDisplay,
-                                  ipLine: ipLine,
-                                  mono: mono,
-                                  scheme: scheme,
-                                  theme: theme,
-                                  radiusCard: radiusCard,
-                                ),
-                                if (unacked > 0) ...[
-                                  const SizedBox(height: 12),
-                                  _AlertsStrip(count: unacked, scheme: scheme),
-                                ],
-                                const SizedBox(height: 32),
-                                _DangerZoneSection(
-                                  scheme: scheme,
-                                  theme: theme,
-                                  radiusCard: radiusCard,
-                                  onIsolate: () => _runIsolateFlow(context),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
+                                    },
+                                  ),
                                 ],
                               ),
                       ),
@@ -254,124 +257,138 @@ class _DashboardConnectionHero extends StatelessWidget {
     return BlocBuilder<ConnectionBloc, EmConnectionState>(
       builder: (context, c) {
         final host = emDisplayConnectionHost(c.host);
-        return Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainer,
-            borderRadius: BorderRadius.circular(EmDesign.radiusLg),
-            border: EmDesign.ghostBorder(scheme),
-            boxShadow: [
-              BoxShadow(
-                color: scheme.onSurface.withValues(
-                  alpha: scheme.brightness == Brightness.dark ? 0.18 : 0.08,
-                ),
-                blurRadius: 24,
-                offset: const Offset(0, 12),
+        final accentGlow = c.isConnected
+            ? scheme.tertiary
+            : c.status == ConnectionStatus.connecting
+                ? scheme.primary
+                : null;
+        final iconColor = c.isConnected
+            ? scheme.tertiary.withValues(alpha: 0.62)
+            : c.status == ConnectionStatus.connecting
+                ? scheme.primary.withValues(alpha: 0.58)
+                : scheme.onSurfaceVariant.withValues(alpha: 0.45);
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(EmDesign.radiusLg),
+              boxShadow: EmDesign.heroElevationShadows(
+                scheme,
+                accentGlow: accentGlow,
               ),
-            ],
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 2,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('STATUS', style: EmDesign.labelCaps(context, scheme)),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        if (c.isConnected) ...[
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: scheme.tertiary,
-                              boxShadow: [
-                                BoxShadow(
-                                  color:
-                                      scheme.tertiary.withValues(alpha: 0.45),
-                                  blurRadius: 8,
-                                ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(EmDesign.radiusLg),
+              child: DecoratedBox(
+                decoration: EmDesign.heroCardDecoration(scheme),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('STATUS',
+                                style: EmDesign.labelCaps(context, scheme)),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                if (c.isConnected) ...[
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: scheme.tertiary,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: scheme.tertiary
+                                              .withValues(alpha: 0.45),
+                                          blurRadius: 8,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Connected',
+                                    style: theme.textTheme.headlineSmall
+                                        ?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ] else if (c.status ==
+                                    ConnectionStatus.connecting) ...[
+                                  SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: scheme.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Connecting…',
+                                    style: theme.textTheme.headlineSmall
+                                        ?.copyWith(
+                                      color: scheme.primary,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ] else ...[
+                                  Text(
+                                    'Disconnected',
+                                    style: theme.textTheme.headlineSmall
+                                        ?.copyWith(
+                                      color: scheme.outline,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Connected',
-                            style: theme.textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.w800,
+                            const SizedBox(height: 6),
+                            Text(
+                              c.isConnected
+                                  ? 'Secure channel · $host'
+                                  : c.status == ConnectionStatus.connecting
+                                      ? 'Restoring the secure channel…'
+                                      : 'Connection lost. Use Reconnect below or the link control in the header.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: c.isConnected
+                                    ? scheme.tertiary
+                                    : scheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
-                          ),
-                        ] else if (c.status ==
-                            ConnectionStatus.connecting) ...[
-                          SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: scheme.primary,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Connecting…',
-                            style: theme.textTheme.headlineSmall?.copyWith(
-                              color: scheme.primary,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ] else ...[
-                          Text(
-                            'Disconnected',
-                            style: theme.textTheme.headlineSmall?.copyWith(
-                              color: scheme.outline,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      c.isConnected
-                          ? 'Secure channel · $host'
-                          : c.status == ConnectionStatus.connecting
-                              ? 'Restoring the secure channel…'
-                              : 'Connection lost. Use Reconnect below or the link control in the header.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: c.isConnected
-                            ? scheme.tertiary
-                            : scheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w500,
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              SizedBox(
-                width: 88,
-                height: 88,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: scheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(EmDesign.radiusMd),
-                    border: EmDesign.ghostBorder(scheme),
-                  ),
-                  child: Center(
-                    child: Icon(
-                      Icons.monitor_heart_rounded,
-                      size: 36,
-                      color: scheme.primary.withValues(alpha: 0.5),
-                    ),
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        width: 88,
+                        height: 88,
+                        child: DecoratedBox(
+                          decoration: EmDesign.heroIconWellDecoration(scheme),
+                          child: Center(
+                            child: Icon(
+                              Icons.monitor_heart_rounded,
+                              size: 36,
+                              color: iconColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ],
+            ),
           ),
         );
       },
@@ -1333,7 +1350,8 @@ class _SummaryMetricsPair extends StatelessWidget {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          Expanded(child: Text(label.toUpperCase(), style: sub)),
+                          Expanded(
+                              child: Text(label.toUpperCase(), style: sub)),
                           Icon(
                             Icons.arrow_forward_rounded,
                             size: 16,
@@ -1414,7 +1432,8 @@ class _AlertsStrip extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
-                Icon(Icons.warning_amber_rounded, color: scheme.error, size: 22),
+                Icon(Icons.warning_amber_rounded,
+                    color: scheme.error, size: 22),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -1474,7 +1493,7 @@ class _DangerZoneSection extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'Isolating the machine will terminate all network traffic except for this management console. Use only in case of suspected compromise.',
+            'Isolating the machine will terminate all network traffic except for this management console.',
             style: theme.textTheme.bodySmall?.copyWith(
               color: scheme.onSurfaceVariant,
               height: 1.45,

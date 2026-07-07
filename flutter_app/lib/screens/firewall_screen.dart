@@ -380,7 +380,7 @@ class _FirewallScreenState extends State<FirewallScreen>
           return BlocBuilder<ConnectionBloc, EmConnectionState>(
             builder: (context, conn) {
               final connected = conn.isConnected;
-              final showSkeleton = fw.waitingFirstSnapshot &&
+              final showLoading = fw.waitingFirstSnapshot &&
                   fw.snapshotLoading &&
                   !fw.pullRefreshing &&
                   connected;
@@ -468,8 +468,13 @@ class _FirewallScreenState extends State<FirewallScreen>
                                 ),
                               ),
                               const SizedBox(height: 10),
-                              if (showSkeleton)
-                                const _BlocksSkeleton()
+                              if (showLoading)
+                                const EmLoadingSpinner(
+                                  expand: false,
+                                  compact: true,
+                                  padding: EdgeInsets.symmetric(vertical: 24),
+                                  message: 'Loading firewall rules…',
+                                )
                               else
                                 EmCollapsibleBlockList(
                                   items: fw.ipAndPortBlocks,
@@ -538,8 +543,13 @@ class _FirewallScreenState extends State<FirewallScreen>
                                 ),
                               ),
                               const SizedBox(height: 10),
-                              if (showSkeleton)
-                                const _BlocksSkeleton()
+                              if (showLoading)
+                                const EmLoadingSpinner(
+                                  expand: false,
+                                  compact: true,
+                                  padding: EdgeInsets.symmetric(vertical: 24),
+                                  message: 'Loading firewall rules…',
+                                )
                               else
                                 EmCollapsibleBlockList(
                                   items: fw.processBlocks,
@@ -792,55 +802,6 @@ class _IsolationCard extends StatelessWidget {
               child: const Text('Isolate Machine'),
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _BlocksSkeleton extends StatelessWidget {
-  const _BlocksSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Column(
-      children: List.generate(
-        3,
-        (i) => Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Container(
-            height: 88,
-            decoration: EmDesign.cardShell(
-              scheme,
-              color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    height: 14,
-                    width: 160,
-                    decoration: BoxDecoration(
-                      color: scheme.onSurface.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    height: 12,
-                    width: 220,
-                    decoration: BoxDecoration(
-                      color: scheme.onSurface.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }

@@ -1,7 +1,5 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -593,85 +591,6 @@ class _EventsScreenState extends State<EventsScreen>
               ],
             ),
           ),
-          Builder(
-            builder: (context) {
-              final isNarrow = MediaQuery.sizeOf(context).width < 460;
-              Future<void> exportEvents() async {
-              try {
-                final p = await SharedPreferences.getInstance();
-                  final base =
-                      p.getString('em_http_base') ?? 'http://192.168.1.10:5000';
-                const s = FlutterSecureStorage();
-                final token = await s.read(key: 'em_token') ?? '';
-                final dio = Dio(BaseOptions(baseUrl: base));
-                final res = await dio.get<dynamic>(
-                  '/export/events',
-                    options:
-                        Options(headers: {'Authorization': 'Bearer $token'}),
-                );
-                if (!context.mounted) return;
-                await showDialog<void>(
-                  context: context,
-                  builder: (c) => AlertDialog(
-                    title: const Text('Export preview'),
-                    content: SingleChildScrollView(
-                      child: Text(() {
-                        final str = res.data?.toString() ?? '';
-                        if (str.length <= 4000) return str;
-                        return '${str.substring(0, 4000)}…';
-                      }()),
-                    ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(c),
-                          child: const Text('Close'),
-                        ),
-                      ],
-                  ),
-                );
-              } catch (e) {
-                if (!context.mounted) return;
-                  ScaffoldMessenger.of(context)
-                      .showSnackBar(SnackBar(content: Text('$e')));
-                }
-              }
-
-              if (isNarrow) {
-                return IconButton(
-                  tooltip: 'Export (HTTP)',
-                  onPressed: exportEvents,
-                  icon: Icon(Icons.ios_share_rounded, color: scheme.primary),
-                );
-              }
-
-              return TextButton.icon(
-                style: TextButton.styleFrom(
-                  foregroundColor: scheme.onSurface,
-                  backgroundColor: scheme.surfaceContainer,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(EmDesign.radiusLg),
-                    side: BorderSide(color: EmDesign.ghostLine(scheme)),
-                  ),
-                ),
-                onPressed: exportEvents,
-                icon: Icon(
-                  Icons.ios_share_rounded,
-                  size: 18,
-                  color: scheme.primary,
-                ),
-                label: Text(
-                  'Export',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: scheme.onSurface,
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(width: 4),
         ],
       ),
       body: Column(
@@ -688,7 +607,7 @@ class _EventsScreenState extends State<EventsScreen>
               children: [
                 const EmPageIntro(
                   title: 'Events',
-                  subtitle: 'Sysmon timeline with filters, noise reduction, and export.',
+                  subtitle: 'Sysmon timeline with filters and noise reduction.',
                   padding: EdgeInsets.zero,
                 ),
                 TextField(
@@ -836,7 +755,7 @@ class _EventsScreenState extends State<EventsScreen>
                 final list = filtered;
 
                 if (state.loading && state.items.isEmpty) {
-                  return const EmListSkeleton();
+                  return const EmLoadingSpinner(message: 'Loading events…');
                 }
 
                 if (list.isEmpty) {

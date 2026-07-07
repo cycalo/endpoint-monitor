@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../bloc/connection_bloc.dart';
 import '../theme/em_design_system.dart';
+import '../utils/agent_health.dart';
 import '../utils/export_http_base.dart';
 import '../widgets/em_brand_app_bar.dart';
 import '../widgets/em_gradient_button.dart';
@@ -35,6 +36,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
   List<String> _recent = const [];
   bool _rememberDetails = false;
   bool _pairing = false;
+  bool _probingHealth = false;
   int _onboardingStep = 0;
   /// True if [em_token] is present in secure storage (pairing already done on this device).
   bool? _hasDeviceToken;
@@ -89,6 +91,30 @@ class _ConnectScreenState extends State<ConnectScreen> {
     await secure.delete(key: _kEmHost);
   }
 
+  Future<void> _testAgentReachability() async {
+    final host = _host.text.trim();
+    if (host.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter the PC IP address first.')),
+      );
+      return;
+    }
+    setState(() => _probingHealth = true);
+    final ok = await probeAgentHealth(host);
+    if (!mounted) return;
+    setState(() => _probingHealth = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok
+              ? 'Agent is reachable at this address.'
+              : 'Agent not reachable. Check IP, firewall, and that Endpoint Monitor is running.',
+        ),
+      ),
+    );
+  }
+
   Future<void> _pairDeviceWithCode() async {
     final host = _host.text.trim();
     if (host.isEmpty) {
@@ -116,7 +142,8 @@ class _ConnectScreenState extends State<ConnectScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'Enter the six-digit code shown in the Windows tray app.',
+                  'Enter the six-digit code from the Windows tray menu, or open '
+                  'the local pairing page on the PC (http://localhost:<port>/local/pair).',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: scheme.onSurfaceVariant,
                     height: 1.4,
@@ -157,6 +184,19 @@ class _ConnectScreenState extends State<ConnectScreen> {
 
       if (mounted) setState(() => _pairing = true);
       final base = httpBaseFromMonitorHost(host);
+      final reachable = await probeAgentHealth(host);
+      if (!reachable) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Could not reach the agent. Check the IP, firewall, and that Endpoint Monitor is running on the PC.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
       final dio = Dio(BaseOptions(
         baseUrl: base,
         connectTimeout: const Duration(seconds: 15),
@@ -185,7 +225,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Pairing failed. Check the code and endpoint, then try again.')),
+          SnackBar(content: Text(pairingFailureMessage(e))),
         );
       }
     } finally {
@@ -302,7 +342,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    'Enter the PC’s IP, pair once with a code from the Windows tray, then connect.',
+                                    'Enter the PC’s IP, pair once with a code from the Windows tray or local pairing page, then connect.',
                                     style: theme.textTheme.bodySmall?.copyWith(
                                       color: scheme.onSurfaceVariant,
                                       height: 1.4,
@@ -332,6 +372,8 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                             recent: _recent,
                                             host: _host,
                                             rememberDetails: _rememberDetails,
+                                            probingHealth: _probingHealth,
+                                            onTestReachability: _testAgentReachability,
                                             onRecentTap: (h) {
                                               _host.text = h
                                                   .replaceFirst(RegExp(r'^https?://'), '')
@@ -431,7 +473,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                _MetaPill(scheme: scheme, label: 'Pairing + TLS'),
+                                _MetaPill(scheme: scheme, label: 'Pairing + health check'),
                                 const SizedBox(width: 20),
                                 _MetaPill(scheme: scheme, label: 'Tailscale / LAN'),
                               ],
@@ -588,8 +630,10 @@ class _ConnectAddressStep extends StatelessWidget {
     required this.recent,
     required this.host,
     required this.rememberDetails,
+    required this.probingHealth,
     required this.onRecentTap,
     required this.onRememberChanged,
+    required this.onTestReachability,
     required this.onNext,
   });
 
@@ -599,8 +643,10 @@ class _ConnectAddressStep extends StatelessWidget {
   final List<String> recent;
   final TextEditingController host;
   final bool rememberDetails;
+  final bool probingHealth;
   final ValueChanged<String> onRecentTap;
   final ValueChanged<bool> onRememberChanged;
+  final VoidCallback onTestReachability;
   final VoidCallback onNext;
 
   @override
@@ -666,6 +712,18 @@ class _ConnectAddressStep extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: probingHealth ? null : onTestReachability,
+          icon: probingHealth
+              ? SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: scheme.primary),
+                )
+              : Icon(Icons.wifi_tethering_rounded, size: 18, color: scheme.primary),
+          label: Text(probingHealth ? 'Checking…' : 'Test agent reachability'),
+        ),
+        const SizedBox(height: 12),
         EmGradientButton(label: 'Continue', icon: Icons.arrow_forward_rounded, onPressed: onNext),
       ],
     );
@@ -700,7 +758,7 @@ class _ConnectPairStep extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Pair this phone with your PC using the six-digit code from the Windows tray.',
+          'Pair this phone with your PC using the six-digit code from the Windows tray or the local pairing page in a browser on the PC.',
           style: theme.textTheme.bodySmall?.copyWith(
             color: scheme.onSurfaceVariant,
             height: 1.4,

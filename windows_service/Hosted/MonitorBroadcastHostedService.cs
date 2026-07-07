@@ -1,51 +1,47 @@
 using System.Text.Json;
 using EndpointMonitorService.Collectors;
 using EndpointMonitorService.Models;
+using EndpointMonitorService.Options;
 using EndpointMonitorService.Services;
+using Microsoft.Extensions.Options;
 
 namespace EndpointMonitorService.Hosted;
 
 public sealed class MonitorBroadcastHostedService(
     ILogger<MonitorBroadcastHostedService> logger,
     WebSocketConnectionManager ws,
-    ProcessCollector processCollector,
-    NetworkCollector networkCollector) : BackgroundService
+    CollectorSnapshotCache snapshots,
+    IOptionsMonitor<MonitoringOptions> options) : BackgroundService
 {
-    /// <summary>Interval between full process + network snapshots broadcast to all WebSocket clients (development plan: 5s).</summary>
-    private static readonly TimeSpan BroadcastInterval = TimeSpan.FromSeconds(5);
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
         {
+            var cfg = options.CurrentValue;
+            var activeInterval = TimeSpan.FromSeconds(Math.Clamp(cfg.ActiveBroadcastIntervalSeconds, 2, 120));
+            var idleInterval = TimeSpan.FromSeconds(Math.Clamp(cfg.IdleIntervalSeconds, 5, 600));
+
+            if (ws.ClientCount == 0)
+            {
+                try
+                {
+                    await Task.Delay(idleInterval, stoppingToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+
+                continue;
+            }
+
             try
             {
-                IReadOnlyList<ProcessInfo> processes;
-                try
-                {
-                    processes = processCollector.Collect();
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "Process collector failed");
-                    processes = [];
-                }
-
-                IReadOnlyList<NetworkConnection> network;
-                try
-                {
-                    network = networkCollector.Collect();
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "Network collector failed");
-                    network = [];
-                }
-
-                var pJson = JsonSerializer.Serialize(new { type = "processes", data = processes }, AppJson.Options);
+                var snap = snapshots.GetSnapshot();
+                var pJson = JsonSerializer.Serialize(new { type = "processes", data = snap.Processes }, AppJson.Options);
                 await ws.BroadcastAsync(System.Text.Encoding.UTF8.GetBytes(pJson), stoppingToken).ConfigureAwait(false);
 
-                var nJson = JsonSerializer.Serialize(new { type = "network", data = network }, AppJson.Options);
+                var nJson = JsonSerializer.Serialize(new { type = "network", data = snap.Network }, AppJson.Options);
                 await ws.BroadcastAsync(System.Text.Encoding.UTF8.GetBytes(nJson), stoppingToken).ConfigureAwait(false);
             }
             catch (Exception ex)
@@ -55,7 +51,7 @@ public sealed class MonitorBroadcastHostedService(
 
             try
             {
-                await Task.Delay(BroadcastInterval, stoppingToken).ConfigureAwait(false);
+                await Task.Delay(activeInterval, stoppingToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {

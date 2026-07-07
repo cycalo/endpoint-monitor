@@ -31,8 +31,7 @@ public sealed class ResponseCommandService(
     VirusTotalReputationService virusTotal,
     ThreatIntelUpdater threatIntel,
     SystemInfoCollector systemInfoCollector,
-    ProcessCollector processCollector,
-    NetworkCollector networkCollector)
+    CollectorSnapshotCache snapshots)
 {
     /// <summary>
     /// Firewall snapshots must always include <c>sourceProcessName</c> on each block (string or JSON null).
@@ -151,24 +150,10 @@ public sealed class ResponseCommandService(
     /// <summary>Same payload shape as <see cref="SystemInfoHostedService"/> broadcasts, for on-demand refresh.</summary>
     private async Task<CommandResult> GetSystemInfoSnapshotAsync(CancellationToken cancellationToken)
     {
-        var info = systemInfoCollector.Collect();
-        try
-        {
-            info.ProcessCount = processCollector.Collect().Count;
-        }
-        catch (Exception ex)
-        {
-            logger.LogDebug(ex, "Process count failed");
-        }
-
-        try
-        {
-            info.NetworkConnectionCount = networkCollector.Collect().Count;
-        }
-        catch (Exception ex)
-        {
-            logger.LogDebug(ex, "Network count failed");
-        }
+        var snap = snapshots.GetSnapshot(forceRefresh: true);
+        var info = systemInfoCollector.Collect(forceRefresh: true);
+        info.ProcessCount = snap.Processes.Count;
+        info.NetworkConnectionCount = snap.Network.Count;
 
         try
         {
