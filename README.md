@@ -1,53 +1,104 @@
 # Endpoint Monitor (EDR) — Self-Hosted Endpoint Detection, Response & Forensics Platform
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform: Windows Service](https://img.shields.io/badge/Agent-Windows_Service_--_.NET_10-purple.svg)]()
 [![Client: Flutter](https://img.shields.io/badge/Client-Flutter_--_Dart-blue.svg)]()
 [![Security: Zero--Trust_Pairing](https://img.shields.io/badge/Security-Zero--Trust_Pairing-green.svg)]()
 
-**Endpoint Monitor** is a self-hosted, lightweight **Endpoint Detection and Response (EDR)** and digital forensics platform. It allows security analysts and administrators to monitor, audit, and remotely control a Windows host directly from a mobile device — without relying on a third-party cloud control plane. 
+**Endpoint Monitor** is a self-hosted, lightweight **Endpoint Detection and Response (EDR)** and digital forensics platform. It allows security analysts and administrators to monitor, audit, and remotely control a Windows host directly from a mobile device — without relying on a third-party cloud control plane.
 
 The system consists of an elevated **C# .NET 10 Windows Service (Agent)** running on the monitored host and a **Flutter Mobile Application (Client)**. Communication occurs directly over local networks or VPNs via secure REST APIs and high-frequency WebSockets.
 
-*This project is designed as a portfolio piece for a **SOC (Security Operations Center) Analyst** or **Security Engineer** role, showcasing deep systems programming, Windows internals, network security, secure software development, and real-time incident response orchestration.*
+---
+
+## Platform showcase
+
+### Connection and pairing
+
+Pair the mobile client to the Windows agent over LAN or VPN. Enter the agent address, then complete one-time pairing with a short-lived code from the system tray or the loopback-only pairing page on the PC.
+
+**Enter agent address**
+
+![Enter agent address](screenshots/Secure%20Pairing%201.png)
+
+**Pair with code**
+
+![Pair with code](screenshots/Secure%20Paring%202.png)
 
 ---
 
-## 📸 Platform Showcase
+### Dashboard
 
-### 1. Authentication & Dashboard
-Establish a secure session using the Zero-Trust pairing protocol. Once connected, the Dashboard provides real-time visibility into the endpoint's health, CPU/RAM utilization, active socket counts, and an interactive security activity heatmap.
+After pairing, the dashboard streams live endpoint health: connection status, 24-hour activity, threat-intel coverage, process and connection counts, resource usage, system identity, Sysmon status, and host isolation controls.
 
-| Secure Pairing | Live Dashboard |
-| :---: | :---: |
-| ![Secure Pairing](screenshots/Screenshot_1783453286.png) | ![Live Dashboard](screenshots/Screenshot_1783453305.png) |
+**Activity, threat intel, and resource overview**
 
----
+![Dashboard activity and threat intel](screenshots/Live%20Dashboard.png)
 
-### 2. Process Inventory & Forensic Analysis
-Audit running processes in real-time. Select any process to view its parent-child relationship, executable path, resource utilization charts, query its hash reputation on **VirusTotal**, or generate an **AI Explanation** of its behavior.
+**System identity, Sysmon status, and host isolation**
 
-| Process Inventory | Process Detail & Actions | AI Process Explanation |
-| :---: | :---: | :---: |
-| ![Process Inventory](screenshots/Screenshot_1783453837.png) | ![Process Detail](screenshots/Screenshot_1783453847.png) | ![AI Process Explanation](screenshots/Screenshot_1783453872.png) |
+![Dashboard system info and isolation](screenshots/Live%20Dashboard%202.png)
 
 ---
 
-### 3. Network Telemetry & Active Firewall Controls
-Monitor active TCP/UDP connections. Remote IPs are cross-referenced in real-time against threat intelligence feeds, highlighting malicious connections in red. Analysts can block specific IPs, outbound ports, or restrict network access for specific executable paths.
+### Processes
 
-| Active Network Connections | IP Blocking Dialog | Active Firewall Rules & Isolation |
-| :---: | :---: | :---: |
-| ![Network Connections](screenshots/Screenshot_1783454038.png) | ![IP Blocking Dialog](screenshots/Screenshot_1783454043.png) | ![Firewall Rules](screenshots/Screenshot_1783454207.png) |
+Browse live and recently terminated processes. Open any process for command line, parent PID, response actions (kill, suspend, resume, flag), VirusTotal lookup, and optional AI-assisted triage.
+
+**Process list**
+
+![Process list](screenshots/Processes.png)
+
+**Process detail and response actions**
+
+![Process detail and actions](screenshots/Process%20Detail%20and%20Actions.png)
+
+**AI process explanation**
+
+![AI process explanation](screenshots/AI%20Process%20Explanation.png)
 
 ---
 
-### 4. Forensic Auditing & Remote Host Controls
-Inspect ingested Sysmon logs, audit browser history across multiple profiles, and inventory installed software (with remote uninstallation capabilities). The platform also supports remote power management, volume controls, and real-time desktop screenshots.
+### Network
 
-| Sysmon Events Timeline | Browser History Audit | Software Inventory | Endpoint Host Controls |
-| :---: | :---: | :---: | :---: |
-| ![Sysmon Events](screenshots/Screenshot_1783454094.png) | ![Browser History](screenshots/Screenshot_1783454177.png) | ![Software Inventory](screenshots/Screenshot_1783454182.png) | ![Endpoint Controls](screenshots/Screenshot_1783454211.png) |
+Monitor active sockets with threat-intel context, geo lookup, and bandwidth metrics. Drill into a connection to inspect endpoints, duration, and block or flag the remote IP.
+
+**Active connections and threat intel**
+
+![Active network connections](screenshots/active%20network%20connections.png)
+
+**Connection detail and blocking**
+
+![Network connection detail](screenshots/network%20details.png)
+
+---
+
+### Firewall and host isolation
+
+Manage machine isolation, quick outbound port blocks, and manual IP rules with direction and expiry options.
+
+**Firewall overview and quick blocks**
+
+![Firewall rules and isolation](screenshots/Fireall%20rules%20and%20isolation.png)
+
+**Manual IP block**
+
+![Manual IP block](screenshots/fire%20rules%20and%20isolation%202.png)
+
+---
+
+### Events
+
+Review a live Sysmon timeline with search, filters, and noise reduction. Events include process creation, network connections, and process termination.
+
+![Sysmon events timeline](screenshots/events.png)
+
+---
+
+### More tools
+
+Access browser history, installed software, alerts, firewall, remote controls, watchlist, and paired-device management from the More hub.
+
+![More screen](screenshots/More%20screen.png)
 
 ---
 
@@ -275,11 +326,3 @@ The mobile client dispatches commands as JSON payloads over the WebSocket. The A
 2. **Parameterized Queries**: All database interactions with SQLite utilize ORM parameter binding to prevent SQL injection.
 3. **Fail-Closed Design**: On any internal exception or authentication failure, the Agent denies the request by default, logs the error server-side, and returns a generic error code to the client.
 4. **Least Privilege**: The Agent runs as a Windows Service under the `LocalSystem` account to access low-level OS APIs, but restricts remote execution to validated, paired devices only.
-
----
-
-## 📄 License & Portfolio Context
-
-This project is licensed under the MIT License. 
-
-*This repository is part of my professional cybersecurity portfolio. It demonstrates my ability to design secure client-server architectures, write low-level systems code in C#, integrate with Windows operating system internals, and build responsive, real-time security tools in Flutter.*
