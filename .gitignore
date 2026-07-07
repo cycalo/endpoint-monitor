@@ -1,3 +1,6 @@
+# Cursor IDE local config — do not commit
+.cursor/
+
 windows_service/appsettings.json
 windows_service/GeoLite2-City.mmdb
 # Local API keys — never commit
