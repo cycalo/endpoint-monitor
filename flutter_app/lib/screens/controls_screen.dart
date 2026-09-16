@@ -13,11 +13,19 @@ import '../bloc/connection_bloc.dart';
 import '../bloc/controls_bloc.dart';
 import '../bloc/system_info_bloc.dart';
 import '../theme/em_design_system.dart';
+import '../widgets/desktop_screenshot_preview.dart';
 import '../widgets/em_brand_app_bar.dart';
 import '../widgets/em_loading_states.dart';
 
-class ControlsScreen extends StatelessWidget {
+class ControlsScreen extends StatefulWidget {
   const ControlsScreen({super.key});
+
+  @override
+  State<ControlsScreen> createState() => _ControlsScreenState();
+}
+
+class _ControlsScreenState extends State<ControlsScreen> {
+  bool _screenshotDialogOpen = false;
 
   static String _hostLabel(SystemInfoState si) {
     final n = si.info?.systemName.trim() ?? '';
@@ -49,9 +57,7 @@ class ControlsScreen extends StatelessWidget {
         listenWhen: (p, c) =>
             c.screenshotPng != null && c.screenshotPng != p.screenshotPng,
         listener: (context, s) {
-          final bytes = s.screenshotPng!;
-          context.read<ControlsBloc>().clearScreenshot();
-          unawaited(_showScreenshotPreview(context, bytes));
+          unawaited(_openScreenshotPreview(context, s.screenshotPng!));
         },
         child: Scaffold(
         backgroundColor: scheme.surface,
@@ -211,6 +217,20 @@ class ControlsScreen extends StatelessWidget {
     );
   }
 
+  Future<void> _openScreenshotPreview(
+      BuildContext hostContext, Uint8List bytes) async {
+    if (_screenshotDialogOpen || !mounted) return;
+    _screenshotDialogOpen = true;
+    try {
+      await _showScreenshotPreview(hostContext, bytes);
+    } finally {
+      if (mounted) {
+        context.read<ControlsBloc>().clearScreenshot();
+        _screenshotDialogOpen = false;
+      }
+    }
+  }
+
   static Future<void> _showScreenshotPreview(
       BuildContext hostContext, Uint8List bytes) async {
     if (!hostContext.mounted) return;
@@ -219,8 +239,6 @@ class ControlsScreen extends StatelessWidget {
       barrierDismissible: true,
       builder: (dialogContext) {
         final scheme = Theme.of(dialogContext).colorScheme;
-        final maxW = MediaQuery.sizeOf(dialogContext).width * 0.92;
-        final maxH = MediaQuery.sizeOf(dialogContext).height * 0.62;
         return Dialog(
           insetPadding:
               const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -229,78 +247,26 @@ class ControlsScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
           ),
           backgroundColor: scheme.surfaceContainerHigh,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Material(
-                color: Colors.transparent,
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(4, 4, 4, 0),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        tooltip: 'Close',
-                        onPressed: () => Navigator.pop(dialogContext),
-                        icon: Icon(Icons.close_rounded, color: scheme.onSurface),
-                      ),
-                      Expanded(
-                        child: Text(
-                          'Desktop screenshot',
-                          style: GoogleFonts.manrope(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16,
-                            color: scheme.onSurface,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+          child: BlocBuilder<ControlsBloc, ControlsState>(
+            builder: (context, state) {
+              final currentBytes = state.screenshotPng ?? bytes;
+              final retakePending =
+                  state.pending.contains('capture_desktop_screenshot');
+              return DesktopScreenshotPreview(
+                bytes: currentBytes,
+                retakePending: retakePending,
+                onRetake: retakePending
+                    ? null
+                    : () => context.read<ControlsBloc>().send(
+                          const {'type': 'capture_desktop_screenshot'},
                         ),
-                      ),
-                      IconButton(
-                        tooltip: 'Download',
-                        onPressed: () =>
-                            unawaited(_saveScreenshot(hostContext, bytes)),
-                        icon: Icon(Icons.download_rounded, color: scheme.primary),
-                      ),
-                      IconButton(
-                        tooltip: 'Share',
-                        onPressed: () =>
-                            unawaited(_shareScreenshot(hostContext, bytes)),
-                        icon: Icon(Icons.share_rounded, color: scheme.primary),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Divider(
-                height: 1,
-                thickness: 1,
-                color: scheme.outlineVariant.withValues(alpha: 0.35),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: SizedBox(
-                  width: maxW,
-                  height: maxH,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: ColoredBox(
-                      color: scheme.surfaceContainerHighest,
-                      child: InteractiveViewer(
-                        minScale: 0.2,
-                        maxScale: 5,
-                        child: Center(
-                          child: Image.memory(
-                            bytes,
-                            fit: BoxFit.contain,
-                            gaplessPlayback: true,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+                onClose: () => Navigator.pop(dialogContext),
+                onDownload: () =>
+                    unawaited(_saveScreenshot(hostContext, currentBytes)),
+                onShare: () =>
+                    unawaited(_shareScreenshot(hostContext, currentBytes)),
+              );
+            },
           ),
         );
       },

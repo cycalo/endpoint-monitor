@@ -38,7 +38,8 @@ class ControlsState extends Equatable {
       ControlsState(
         pending: pending ?? this.pending,
         feedback: clearFeedback ? null : (feedback ?? this.feedback),
-        screenshotPng: clearScreenshot ? null : (screenshotPng ?? this.screenshotPng),
+        screenshotPng:
+            clearScreenshot ? null : (screenshotPng ?? this.screenshotPng),
       );
 
   @override
@@ -48,7 +49,7 @@ class ControlsState extends Equatable {
 /// Remote system control commands (Windows service).
 class ControlsBloc extends Cubit<ControlsState> {
   ControlsBloc() : super(const ControlsState()) {
-    FlutterForegroundTask.addTaskDataCallback(_onData);
+    FlutterForegroundTask.addTaskDataCallback(handleTaskData);
   }
 
   static const _commands = {
@@ -84,7 +85,8 @@ class ControlsBloc extends Cubit<ControlsState> {
     FlutterForegroundTask.sendDataToTask(jsonEncode(cmd));
   }
 
-  void _onData(Object data) {
+  /// Applies data received from the foreground WebSocket task.
+  void handleTaskData(Object data) {
     if (data is! Map) return;
     final m = Map<String, dynamic>.from(data);
     if (m['type']?.toString() != 'command_result') return;
@@ -111,8 +113,6 @@ class ControlsBloc extends Cubit<ControlsState> {
       }
       emit(state.copyWith(
         pending: next,
-        clearFeedback: true,
-        clearScreenshot: !(ok && png != null),
         screenshotPng: (ok && png != null) ? png : null,
         feedback: ok && png != null
             ? null
@@ -128,13 +128,14 @@ class ControlsBloc extends Cubit<ControlsState> {
 
     emit(state.copyWith(
       pending: next,
-      feedback: ControlsFeedback(success: ok, message: msg.isNotEmpty ? msg : (ok ? 'OK' : 'Failed')),
+      feedback: ControlsFeedback(
+          success: ok, message: msg.isNotEmpty ? msg : (ok ? 'OK' : 'Failed')),
     ));
   }
 
   @override
   Future<void> close() {
-    FlutterForegroundTask.removeTaskDataCallback(_onData);
+    FlutterForegroundTask.removeTaskDataCallback(handleTaskData);
     return super.close();
   }
 }
