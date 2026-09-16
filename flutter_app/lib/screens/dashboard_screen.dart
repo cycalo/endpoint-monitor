@@ -8,10 +8,8 @@ import '../bloc/alerts_bloc.dart';
 import '../bloc/process_bloc.dart';
 import '../bloc/system_info_bloc.dart';
 import '../bloc/threat_intel_bloc.dart';
-import '../bloc/activity_heatmap_bloc.dart';
 import '../models/ws_models.dart';
 import '../theme/em_design_system.dart';
-import '../widgets/activity_heatmap_card.dart';
 import '../widgets/em_brand_app_bar.dart';
 import '../widgets/em_gradient_button.dart';
 import '../widgets/em_loading_states.dart';
@@ -49,7 +47,6 @@ class DashboardScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const _DashboardDataBootstrap(),
                     const _DashboardConnectionHero(),
                     if (!conn.isConnected) ...[
                       const SizedBox(height: 24),
@@ -79,12 +76,9 @@ class DashboardScreen extends StatelessWidget {
                     ] else ...[
                       const EmPageIntro(
                         title: 'Dashboard',
-                        subtitle:
-                            'Live endpoint health, activity, and system identity.',
+                        subtitle: 'Live endpoint health and system identity.',
                         padding: EdgeInsets.only(top: 8, bottom: 16),
                       ),
-                      const _DashboardActivityHeatmap(),
-                      const SizedBox(height: 16),
                       const _DashboardThreatIntelCard(),
                       const SizedBox(height: 24),
                       AnimatedSwitcher(
@@ -316,8 +310,8 @@ class _DashboardConnectionHero extends StatelessWidget {
                                   const SizedBox(width: 8),
                                   Text(
                                     'Connected',
-                                    style: theme.textTheme.headlineSmall
-                                        ?.copyWith(
+                                    style:
+                                        theme.textTheme.headlineSmall?.copyWith(
                                       fontWeight: FontWeight.w800,
                                     ),
                                   ),
@@ -334,8 +328,8 @@ class _DashboardConnectionHero extends StatelessWidget {
                                   const SizedBox(width: 8),
                                   Text(
                                     'Connecting…',
-                                    style: theme.textTheme.headlineSmall
-                                        ?.copyWith(
+                                    style:
+                                        theme.textTheme.headlineSmall?.copyWith(
                                       color: scheme.primary,
                                       fontWeight: FontWeight.w800,
                                     ),
@@ -343,8 +337,8 @@ class _DashboardConnectionHero extends StatelessWidget {
                                 ] else ...[
                                   Text(
                                     'Disconnected',
-                                    style: theme.textTheme.headlineSmall
-                                        ?.copyWith(
+                                    style:
+                                        theme.textTheme.headlineSmall?.copyWith(
                                       color: scheme.outline,
                                       fontWeight: FontWeight.w800,
                                     ),
@@ -1525,62 +1519,6 @@ class _DangerZoneSection extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _DashboardDataBootstrap extends StatefulWidget {
-  const _DashboardDataBootstrap();
-
-  @override
-  State<_DashboardDataBootstrap> createState() =>
-      _DashboardDataBootstrapState();
-}
-
-class _DashboardDataBootstrapState extends State<_DashboardDataBootstrap> {
-  bool _autoRefreshStarted = false;
-
-  void _onConnected() {
-    if (!_autoRefreshStarted) {
-      _autoRefreshStarted = true;
-      context.read<ActivityHeatmapBloc>().startAutoRefresh();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocListener<ConnectionBloc, EmConnectionState>(
-      listenWhen: (prev, curr) => curr.isConnected && !prev.isConnected,
-      listener: (context, _) => _onConnected(),
-      child: BlocBuilder<ConnectionBloc, EmConnectionState>(
-        builder: (context, conn) {
-          if (conn.isConnected && !_autoRefreshStarted) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) _onConnected();
-            });
-          }
-          return const SizedBox.shrink();
-        },
-      ),
-    );
-  }
-}
-
-class _DashboardActivityHeatmap extends StatelessWidget {
-  const _DashboardActivityHeatmap();
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<ActivityHeatmapBloc, ActivityHeatmapState>(
-      builder: (context, st) {
-        return ActivityHeatmapCard(
-          loading: st.loading,
-          buckets: st.buckets,
-          loadError: st.loadError,
-          onRefresh: () =>
-              context.read<ActivityHeatmapBloc>().refresh(hours: 24),
-        );
-      },
     );
   }
 }

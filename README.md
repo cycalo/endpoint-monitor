@@ -13,7 +13,7 @@ The system consists of an elevated **C# .NET 10 Windows Service (Agent)** runnin
 ## 📸 Platform Showcase
 
 ### 1. Authentication & Dashboard
-Establish a secure session using the Zero-Trust pairing protocol. Once connected, the Dashboard provides real-time visibility into the endpoint's health, CPU/RAM utilization, active socket counts, and an interactive security activity heatmap.
+Establish a secure session using the Zero-Trust pairing protocol. Once connected, the Dashboard provides real-time visibility into the endpoint's health, CPU/RAM utilization, and active socket counts.
 
 | Secure Pairing (Address) | Secure Pairing (Code) |
 | :---: | :---: |

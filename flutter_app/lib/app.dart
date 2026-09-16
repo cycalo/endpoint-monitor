@@ -19,7 +19,6 @@ import 'bloc/process_bloc.dart';
 import 'bloc/software_bloc.dart';
 import 'bloc/system_info_bloc.dart';
 import 'bloc/threat_intel_bloc.dart';
-import 'bloc/activity_heatmap_bloc.dart';
 import 'bloc/watchlist_bloc.dart';
 import 'widgets/pin_unlock_gate.dart';
 
@@ -68,7 +67,6 @@ class _EndpointMonitorAppState extends State<EndpointMonitorApp> {
         ),
         BlocProvider(create: (_) => BrowserBloc()),
         BlocProvider(create: (_) => SoftwareBloc()),
-        BlocProvider(create: (_) => ActivityHeatmapBloc()),
         BlocProvider(create: (_) => ThreatIntelBloc()),
         BlocProvider(create: (_) => ControlsBloc()),
       ],
