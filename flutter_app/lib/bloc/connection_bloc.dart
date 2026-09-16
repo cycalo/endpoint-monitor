@@ -221,8 +221,6 @@ class ConnectionBloc extends Bloc<ConnectionEvent, EmConnectionState> {
     FlutterForegroundTask.sendDataToTask(
         jsonEncode({'type': 'get_system_info'}));
     FlutterForegroundTask.sendDataToTask(
-        jsonEncode({'type': 'get_timeline', 'hours': 24}));
-    FlutterForegroundTask.sendDataToTask(
         jsonEncode({'type': 'get_threat_intel_status'}));
     FlutterForegroundTask.sendDataToTask(
         jsonEncode({'type': 'get_threat_intel_entries'}));
