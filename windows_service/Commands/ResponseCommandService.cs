@@ -16,7 +16,6 @@ using EndpointMonitorService.Database;
 using EndpointMonitorService.Hosted;
 using EndpointMonitorService.Options;
 using EndpointMonitorService.Services;
-using Microsoft.Extensions.Options;
 using Microsoft.Win32;
 
 namespace EndpointMonitorService.Commands;
@@ -24,8 +23,9 @@ namespace EndpointMonitorService.Commands;
 public sealed class ResponseCommandService(
     ILogger<ResponseCommandService> logger,
     AppDatabase database,
-    IOptions<ServerOptions> serverOptions,
     WebSocketConnectionManager webSockets,
+    FirewallIsolationService firewallIsolation,
+    INetshRunner netsh,
     Browser.BrowserHistoryReader browserHistoryReader,
     Collectors.InstalledSoftwareCollector installedSoftwareCollector,
     VirusTotalReputationService virusTotal,
@@ -251,10 +251,20 @@ public sealed class ResponseCommandService(
         var outRule = $"EM_BLOCK_{ruleSan}";
         var inRule = $"{outRule}_in";
 
+        DeleteFirewallRule(outRule);
+        DeleteFirewallRule(inRule);
         if (dir is "outbound" or "both")
-            RunNetsh($"advfirewall firewall add rule name=\"{outRule}\" dir=out action=block remoteip={ip}{portArgs}");
+        {
+            if (!TryAddFirewallRule(
+                    $"advfirewall firewall add rule name=\"{outRule}\" dir=out action=block remoteip={ip}{portArgs}"))
+                return new CommandResult(false, "block_ip", "firewall_rule_failed");
+        }
         if (dir is "inbound" or "both")
-            RunNetsh($"advfirewall firewall add rule name=\"{inRule}\" dir=in action=block remoteip={ip}{portArgs}");
+        {
+            if (!TryAddFirewallRule(
+                    $"advfirewall firewall add rule name=\"{inRule}\" dir=in action=block remoteip={ip}{portArgs}"))
+                return new CommandResult(false, "block_ip", "firewall_rule_failed");
+        }
 
         await database.AddFirewallBlockAsync(ip, dir, sourceProcess, remotePort, expiresAt, cancellationToken).ConfigureAwait(false);
         await database.AppendAuditAsync("block_ip", ip, clientIp, cancellationToken).ConfigureAwait(false);
@@ -268,8 +278,10 @@ public sealed class ResponseCommandService(
             return new CommandResult(false, "block_outbound_port", "invalid_port");
         var key = $"port:{port}";
         var expiresAt = ParseExpiresAtUtc(root);
-        RunNetsh($"advfirewall firewall delete rule name=\"EM_BLOCK_PORT_{port}_out\"");
-        RunNetsh($"advfirewall firewall add rule name=\"EM_BLOCK_PORT_{port}_out\" dir=out action=block protocol=tcp remoteport={port}");
+        DeleteFirewallRule($"EM_BLOCK_PORT_{port}_out");
+        if (!TryAddFirewallRule(
+                $"advfirewall firewall add rule name=\"EM_BLOCK_PORT_{port}_out\" dir=out action=block protocol=tcp remoteport={port}"))
+            return new CommandResult(false, "block_outbound_port", "firewall_rule_failed");
         await database.AddFirewallBlockAsync(key, "outbound", null, port, expiresAt, cancellationToken).ConfigureAwait(false);
         await database.AppendAuditAsync("block_outbound_port", key, clientIp, cancellationToken).ConfigureAwait(false);
         await BroadcastFirewallAsync(cancellationToken).ConfigureAwait(false);
@@ -324,13 +336,17 @@ public sealed class ResponseCommandService(
         var escaped = path.Replace("\"", "\\\"", StringComparison.Ordinal);
         if (dir is "outbound" or "both")
         {
-            RunNetsh($"advfirewall firewall delete rule name=\"{ruleKey}_out\"");
-            RunNetsh($"advfirewall firewall add rule name=\"{ruleKey}_out\" dir=out action=block program=\"{escaped}\"");
+            DeleteFirewallRule($"{ruleKey}_out");
+            if (!TryAddFirewallRule(
+                    $"advfirewall firewall add rule name=\"{ruleKey}_out\" dir=out action=block program=\"{escaped}\""))
+                return new CommandResult(false, "block_process", "firewall_rule_failed");
         }
         if (dir is "inbound" or "both")
         {
-            RunNetsh($"advfirewall firewall delete rule name=\"{ruleKey}_in\"");
-            RunNetsh($"advfirewall firewall add rule name=\"{ruleKey}_in\" dir=in action=block program=\"{escaped}\"");
+            DeleteFirewallRule($"{ruleKey}_in");
+            if (!TryAddFirewallRule(
+                    $"advfirewall firewall add rule name=\"{ruleKey}_in\" dir=in action=block program=\"{escaped}\""))
+                return new CommandResult(false, "block_process", "firewall_rule_failed");
         }
         var expiresAt = ParseExpiresAtUtc(root);
         await database.AddFirewallProcessBlockAsync(ruleKey, name, dir, path, expiresAt, cancellationToken).ConfigureAwait(false);
@@ -346,8 +362,8 @@ public sealed class ResponseCommandService(
             name += ".exe";
         var dir = NormalizeFirewallDirection(root.TryGetProperty("direction", out var d) ? d.GetString() : null);
         var ruleKey = ProcessFirewallRuleKey(name, dir);
-        RunNetsh($"advfirewall firewall delete rule name=\"{ruleKey}_out\"");
-        RunNetsh($"advfirewall firewall delete rule name=\"{ruleKey}_in\"");
+        DeleteFirewallRule($"{ruleKey}_out");
+        DeleteFirewallRule($"{ruleKey}_in");
         await database.RemoveFirewallProcessBlockAsync(ruleKey, cancellationToken).ConfigureAwait(false);
         await database.AppendAuditAsync("unblock_process", name, clientIp, cancellationToken).ConfigureAwait(false);
         await BroadcastFirewallAsync(cancellationToken).ConfigureAwait(false);
@@ -360,7 +376,7 @@ public sealed class ResponseCommandService(
         if (ipRaw.StartsWith("port:", StringComparison.OrdinalIgnoreCase) &&
             int.TryParse(ipRaw.AsSpan(5), out var p) && p is >= 1 and <= 65535)
         {
-            RunNetsh($"advfirewall firewall delete rule name=\"EM_BLOCK_PORT_{p}_out\"");
+            DeleteFirewallRule($"EM_BLOCK_PORT_{p}_out");
             await database.RemoveFirewallBlockAsync(ipRaw, cancellationToken).ConfigureAwait(false);
             await database.AppendAuditAsync("unblock_ip", ipRaw, clientIp, cancellationToken).ConfigureAwait(false);
             await BroadcastFirewallAsync(cancellationToken).ConfigureAwait(false);
@@ -371,8 +387,8 @@ public sealed class ResponseCommandService(
         var ruleSan = SanitizeIpForRuleName(ip);
         var outRule = $"EM_BLOCK_{ruleSan}";
         var inRule = $"{outRule}_in";
-        RunNetsh($"advfirewall firewall delete rule name=\"{outRule}\"");
-        RunNetsh($"advfirewall firewall delete rule name=\"{inRule}\"");
+        DeleteFirewallRule(outRule);
+        DeleteFirewallRule(inRule);
         await database.RemoveFirewallBlockAsync(ip, cancellationToken).ConfigureAwait(false);
         await database.AppendAuditAsync("unblock_ip", ip, clientIp, cancellationToken).ConfigureAwait(false);
         await BroadcastFirewallAsync(cancellationToken).ConfigureAwait(false);
@@ -402,32 +418,35 @@ public sealed class ResponseCommandService(
 
     private async Task<CommandResult> IsolateAsync(string? clientIp, CancellationToken cancellationToken)
     {
-        var port = serverOptions.Value.Port;
-        RunNetsh("advfirewall firewall add rule name=\"EM_ISOLATE_BLOCK_IN\" dir=in action=block");
-        RunNetsh("advfirewall firewall add rule name=\"EM_ISOLATE_BLOCK_OUT\" dir=out action=block");
-        RunNetsh($"advfirewall firewall add rule name=\"EM_ISOLATE_ALLOW_MONITOR\" dir=in action=allow protocol=TCP localport={port}");
-        RunNetsh($"advfirewall firewall add rule name=\"EM_ISOLATE_ALLOW_MONITOR_OUT\" dir=out action=allow protocol=TCP localport={port}");
-        await database.SetIsolationAsync(true, cancellationToken).ConfigureAwait(false);
-        await database.AppendAuditAsync("isolate_machine", "on", clientIp, cancellationToken).ConfigureAwait(false);
+        var result = await firewallIsolation.IsolateAsync(clientIp, cancellationToken).ConfigureAwait(false);
+        if (!result.Success)
+        {
+            logger.LogWarning("isolate_machine failed: {Code}", result.Code);
+            return new CommandResult(false, "isolate_machine", result.Code);
+        }
+
         await BroadcastFirewallAsync(cancellationToken).ConfigureAwait(false);
         return new CommandResult(true, "isolate_machine", "ok");
     }
 
     private async Task<CommandResult> UnisolateAsync(string? clientIp, CancellationToken cancellationToken)
     {
-        RunNetsh("advfirewall firewall delete rule name=\"EM_ISOLATE_BLOCK_IN\"");
-        RunNetsh("advfirewall firewall delete rule name=\"EM_ISOLATE_BLOCK_OUT\"");
-        RunNetsh("advfirewall firewall delete rule name=\"EM_ISOLATE_ALLOW_MONITOR\"");
-        RunNetsh("advfirewall firewall delete rule name=\"EM_ISOLATE_ALLOW_MONITOR_OUT\"");
-        await database.SetIsolationAsync(false, cancellationToken).ConfigureAwait(false);
-        await database.AppendAuditAsync("unisolate_machine", "off", clientIp, cancellationToken).ConfigureAwait(false);
+        var result = await firewallIsolation.UnisolateAsync(clientIp, "user", cancellationToken)
+            .ConfigureAwait(false);
+        if (!result.Success)
+        {
+            logger.LogWarning("unisolate_machine failed: {Code}", result.Code);
+            return new CommandResult(false, "unisolate_machine", result.Code);
+        }
+
         await BroadcastFirewallAsync(cancellationToken).ConfigureAwait(false);
         return new CommandResult(true, "unisolate_machine", "ok");
     }
 
     private async Task<JsonElement> BuildFirewallDataElementAsync(CancellationToken cancellationToken)
     {
-        var isolated = await database.GetIsolationAsync(cancellationToken).ConfigureAwait(false);
+        await firewallIsolation.ReconcileAsync(cancellationToken).ConfigureAwait(false);
+        var isolated = await firewallIsolation.IsLiveIsolatedAsync(cancellationToken).ConfigureAwait(false);
         var rows = await database.GetFirewallBlocksAsync(cancellationToken).ConfigureAwait(false);
         var blocks = new List<FirewallBlockJson>();
         foreach (var b in rows)
@@ -1030,16 +1049,17 @@ public sealed class ResponseCommandService(
         }
     }
 
-    private static void RunNetsh(string arguments)
+    private bool TryAddFirewallRule(string arguments)
     {
-        using var p = Process.Start(new ProcessStartInfo("netsh", arguments)
-        {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardError = true,
-            RedirectStandardOutput = true
-        });
-        p?.WaitForExit(30_000);
+        var result = netsh.Run(arguments);
+        if (!result.Success)
+            logger.LogWarning("Firewall add failed ({Code}): {Args}", result.ExitCode, arguments);
+        return result.Success;
+    }
+
+    private void DeleteFirewallRule(string ruleName)
+    {
+        netsh.Run($"advfirewall firewall delete rule name=\"{ruleName}\"");
     }
 }
 

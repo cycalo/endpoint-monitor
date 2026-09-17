@@ -100,14 +100,6 @@ class MoreScreen extends StatelessWidget {
               ),
               _MoreMenuRow(
                 index: 4,
-                icon: Icons.ssid_chart_rounded,
-                iconColor: scheme.tertiary,
-                title: 'System vitals',
-                subtitle: 'Live CPU, RAM, disk, and network',
-                onTap: () => context.pushNamed('systemMonitor'),
-              ),
-              _MoreMenuRow(
-                index: 5,
                 icon: Icons.computer_rounded,
                 iconColor: scheme.primary,
                 title: 'Controls',
@@ -115,7 +107,7 @@ class MoreScreen extends StatelessWidget {
                 onTap: () => context.pushNamed('controls'),
               ),
               _MoreMenuRow(
-                index: 6,
+                index: 5,
                 icon: Icons.visibility_outlined,
                 iconColor: scheme.primary,
                 title: 'Watchlist',
@@ -123,7 +115,7 @@ class MoreScreen extends StatelessWidget {
                 onTap: () => context.pushNamed('watchlist'),
               ),
               _MoreMenuRow(
-                index: 7,
+                index: 6,
                 icon: Icons.phonelink_setup_rounded,
                 iconColor: scheme.primary,
                 title: 'Paired devices',
@@ -131,12 +123,20 @@ class MoreScreen extends StatelessWidget {
                 onTap: () => context.pushNamed('pairedDevices'),
               ),
               _MoreMenuRow(
-                index: 8,
+                index: 7,
                 icon: Icons.settings_outlined,
                 iconColor: scheme.onSurfaceVariant,
                 title: 'Settings',
                 subtitle: 'HTTP base, tokens, PIN',
                 onTap: () => context.pushNamed('settings'),
+              ),
+              _MoreMenuRow(
+                index: 8,
+                icon: Icons.feedback_outlined,
+                iconColor: scheme.primary,
+                title: 'Send feedback',
+                subtitle: 'Ideas, bugs, and other comments',
+                onTap: () => context.pushNamed('feedback'),
               ),
             ],
           ),
@@ -316,9 +316,7 @@ class _MoreMenuRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final zebra = index.isEven
-        ? scheme.surface
-        : scheme.surfaceContainerLowest;
+    final zebra = index.isEven ? scheme.surface : scheme.surfaceContainerLowest;
 
     return Material(
       color: zebra,

@@ -26,7 +26,7 @@ public partial class MainWindow : Window
         EnsureThemeResources();
         InitializeComponent();
 
-        _homePage = new HomePage(data, () => NavigateTo(NavPair));
+        _homePage = new HomePage(data, () => NavigateTo(NavPair), () => NavigateTo(NavDevices));
         _pairPage = new PairPage(data);
         _devicesPage = new DevicesPage(data);
         _diagnosticsPage = new DiagnosticsPage(data);

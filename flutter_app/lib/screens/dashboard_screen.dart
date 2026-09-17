@@ -5,7 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../bloc/connection_bloc.dart';
 import '../bloc/alerts_bloc.dart';
-import '../bloc/process_bloc.dart';
+import '../bloc/firewall_bloc.dart';
 import '../bloc/system_info_bloc.dart';
 import '../bloc/threat_intel_bloc.dart';
 import '../models/ws_models.dart';
@@ -33,18 +33,7 @@ class DashboardScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: scheme.surface,
-      appBar: EmBrandAppBar(
-        actions: [
-          IconButton(
-            tooltip: 'System vitals',
-            onPressed: () => context.pushNamed('systemMonitor'),
-            icon: Icon(
-              Icons.ssid_chart_rounded,
-              color: scheme.primary,
-            ),
-          ),
-        ],
-      ),
+      appBar: const EmBrandAppBar(),
       body: BlocBuilder<SystemInfoBloc, SystemInfoState>(
         builder: (context, s) {
           final i = s.info;
@@ -210,13 +199,14 @@ class DashboardScreen extends StatelessWidget {
   }
 
   static Future<void> _runIsolateFlow(BuildContext context) async {
-    final proc = context.read<ProcessBloc>();
+    final firewall = context.read<FirewallBloc>();
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         title: const Text('Confirm isolation'),
         content: const Text(
-          'Isolating the machine will terminate all external networking protocols except for this secure management channel. Continue?',
+          'Isolating the machine changes Windows Firewall default policy to block inbound and outbound traffic except the Endpoint Monitor channel. '
+          'If the app cannot still reach this PC within 90 seconds, isolation is automatically removed. Continue?',
         ),
         actions: [
           TextButton(
@@ -234,7 +224,8 @@ class DashboardScreen extends StatelessWidget {
       builder: (c) => AlertDialog(
         title: const Text('Confirm isolation'),
         content: const Text(
-          'Are you absolutely sure? Remote desktop, file shares, and internet access may be blocked immediately.',
+          'Are you absolutely sure? Remote desktop, file shares, and internet access will be blocked immediately. '
+          'Isolation is removed automatically if the app loses contact within 90 seconds.',
         ),
         actions: [
           TextButton(
@@ -247,7 +238,7 @@ class DashboardScreen extends StatelessWidget {
       ),
     );
     if (ok2 == true && context.mounted) {
-      proc.sendCommand({'type': 'isolate_machine'});
+      firewall.requestIsolate();
     }
   }
 }

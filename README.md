@@ -279,10 +279,32 @@ The mobile client dispatches commands as JSON payloads over the WebSocket. The A
 | `resume_process` | `{"pid": 1234}` | Resumes a suspended process. |
 | `block_ip` | `{"ip": "x.x.x.x", "direction": "both", "expiresInHours": 2}` | Blocks an IP in the Windows Firewall. |
 | `unblock_ip` | `{"ip": "x.x.x.x"}` | Removes an IP block rule. |
-| `isolate_machine` | *None* | Blocks all network traffic except the Agent's port. |
-| `unisolate_machine`| *None* | Restores normal network connectivity. |
+| `isolate_machine` | *None* | Sets all firewall profiles to block inbound/outbound except a scoped allow for the agent executable and monitor port(s). Auto-unisolates after 90s if no authenticated app connection remains. |
+| `unisolate_machine`| *None* | Restores saved firewall default policies and removes isolation allow rules. |
 | `block_process` | `{"name": "app.exe", "direction": "outbound"}` | Blocks an executable path from network access. |
 | `capture_desktop_screenshot` | *None* | Captures and returns a base64 PNG of the desktop. |
+
+---
+
+## Emergency recovery: machine isolation
+
+If **Isolate Machine** was used and the Flutter app can no longer reach the Windows agent, recovery requires **local access** to the PC (physical keyboard, iDRAC/IPMI, or hypervisor console — not the phone app).
+
+Run in an **elevated Command Prompt**:
+
+```bat
+netsh advfirewall set allprofiles firewallpolicy blockinbound,allowoutbound
+netsh advfirewall firewall delete rule name="EM_ISOLATE_ALLOW_MONITOR_IN"
+netsh advfirewall firewall delete rule name="EM_ISOLATE_ALLOW_MONITOR_OUT"
+netsh advfirewall firewall delete rule name="EM_ISOLATE_BLOCK_IN"
+netsh advfirewall firewall delete rule name="EM_ISOLATE_BLOCK_OUT"
+netsh advfirewall firewall delete rule name="EM_ISOLATE_ALLOW_MONITOR"
+netsh advfirewall firewall delete rule name="EM_ISOLATE_ALLOW_MONITOR_OUT"
+```
+
+Then reconnect the app and tap **Unisolate Machine** on the Firewall screen so the agent SQLite state matches the live firewall.
+
+**Manual verification:** isolate while the app stays connected → browsing stops but the app remains connected → unisolate restores normal traffic. Isolate with the phone disconnected → network should return within ~90 seconds automatically.
 
 ---
 

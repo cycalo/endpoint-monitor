@@ -8,6 +8,7 @@ import '../bloc/connection_bloc.dart';
 import '../bloc/blocked_remote_ips_cubit.dart';
 import '../bloc/firewall_bloc.dart';
 import '../bloc/network_bloc.dart';
+import '../bloc/process_bloc.dart';
 import '../bloc/system_info_bloc.dart';
 import '../bloc/threat_intel_bloc.dart';
 import '../mixins/auto_close_transient_routes_on_leave_mixin.dart';
@@ -376,17 +377,7 @@ class _NetworkScreenState extends State<NetworkScreen>
     return BlocListener<ConnectionBloc, EmConnectionState>(
       listenWhen: (p, c) => c.isConnected && !p.isConnected,
       listener: (context, _) => context.read<FirewallBloc>().refresh(),
-      child: BlocConsumer<FirewallBloc, FirewallState>(
-        listenWhen: (p, c) =>
-            c.snackbarMessage != null && c.snackbarMessage != p.snackbarMessage,
-        listener: (context, state) {
-          final msg = state.snackbarMessage;
-          if (msg == null) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
-          );
-          context.read<FirewallBloc>().clearFeedback();
-        },
+      child: BlocBuilder<FirewallBloc, FirewallState>(
         builder: (context, fw) {
           return Scaffold(
       backgroundColor: scheme.surface,
@@ -516,14 +507,36 @@ class _NetworkScreenState extends State<NetworkScreen>
                     )
                     .where((e) => e.processName.isNotEmpty)
                     .toList();
+                final blockedProcessNames =
+                    processBlocks.map((e) => e.processName).toList();
+                final runningPids = <String, Set<int>>{};
+                for (final p in context.watch<ProcessBloc>().state.items) {
+                  final key = p.name.trim().toLowerCase();
+                  if (key.isEmpty || p.pid <= 0) continue;
+                  runningPids.putIfAbsent(key, () => {}).add(p.pid);
+                }
 
-                var groups = buildNetworkProcessGroups(list)
+                var groups = buildNetworkProcessGroups(list);
+                if (_listMode == 'apps') {
+                  groups = mergeFirewallBlockedProcessGroups(
+                    groups: groups,
+                    blocks: processBlocks,
+                    runningPidsByProcessName: runningPids,
+                  );
+                }
+                groups = groups
                     .where((g) => networkGroupMatchesSearch(g, q))
                     .toList();
 
                 if (_listMode == 'apps' && _state == 'all') {
-                  groups =
-                      groups.where(networkGroupIsTalkingByDefault).toList();
+                  groups = groups
+                      .where(
+                        (g) => networkGroupVisibleInDefaultAppsView(
+                          g,
+                          blockedProcessNames,
+                        ),
+                      )
+                      .toList();
                 } else if (_state != 'all') {
                   groups = groups
                       .where(
@@ -534,6 +547,35 @@ class _NetworkScreenState extends State<NetworkScreen>
                         ),
                       )
                       .toList();
+                }
+
+                if (_listMode == 'apps') {
+                  switch (_blockedScope) {
+                    case 'blocked':
+                      groups = groups
+                          .where(
+                            (g) =>
+                                processNameHasFirewallBlock(
+                                  g.processName,
+                                  blockedProcessNames,
+                                ) ||
+                                g.allConnections.any(
+                                  (n) => _rowIsBlocked(n, blockedMap),
+                                ),
+                          )
+                          .toList();
+                      break;
+                    case 'unblocked':
+                      groups = groups
+                          .where(
+                            (g) => !processNameHasFirewallBlock(
+                              g.processName,
+                              blockedProcessNames,
+                            ),
+                          )
+                          .toList();
+                      break;
+                  }
                 }
 
                 final establishedTotal = groups.fold<int>(
@@ -798,7 +840,7 @@ class _NetworkScreenState extends State<NetworkScreen>
                             message: _hasActiveFilters ||
                                     _search.text.trim().isNotEmpty
                                 ? 'Adjust filters or clear search to see more apps.'
-                                : 'Apps with active connections will appear here.',
+                                : 'Apps with active connections stay here. Blocked apps stay listed until you unblock them.',
                           ),
                         )
                       else

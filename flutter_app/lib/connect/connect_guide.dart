@@ -4,6 +4,14 @@ import 'connect_path.dart';
 const kTailscaleWindowsDownloadUri = 'https://tailscale.com/download/windows';
 const kTailscaleMobileDownloadUri = 'https://tailscale.com/download';
 
+/// Windows service / PC agent download (GitHub releases).
+const kWindowsServiceReleasesUri =
+    'https://github.com/cycalo/endpoint-monitor/releases';
+
+const kWindowsServiceDownloadTitle = 'Download Windows service';
+const kWindowsServiceDownloadSubtitle =
+    'Install Endpoint Monitor on the PC before you connect from this phone.';
+
 const kDefaultPairingPort = 5000;
 
 /// Title shown on the chooser screen.

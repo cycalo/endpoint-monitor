@@ -57,4 +57,37 @@ void main() {
     expect(find.text('Block connection'), findsNothing);
     expect(find.text('2 processes'), findsOneWidget);
   });
+
+  testWidgets('Blocked app with no sockets still shows Unblock app',
+      (tester) async {
+    final group = NetworkProcessGroup.firewallHeld(
+      processName: 'chrome.exe',
+      pids: {4321},
+    );
+    final scheme = ColorScheme.fromSeed(seedColor: Colors.blue);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: EmNetworkAppCard(
+            group: group,
+            scheme: scheme,
+            blockedMap: const {},
+            processBlocked: true,
+            processBlockDirection: 'outbound',
+            threatLookup: (_) => null,
+            rowIcon: (_) => Icons.hub_rounded,
+            onBlockProcess: (_) async {},
+            onUnblockProcess: (_) async {},
+            onBlockIp: (_) async {},
+            onUnblockIp: (_) async {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Unblock app'), findsOneWidget);
+    expect(find.text('BLOCKED'), findsOneWidget);
+    expect(find.text('No active connections'), findsOneWidget);
+  });
 }

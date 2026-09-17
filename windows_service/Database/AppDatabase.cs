@@ -22,6 +22,7 @@ public sealed class AppDatabase(ILogger<AppDatabase> logger)
         await TryAddFirewallRemotePortExpiresColumnsAsync().ConfigureAwait(false);
         await _db.CreateTableAsync<AuditLogRow>().ConfigureAwait(false);
         await _db.CreateTableAsync<IsolationStateRow>().ConfigureAwait(false);
+        await TryAddIsolationPolicyColumnsAsync().ConfigureAwait(false);
         await _db.CreateTableAsync<BadIpRow>().ConfigureAwait(false);
         await TryMigrateBadIpColumnsAsync().ConfigureAwait(false);
         await _db.CreateTableAsync<AlertAckRow>().ConfigureAwait(false);
@@ -190,17 +191,99 @@ public sealed class AppDatabase(ILogger<AppDatabase> logger)
         await _db.DeleteAsync<FirewallBlockRow>(ip).ConfigureAwait(false);
     }
 
+    private async Task TryAddIsolationPolicyColumnsAsync()
+    {
+        if (_db == null) return;
+        foreach (var column in new[] { "SavedDomainPolicy", "SavedPrivatePolicy", "SavedPublicPolicy" })
+        {
+            try
+            {
+                await _db.ExecuteAsync(
+                    $"ALTER TABLE IsolationState ADD COLUMN {column} TEXT NOT NULL DEFAULT ''").ConfigureAwait(false);
+            }
+            catch
+            {
+                // column exists
+            }
+        }
+    }
+
+    public async Task<IsolationStateRow?> GetIsolationStateAsync(CancellationToken cancellationToken = default)
+    {
+        if (_db == null) return null;
+        return await _db.Table<IsolationStateRow>().Where(x => x.Id == 1).FirstOrDefaultAsync().ConfigureAwait(false);
+    }
+
     public async Task<bool> GetIsolationAsync(CancellationToken cancellationToken = default)
     {
         if (_db == null) return false;
-        var row = await _db.Table<IsolationStateRow>().Where(x => x.Id == 1).FirstOrDefaultAsync().ConfigureAwait(false);
+        var row = await GetIsolationStateAsync(cancellationToken).ConfigureAwait(false);
         return row?.IsIsolated ?? false;
     }
 
     public async Task SetIsolationAsync(bool isolated, CancellationToken cancellationToken = default)
     {
         if (_db == null) return;
-        await _db.InsertOrReplaceAsync(new IsolationStateRow { Id = 1, IsIsolated = isolated }).ConfigureAwait(false);
+        var existing = await GetIsolationStateAsync(cancellationToken).ConfigureAwait(false);
+        await _db.InsertOrReplaceAsync(new IsolationStateRow
+        {
+            Id = 1,
+            IsIsolated = isolated,
+            SavedDomainPolicy = existing?.SavedDomainPolicy ?? "",
+            SavedPrivatePolicy = existing?.SavedPrivatePolicy ?? "",
+            SavedPublicPolicy = existing?.SavedPublicPolicy ?? "",
+        }).ConfigureAwait(false);
+    }
+
+    public async Task SaveIsolationPoliciesAsync(
+        string domainPolicy,
+        string privatePolicy,
+        string publicPolicy,
+        CancellationToken cancellationToken = default)
+    {
+        if (_db == null) return;
+        var existing = await GetIsolationStateAsync(cancellationToken).ConfigureAwait(false);
+        await _db.InsertOrReplaceAsync(new IsolationStateRow
+        {
+            Id = 1,
+            IsIsolated = existing?.IsIsolated ?? false,
+            SavedDomainPolicy = domainPolicy,
+            SavedPrivatePolicy = privatePolicy,
+            SavedPublicPolicy = publicPolicy,
+        }).ConfigureAwait(false);
+    }
+
+    public async Task ClearIsolationPoliciesAsync(CancellationToken cancellationToken = default)
+    {
+        if (_db == null) return;
+        var existing = await GetIsolationStateAsync(cancellationToken).ConfigureAwait(false);
+        await _db.InsertOrReplaceAsync(new IsolationStateRow
+        {
+            Id = 1,
+            IsIsolated = existing?.IsIsolated ?? false,
+            SavedDomainPolicy = "",
+            SavedPrivatePolicy = "",
+            SavedPublicPolicy = "",
+        }).ConfigureAwait(false);
+    }
+
+    public async Task SetIsolationStateAsync(
+        bool isolated,
+        string? domainPolicy,
+        string? privatePolicy,
+        string? publicPolicy,
+        CancellationToken cancellationToken = default)
+    {
+        if (_db == null) return;
+        var existing = await GetIsolationStateAsync(cancellationToken).ConfigureAwait(false);
+        await _db.InsertOrReplaceAsync(new IsolationStateRow
+        {
+            Id = 1,
+            IsIsolated = isolated,
+            SavedDomainPolicy = domainPolicy ?? existing?.SavedDomainPolicy ?? "",
+            SavedPrivatePolicy = privatePolicy ?? existing?.SavedPrivatePolicy ?? "",
+            SavedPublicPolicy = publicPolicy ?? existing?.SavedPublicPolicy ?? "",
+        }).ConfigureAwait(false);
     }
 
     public async Task AppendAuditAsync(string action, string detail, string? clientIp, CancellationToken cancellationToken = default)

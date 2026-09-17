@@ -48,6 +48,8 @@ builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>()
 
 builder.Services.AddSingleton<AppDatabase>();
 builder.Services.AddSingleton<CollectorSnapshotCache>();
+builder.Services.AddSingleton<INetshRunner, NetshRunner>();
+builder.Services.AddSingleton<FirewallIsolationService>();
 builder.Services.AddSingleton<WebSocketConnectionManager>();
 builder.Services.AddSingleton<PairingAuthService>();
 builder.Services.AddSingleton<AuthTokenValidator>();
@@ -79,6 +81,7 @@ builder.Services.AddHostedService<MonitorBroadcastHostedService>();
 builder.Services.AddHostedService<SystemInfoHostedService>();
 builder.Services.AddHostedService<SysmonHostedService>();
 builder.Services.AddHostedService<FirewallBlockExpiryHostedService>();
+builder.Services.AddHostedService<IsolationWatchdogHostedService>();
 builder.Services.AddHostedService<ThreatIntelHostedService>();
 builder.Services.AddHostedService<InstalledSoftwareDetectionHostedService>();
 

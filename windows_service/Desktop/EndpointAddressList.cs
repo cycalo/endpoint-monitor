@@ -114,7 +114,7 @@ internal static class EndpointAddressList
             copy.Click += (_, _) =>
             {
                 if (copy.Tag is string ip)
-                    CopyText(ip);
+                    CopyFeedback.CopyFromButton(copy, ip);
             };
             Grid.SetColumn(copy, 1);
             row.Children.Add(copy);
@@ -122,10 +122,4 @@ internal static class EndpointAddressList
         return row;
     }
 
-    internal static void CopyText(string text)
-    {
-        if (string.IsNullOrWhiteSpace(text) || text == "—")
-            return;
-        try { Clipboard.SetText(text); } catch { /* ignore */ }
-    }
 }

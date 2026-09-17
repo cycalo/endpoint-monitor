@@ -78,6 +78,13 @@ public sealed class IsolationStateRow
     public int Id { get; set; }
 
     public bool IsIsolated { get; set; }
+
+    /// <summary>Saved domain profile policy before isolation, e.g. BlockInbound,AllowOutbound.</summary>
+    public string SavedDomainPolicy { get; set; } = "";
+
+    public string SavedPrivatePolicy { get; set; } = "";
+
+    public string SavedPublicPolicy { get; set; } = "";
 }
 
 [Table("BadIpList")]

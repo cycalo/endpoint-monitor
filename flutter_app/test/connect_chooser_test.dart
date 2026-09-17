@@ -20,6 +20,8 @@ void main() {
     expect(find.text('How should this phone reach the PC?'), findsOneWidget);
     expect(find.text('This Wi-Fi'), findsOneWidget);
     expect(find.text('Away from home'), findsOneWidget);
+    expect(find.text('Download Windows service'), findsOneWidget);
+    expect(find.textContaining('Install Endpoint Monitor on the PC'), findsOneWidget);
 
     await tester.tap(find.text('This Wi-Fi'));
     await tester.pump();

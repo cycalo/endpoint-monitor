@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../bloc/connection_bloc.dart';
 import '../connect/connect_guide.dart';
 import '../connect/connect_path.dart';
+import '../connect/connect_persistence.dart';
 import '../connect/connect_validation.dart';
 import '../theme/em_design_system.dart';
 import '../utils/agent_health.dart';
@@ -25,8 +26,6 @@ import 'connect_guided_page.dart';
 /// Same keys as [ConnectionBloc] for host and paired device token.
 const _kEmHost = 'em_host';
 const _kEmToken = 'em_token';
-const _kRememberConnect = 'em_remember_connect';
-const _kSavedHost = 'em_connect_saved_host';
 
 class ConnectScreen extends StatefulWidget {
   const ConnectScreen({super.key});
@@ -40,12 +39,14 @@ class _ConnectScreenState extends State<ConnectScreen> {
   final _code = TextEditingController();
 
   ConnectPath? _selectedPath;
-  bool _rememberAddress = true;
   bool _busy = false;
   String? _inlineError;
   bool? _hasDeviceToken;
-  String? _savedHost;
   ConnectPath? _savedPath;
+  ConnectPersistedPaths _persisted = const ConnectPersistedPaths(
+    savedHosts: {},
+    rememberAddress: {},
+  );
 
   @override
   void initState() {
@@ -56,16 +57,27 @@ class _ConnectScreenState extends State<ConnectScreen> {
   Future<void> _loadPersisted() async {
     const secure = FlutterSecureStorage();
     final p = await SharedPreferences.getInstance();
-    final remember = p.getBool(_kRememberConnect);
-    final savedHost = p.getString(_kSavedHost) ?? await secure.read(key: _kEmHost);
+    await migrateLegacyConnectPrefs(
+      p,
+      secureHost: await secure.read(key: _kEmHost),
+    );
+    final persisted = loadConnectPersistedPaths(p);
     final token = await secure.read(key: _kEmToken);
     final pathPref = connectPathFromPref(p.getString(kConnectPathPrefKey));
 
     if (!mounted) return;
 
     var hasToken = token != null && token.isNotEmpty;
-    final rememberedHost =
-        (savedHost != null && savedHost.isNotEmpty) ? savedHost : null;
+    ConnectPath? lastPath = pathPref;
+    if (lastPath == null) {
+      for (final path in ConnectPath.values) {
+        if (persisted.savedHosts[path] != null) {
+          lastPath = path;
+          break;
+        }
+      }
+    }
+    final rememberedHost = lastPath == null ? null : persisted.savedHosts[lastPath];
     if (hasToken && rememberedHost != null) {
       final status = await probeDeviceToken(rememberedHost, token);
       if (status == DeviceTokenStatus.revoked) {
@@ -77,13 +89,8 @@ class _ConnectScreenState extends State<ConnectScreen> {
     if (!mounted) return;
     setState(() {
       _hasDeviceToken = hasToken;
-      _rememberAddress = remember ?? true;
-      _savedHost = rememberedHost;
-      _savedPath = pathPref ??
-          (_savedHost != null ? inferConnectPathFromHost(_savedHost!) : null);
-      if (_rememberAddress && _savedHost != null) {
-        _address.text = _savedHost!;
-      }
+      _persisted = persisted;
+      _savedPath = lastPath;
     });
   }
 
@@ -96,16 +103,19 @@ class _ConnectScreenState extends State<ConnectScreen> {
     setState(() {
       _selectedPath = path;
       _inlineError = null;
+      _address.text = connectAddressForPath(path, _persisted) ?? '';
     });
     _persistPath(path);
   }
 
   void _openSavedSession() {
-    if (_savedHost == null) return;
-    final path = _savedPath ?? inferConnectPathFromHost(_savedHost!);
+    final path = _savedPath;
+    if (path == null) return;
+    final host = _persisted.savedHosts[path];
+    if (host == null || host.isEmpty) return;
     setState(() {
       _selectedPath = path;
-      _address.text = _savedHost!;
+      _address.text = host;
       _inlineError = null;
     });
     _persistPath(path);
@@ -118,25 +128,46 @@ class _ConnectScreenState extends State<ConnectScreen> {
     });
   }
 
-  Future<void> _saveRememberedHost(String host) async {
+  Future<void> _saveRememberedHost(String host, ConnectPath path) async {
     const secure = FlutterSecureStorage();
     final p = await SharedPreferences.getInstance();
-    if (_rememberAddress) {
-      await p.setBool(_kRememberConnect, true);
-      await p.setString(_kSavedHost, host);
+    final remember = _persisted.rememberAddress[path] ?? true;
+    if (remember) {
+      await p.setBool(rememberConnectPrefKey(path), true);
+      await p.setString(savedHostPrefKey(path), host);
       await secure.write(key: _kEmHost, value: host);
+      if (!mounted) return;
+      setState(() {
+        _persisted = ConnectPersistedPaths(
+          savedHosts: {..._persisted.savedHosts, path: host},
+          rememberAddress: {..._persisted.rememberAddress, path: true},
+        );
+        _savedPath = path;
+      });
     } else {
-      await p.setBool(_kRememberConnect, false);
-      await p.remove(_kSavedHost);
+      await p.setBool(rememberConnectPrefKey(path), false);
+      await p.remove(savedHostPrefKey(path));
+      if (!mounted) return;
+      setState(() {
+        _persisted = ConnectPersistedPaths(
+          savedHosts: {..._persisted.savedHosts, path: null},
+          rememberAddress: {..._persisted.rememberAddress, path: false},
+        );
+      });
     }
   }
 
-  Future<void> _clearRememberedHostOnly() async {
-    const secure = FlutterSecureStorage();
+  Future<void> _clearRememberedHostOnly(ConnectPath path) async {
     final p = await SharedPreferences.getInstance();
-    await p.setBool(_kRememberConnect, false);
-    await p.remove(_kSavedHost);
-    await secure.delete(key: _kEmHost);
+    await p.setBool(rememberConnectPrefKey(path), false);
+    await p.remove(savedHostPrefKey(path));
+    if (!mounted) return;
+    setState(() {
+      _persisted = ConnectPersistedPaths(
+        savedHosts: {..._persisted.savedHosts, path: null},
+        rememberAddress: {..._persisted.rememberAddress, path: false},
+      );
+    });
   }
 
   Future<void> _forgetLocalPairing() async {
@@ -208,7 +239,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
         if (mounted) setState(() => _hasDeviceToken = true);
       }
 
-      await _saveRememberedHost(host);
+      await _saveRememberedHost(host, path);
       await _persistPath(path);
       if (!mounted) return;
       context.read<ConnectionBloc>().add(
@@ -295,10 +326,13 @@ class _ConnectScreenState extends State<ConnectScreen> {
                   }
                 },
                 builder: (context, state) {
+                  final continueHost = _savedPath == null
+                      ? null
+                      : _persisted.savedHosts[_savedPath!];
                   final showContinueChip =
                       _hasDeviceToken == true &&
-                      _savedHost != null &&
-                      _savedHost!.isNotEmpty;
+                      continueHost != null &&
+                      continueHost.isNotEmpty;
 
                   return SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
@@ -364,7 +398,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                         child: _selectedPath == null
                                             ? ConnectChooser(
                                                 key: const ValueKey('chooser'),
-                                                savedHost: showContinueChip ? _savedHost : null,
+                                                savedHost: showContinueChip ? continueHost : null,
                                                 savedPath: _savedPath,
                                                 onContinueSaved: showContinueChip ? _openSavedSession : null,
                                                 onPathSelected: _selectPath,
@@ -375,23 +409,34 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                                 alreadyPaired: _hasDeviceToken == true,
                                                 addressController: _address,
                                                 codeController: _code,
-                                                rememberAddress: _rememberAddress,
+                                                rememberAddress:
+                                                    _persisted.rememberAddress[_selectedPath!] ??
+                                                    true,
                                                 busy: _busy,
                                                 connecting: state.status == ConnectionStatus.connecting,
                                                 errorMessage: _inlineError ?? state.message,
                                                 onRememberChanged: (next) async {
+                                                  final path = _selectedPath!;
                                                   if (!next) {
-                                                    await _clearRememberedHostOnly();
-                                                    if (mounted) {
-                                                      setState(() => _rememberAddress = false);
-                                                    }
+                                                    await _clearRememberedHostOnly(path);
                                                     return;
                                                   }
                                                   if (mounted) {
-                                                    setState(() => _rememberAddress = true);
+                                                    setState(() {
+                                                      _persisted = ConnectPersistedPaths(
+                                                        savedHosts: _persisted.savedHosts,
+                                                        rememberAddress: {
+                                                          ..._persisted.rememberAddress,
+                                                          path: true,
+                                                        },
+                                                      );
+                                                    });
                                                   }
                                                   if (_address.text.trim().isNotEmpty) {
-                                                    await _saveRememberedHost(_address.text.trim());
+                                                    await _saveRememberedHost(
+                                                      _address.text.trim(),
+                                                      path,
+                                                    );
                                                   }
                                                 },
                                                 onBack: _backToChooser,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../connect/connect_guide.dart';
 import '../connect/connect_path.dart';
@@ -90,7 +91,75 @@ class ConnectChooser extends StatelessWidget {
           icon: Icons.public_rounded,
           onTap: () => onPathSelected(ConnectPath.tailscale),
         ),
+        const SizedBox(height: 20),
+        const _WindowsServiceDownloadRow(),
       ],
+    );
+  }
+}
+
+class _WindowsServiceDownloadRow extends StatelessWidget {
+  const _WindowsServiceDownloadRow();
+
+  Future<void> _openReleases(BuildContext context) async {
+    final launched = await launchUrl(
+      Uri.parse(kWindowsServiceReleasesUri),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!launched && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open download page')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Material(
+      color: scheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(EmDesign.radiusLg),
+      child: InkWell(
+        onTap: () => _openReleases(context),
+        borderRadius: BorderRadius.circular(EmDesign.radiusLg),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: EmDesign.cardShell(
+            scheme,
+            color: scheme.surfaceContainerLow,
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.download_rounded, color: scheme.tertiary, size: 22),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      kWindowsServiceDownloadTitle,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      kWindowsServiceDownloadSubtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.open_in_new_rounded, size: 18, color: scheme.outline),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -160,11 +160,26 @@ System Monitor (Sysmon) is a Windows system service and device driver that logs 
 The agent implements powerful, low-level operating system controls to contain threats directly from the mobile app.
 
 ### 5.1 Host Network Isolation
-- **Mechanism**: When a machine is isolated (`isolate_machine` command), the agent injects strict Windows Firewall rules using `netsh advfirewall`:
-  - `EM_ISOLATE_BLOCK_IN`: Blocks all incoming network traffic.
-  - `EM_ISOLATE_BLOCK_OUT`: Blocks all outgoing network traffic.
-  - `EM_ISOLATE_ALLOW_MONITOR` / `EM_ISOLATE_ALLOW_MONITOR_OUT`: Explicitly allows TCP traffic on the agent's port (e.g., `5000`) so the mobile app maintains control of the isolated host.
-- **Persistence**: The isolation state is recorded in the `IsolationState` SQLite table. On agent startup, `FirewallBlockExpiryHostedService` verifies and re-enforces isolation if the service was restarted.
+- **Mechanism**: When a machine is isolated (`isolate_machine` command), the agent:
+  1. Adds scoped **Allow** rules for the service executable on the configured monitor port(s) (`EM_ISOLATE_ALLOW_MONITOR_IN` / `EM_ISOLATE_ALLOW_MONITOR_OUT`).
+  2. Saves the current Domain/Private/Public firewall default policies to SQLite.
+  3. Sets all profiles to `blockinbound,blockoutbound` (default-policy containment — no competing explicit block rules).
+- **Safety**: If isolation cannot be verified (`netsh` exit code, allow-rule presence, policy readback), the agent rolls back and reports failure. A **90-second watchdog** auto-unisolates if no authenticated WebSocket client remains connected.
+- **Persistence**: Isolation state and saved restore policies live in the `IsolationState` SQLite table. On startup, `IsolationWatchdogHostedService` reconciles SQLite against live firewall state and re-arms the watchdog if still isolated.
+- **Normal recovery**: More → Firewall → **Unisolate Machine** (or Dashboard isolate flow in reverse).
+- **Emergency local recovery** (when the app cannot reach the agent — requires physical/console access to the PC):
+
+```bat
+netsh advfirewall set allprofiles firewallpolicy blockinbound,allowoutbound
+netsh advfirewall firewall delete rule name="EM_ISOLATE_ALLOW_MONITOR_IN"
+netsh advfirewall firewall delete rule name="EM_ISOLATE_ALLOW_MONITOR_OUT"
+netsh advfirewall firewall delete rule name="EM_ISOLATE_BLOCK_IN"
+netsh advfirewall firewall delete rule name="EM_ISOLATE_BLOCK_OUT"
+netsh advfirewall firewall delete rule name="EM_ISOLATE_ALLOW_MONITOR"
+netsh advfirewall firewall delete rule name="EM_ISOLATE_ALLOW_MONITOR_OUT"
+```
+
+Then reconnect the app and tap **Unisolate Machine** once so SQLite state matches the live firewall.
 
 ### 5.2 Process Suspension & Resumption
 - **Forensic Containment**: Instead of killing a suspicious process (which destroys volatile memory and prevents forensic analysis), analysts can suspend it.

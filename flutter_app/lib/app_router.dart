@@ -3,8 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import 'bloc/connection_bloc.dart';
-import 'bloc/system_info_bloc.dart';
-import 'bloc/system_vitals_history_cubit.dart';
+import 'bloc/firewall_bloc.dart';
 import 'models/ws_models.dart';
 import 'router/go_router_refresh.dart';
 import 'screens/alerts_screen.dart';
@@ -13,6 +12,7 @@ import 'screens/connect_screen.dart';
 import 'screens/controls_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/events_screen.dart';
+import 'screens/feedback_screen.dart';
 import 'screens/firewall_screen.dart';
 import 'screens/more_screen.dart';
 import 'screens/network_connection_detail_screen.dart';
@@ -21,7 +21,6 @@ import 'screens/paired_devices_screen.dart';
 import 'screens/process_detail_screen.dart';
 import 'screens/processes_screen.dart';
 import 'screens/settings_screen.dart';
-import 'screens/system_monitor_screen.dart';
 import 'screens/software_detail_screen.dart';
 import 'screens/software_screen.dart';
 import 'screens/watchlist_screen.dart';
@@ -38,13 +37,10 @@ GoRouter createAppRouter(ConnectionBloc connectionBloc) {
       final loc = state.matchedLocation;
       final onConnect = loc == '/connect';
       final onDashboard = loc == '/dashboard';
-      final onSystemMonitor = loc == '/system-monitor';
       final canReconnect = connectionBloc.state.host != null &&
           connectionBloc.state.host!.trim().isNotEmpty;
       if (!connected && !onConnect) {
-        if (canReconnect && !onDashboard && !onSystemMonitor) {
-          return '/dashboard';
-        }
+        if (canReconnect && !onDashboard) return '/dashboard';
         if (!canReconnect) return '/connect';
       }
       if (connected && onConnect) return '/dashboard';
@@ -85,8 +81,7 @@ GoRouter createAppRouter(ConnectionBloc connectionBloc) {
                     builder: (context, state) {
                       final pid =
                           int.tryParse(state.pathParameters['pid'] ?? '') ?? 0;
-                      final ghost =
-                          state.uri.queryParameters['ghost'] == '1';
+                      final ghost = state.uri.queryParameters['ghost'] == '1';
                       return ProcessDetailScreen(
                         pid: pid,
                         isKilledGhostSnapshot: ghost,
@@ -209,33 +204,9 @@ GoRouter createAppRouter(ConnectionBloc connectionBloc) {
         ),
       ),
       GoRoute(
-        name: 'systemMonitor',
-        path: '/system-monitor',
-        pageBuilder: (context, state) => CustomTransitionPage<void>(
-          key: state.pageKey,
-          transitionDuration: const Duration(milliseconds: 280),
-          reverseTransitionDuration: const Duration(milliseconds: 240),
-          child: BlocProvider(
-            create: (ctx) =>
-                SystemVitalsHistoryCubit.fromBloc(ctx.read<SystemInfoBloc>())
-                  ..prime(),
-            child: const SystemMonitorScreen(),
-          ),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            final curved = CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeOutCubic,
-              reverseCurve: Curves.easeInCubic,
-            );
-            return FadeTransition(
-              opacity: curved,
-              child: ScaleTransition(
-                scale: Tween<double>(begin: 0.96, end: 1).animate(curved),
-                child: child,
-              ),
-            );
-          },
-        ),
+        name: 'feedback',
+        path: '/feedback',
+        builder: (context, state) => const FeedbackScreen(),
       ),
     ],
   );
@@ -249,60 +220,72 @@ class ScaffoldWithNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Scaffold(
-      body: shell,
-      bottomNavigationBar: DecoratedBox(
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainerHighest,
-          border: Border(
-            top: BorderSide(
-                color: scheme.outlineVariant.withValues(alpha: 0.15)),
+    return BlocListener<FirewallBloc, FirewallState>(
+      listenWhen: (p, c) =>
+          c.snackbarMessage != null && c.snackbarMessage != p.snackbarMessage,
+      listener: (context, state) {
+        final msg = state.snackbarMessage;
+        if (msg == null) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
+        );
+        context.read<FirewallBloc>().clearFeedback();
+      },
+      child: Scaffold(
+        body: shell,
+        bottomNavigationBar: DecoratedBox(
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerHighest,
+            border: Border(
+              top: BorderSide(
+                  color: scheme.outlineVariant.withValues(alpha: 0.15)),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: scheme.onSurface.withValues(alpha: 0.06),
+                blurRadius: 12,
+                offset: const Offset(0, -4),
+              ),
+            ],
           ),
-          boxShadow: [
-            BoxShadow(
-              color: scheme.onSurface.withValues(alpha: 0.06),
-              blurRadius: 12,
-              offset: const Offset(0, -4),
-            ),
-          ],
-        ),
-        child: NavigationBar(
-          animationDuration: const Duration(milliseconds: 280),
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          selectedIndex: shell.currentIndex,
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.dashboard_outlined),
-              selectedIcon: Icon(Icons.dashboard_rounded),
-              label: 'Dashboard',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.memory_outlined),
-              selectedIcon: Icon(Icons.memory_rounded),
-              label: 'Processes',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.lan_outlined),
-              selectedIcon: Icon(Icons.lan_rounded),
-              label: 'Network',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.event_note_outlined),
-              selectedIcon: Icon(Icons.event_note_rounded),
-              label: 'Events',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.menu_open_rounded),
-              selectedIcon: Icon(Icons.menu_rounded),
-              label: 'More',
-            ),
-          ],
-          onDestinationSelected: (index) {
-            if (index != shell.currentIndex) {
-              popTransientOverlayRoutes(context);
-            }
-            shell.goBranch(index);
-          },
+          child: NavigationBar(
+            animationDuration: const Duration(milliseconds: 280),
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+            selectedIndex: shell.currentIndex,
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.dashboard_outlined),
+                selectedIcon: Icon(Icons.dashboard_rounded),
+                label: 'Dashboard',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.memory_outlined),
+                selectedIcon: Icon(Icons.memory_rounded),
+                label: 'Processes',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.lan_outlined),
+                selectedIcon: Icon(Icons.lan_rounded),
+                label: 'Network',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.event_note_outlined),
+                selectedIcon: Icon(Icons.event_note_rounded),
+                label: 'Events',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.menu_open_rounded),
+                selectedIcon: Icon(Icons.menu_rounded),
+                label: 'More',
+              ),
+            ],
+            onDestinationSelected: (index) {
+              if (index != shell.currentIndex) {
+                popTransientOverlayRoutes(context);
+              }
+              shell.goBranch(index);
+            },
+          ),
         ),
       ),
     );

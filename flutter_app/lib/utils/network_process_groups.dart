@@ -77,7 +77,24 @@ class NetworkProcessGroup {
     if (parts.isEmpty && localBinds.isNotEmpty) {
       parts.add('${localBinds.length} local bind${localBinds.length == 1 ? '' : 's'}');
     }
+    if (parts.isEmpty) {
+      return 'No active connections';
+    }
     return parts.join(' · ');
+  }
+
+  factory NetworkProcessGroup.firewallHeld({
+    required String processName,
+    Set<int> pids = const {},
+  }) {
+    return NetworkProcessGroup(
+      processName: processName,
+      pids: pids,
+      remotes: const [],
+      localBinds: const [],
+      establishedCount: 0,
+      allConnections: const [],
+    );
   }
 }
 
@@ -195,6 +212,74 @@ bool networkGroupMatchesSearch(NetworkProcessGroup group, String query) {
 /// Default Apps view: show groups with at least one established talking socket.
 bool networkGroupIsTalkingByDefault(NetworkProcessGroup group) =>
     group.establishedCount > 0;
+
+/// Default Apps view also keeps firewall-blocked apps after their sockets drop.
+bool networkGroupVisibleInDefaultAppsView(
+  NetworkProcessGroup group,
+  Iterable<String> blockedProcessNames,
+) {
+  if (networkGroupIsTalkingByDefault(group)) return true;
+  return processNameHasFirewallBlock(group.processName, blockedProcessNames);
+}
+
+Set<int> _runningPidsForProcess(
+  String processName,
+  Map<String, Set<int>> runningPidsByProcessName,
+) {
+  if (runningPidsByProcessName.isEmpty) return const {};
+  final target = processName.trim().toLowerCase();
+  if (target.isEmpty) return const {};
+  final out = <int>{};
+  void addAll(String key) {
+    final pids = runningPidsByProcessName[key];
+    if (pids != null) out.addAll(pids);
+  }
+
+  addAll(target);
+  if (target.endsWith('.exe')) {
+    addAll(target.substring(0, target.length - 4));
+  } else {
+    addAll('$target.exe');
+  }
+  return out;
+}
+
+/// Re-inserts process firewall rules that vanished from the live socket dump.
+List<NetworkProcessGroup> mergeFirewallBlockedProcessGroups({
+  required List<NetworkProcessGroup> groups,
+  required Iterable<FirewallProcessBlockInfo> blocks,
+  Map<String, Set<int>> runningPidsByProcessName = const {},
+}) {
+  final out = List<NetworkProcessGroup>.from(groups);
+  for (final block in blocks) {
+    final name = block.processName.trim();
+    if (name.isEmpty) continue;
+    if (out.any((g) => processNameHasFirewallBlock(g.processName, [name]))) {
+      continue;
+    }
+    out.add(
+      NetworkProcessGroup.firewallHeld(
+        processName: name,
+        pids: _runningPidsForProcess(name, runningPidsByProcessName),
+      ),
+    );
+  }
+  out.sort((a, b) {
+    final names = blocks.map((e) => e.processName);
+    final aSilentBlocked = a.establishedCount == 0 &&
+        processNameHasFirewallBlock(a.processName, names);
+    final bSilentBlocked = b.establishedCount == 0 &&
+        processNameHasFirewallBlock(b.processName, names);
+    if (aSilentBlocked != bSilentBlocked) {
+      return aSilentBlocked ? -1 : 1;
+    }
+    if (a.establishedCount != b.establishedCount) {
+      return b.establishedCount.compareTo(a.establishedCount);
+    }
+    return a.processName.toLowerCase().compareTo(b.processName.toLowerCase());
+  });
+  return out;
+}
 
 bool processNameHasFirewallBlock(
   String processName,

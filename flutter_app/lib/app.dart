@@ -80,6 +80,7 @@ class _EndpointMonitorAppState extends State<EndpointMonitorApp> {
           builder: (context, themeMode) {
             return MaterialApp.router(
               title: 'Endpoint Monitor',
+              debugShowCheckedModeBanner: false,
               theme: buildEndpointMonitorLightTheme(),
               darkTheme: buildEndpointMonitorDarkTheme(),
               themeMode: themeMode,

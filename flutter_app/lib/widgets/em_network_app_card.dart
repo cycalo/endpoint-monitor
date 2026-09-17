@@ -165,9 +165,11 @@ class _EmNetworkAppCardState extends State<EmNetworkAppCard> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                g.pidCount <= 1
-                                    ? '1 process'
-                                    : '${g.pidCount} processes',
+                                g.pidCount == 0
+                                    ? 'No live sockets'
+                                    : g.pidCount == 1
+                                        ? '1 process'
+                                        : '${g.pidCount} processes',
                                 style: GoogleFonts.inter(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
@@ -237,6 +239,18 @@ class _EmNetworkAppCardState extends State<EmNetworkAppCard> {
                   ),
                   if (_expanded) ...[
                     const SizedBox(height: 12),
+                    if (g.remotes.isEmpty && g.localBinds.isEmpty) ...[
+                      Text(
+                        widget.processBlocked
+                            ? 'This app has a firewall program rule, so its sockets dropped off the live list. Unblock it here to restore network access.'
+                            : 'No remote peers in the current snapshot.',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          height: 1.4,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                     if (g.remotes.isNotEmpty) ...[
                       Text(
                         'Remote peers',

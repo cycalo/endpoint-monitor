@@ -34,12 +34,18 @@ public partial class PairPage : UserControl
     {
         var root = new StackPanel();
         root.Children.Add(new TextBlock { Text = "Pair", Style = (Style)Application.Current.FindResource("CsPageTitle") });
+        root.Children.Add(new TextBlock
+        {
+            Text = "Generate a code and copy the address the phone app should use.",
+            Style = (Style)Application.Current.FindResource("CsBody"),
+            Margin = new Thickness(0, -8, 0, 16),
+        });
 
         var card = new Border { Style = (Style)Application.Current.FindResource("CsCard"), Margin = new Thickness(0, 0, 0, 12) };
         var inner = new StackPanel();
         inner.Children.Add(new TextBlock
         {
-            Text = "Enter this code in the Endpoint Monitor app (Connect screen). Same code for Wi-Fi or Tailscale.",
+            Text = "Enter this 6-digit code in the phone app on Connect. Same code for This Wi-Fi or Away from home.",
             Style = (Style)Application.Current.FindResource("CsBody"),
             Margin = new Thickness(0, 0, 0, 16),
         });
@@ -96,7 +102,7 @@ public partial class PairPage : UserControl
 
         var btnRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
         var copyCode = new Button { Content = "Copy code", Style = (Style)Application.Current.FindResource("CsPrimaryButton"), Margin = new Thickness(0, 0, 8, 0) };
-        copyCode.Click += (_, _) => EndpointAddressList.CopyText(_codeText.Text);
+        copyCode.Click += (_, _) => CopyFeedback.CopyFromButton(copyCode, _codeText.Text, "Copied!");
         var newCode = new Button { Content = "New code", Style = (Style)Application.Current.FindResource("CsSecondaryButton") };
         newCode.Click += async (_, _) => await GenerateCodeAsync().ConfigureAwait(true);
         btnRow.Children.Add(copyCode);

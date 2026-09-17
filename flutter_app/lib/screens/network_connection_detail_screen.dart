@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../bloc/blocked_remote_ips_cubit.dart';
+import '../bloc/firewall_bloc.dart';
 import '../bloc/network_bloc.dart';
 import '../bloc/process_bloc.dart';
 import '../bloc/watchlist_bloc.dart';
@@ -15,6 +16,7 @@ import '../utils/network_endpoint_display.dart'
         formatNetworkEndpoint,
         hasBlockableRemoteEndpoint,
         isListeningStyleSocket;
+import '../utils/network_process_groups.dart';
 import '../utils/network_tcp_state.dart';
 import '../widgets/em_brand_app_bar.dart';
 
@@ -134,14 +136,31 @@ class NetworkConnectionDetailScreen extends StatelessWidget {
                         _SectionCard(
                           title: 'ACTIONS',
                           icon: Icons.shield_rounded,
-                          child: Builder(
-                            builder: (context) {
+                          child: BlocBuilder<FirewallBloc, FirewallState>(
+                            builder: (context, fw) {
                               final theme = Theme.of(context);
                               final canBlock = hasBlockableRemoteEndpoint(
                                   current.remoteAddress);
                               final listenOnly =
                                   !canBlock && isListeningStyleSocket(current);
                               final rawProc = current.processName.trim();
+                              final canBlockApp = rawProc.isNotEmpty;
+                              final processBlocks = fw.processBlocks
+                                  .map(
+                                    (e) => FirewallProcessBlockInfo(
+                                      processName: e.processName ?? '',
+                                      direction: e.direction,
+                                    ),
+                                  )
+                                  .where((e) => e.processName.isNotEmpty)
+                                  .toList();
+                              final processBlock = canBlockApp
+                                  ? processFirewallBlockForName(
+                                      rawProc,
+                                      processBlocks,
+                                    )
+                                  : null;
+                              final processBlocked = processBlock != null;
                               final canWatchlistFlag = rawProc.isNotEmpty &&
                                   WatchlistBloc.normalizeExecutableName(
                                           rawProc) !=
@@ -193,6 +212,60 @@ class NetworkConnectionDetailScreen extends StatelessWidget {
                                       ),
                                     ],
                                   ),
+                                  if (canBlockApp) ...[
+                                    const SizedBox(height: 10),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: FilledButton(
+                                            style: FilledButton.styleFrom(
+                                              backgroundColor: processBlocked
+                                                  ? scheme
+                                                      .surfaceContainerHighest
+                                                  : scheme.errorContainer,
+                                              foregroundColor: processBlocked
+                                                  ? scheme.onSurfaceVariant
+                                                      .withValues(alpha: 0.45)
+                                                  : scheme.error,
+                                            ),
+                                            onPressed: !processBlocked
+                                                ? () => _confirmBlockProcess(
+                                                      context,
+                                                      rawProc,
+                                                    )
+                                                : null,
+                                            child: Text(
+                                              processBlocked
+                                                  ? 'App blocked'
+                                                  : 'Block app',
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: FilledButton.tonal(
+                                            onPressed: processBlocked
+                                                ? () => _confirmUnblockProcess(
+                                                      context,
+                                                      rawProc,
+                                                      processBlock,
+                                                    )
+                                                : null,
+                                            child: const Text('Unblock app'),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'Blocks outbound network access for the whole executable ($rawProc), not just this socket or remote IP.',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: scheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
                                   if (!canBlock) ...[
                                     const SizedBox(height: 8),
                                     Text(
@@ -691,12 +764,14 @@ Future<void> _confirmKillProcess(
 
 Future<void> _confirmNetworkBlock(
     BuildContext context, NetworkConnection n) async {
+  final endpoint = formatNetworkEndpoint(n.remoteAddress, n.remotePort);
   final ok = await showDialog<bool>(
     context: context,
     builder: (c) => AlertDialog(
       title: const Text('Block remote IP?'),
       content: Text(
-        formatNetworkEndpoint(n.remoteAddress, n.remotePort),
+        'This applies a machine-wide Windows Firewall rule for outbound traffic to $endpoint. '
+        'Other apps using the same IP may be affected.',
       ),
       actions: [
         TextButton(
@@ -704,7 +779,7 @@ Future<void> _confirmNetworkBlock(
             child: const Text('Cancel')),
         FilledButton(
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('Block')),
+            child: const Text('Block IP')),
       ],
     ),
   );
@@ -720,4 +795,65 @@ Future<void> _confirmNetworkBlock(
           snapshot: n,
         );
   }
+}
+
+Future<void> _confirmBlockProcess(
+  BuildContext context,
+  String processName,
+) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (c) => AlertDialog(
+      title: const Text('Block app network access?'),
+      content: Text(
+        'Apply a Windows Firewall program rule to block outbound network access for '
+        '$processName? This covers every running instance and future sockets from that executable.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(c, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(c, true),
+          child: const Text('Block app'),
+        ),
+      ],
+    ),
+  );
+  if (ok == true && context.mounted) {
+    context.read<FirewallBloc>().requestBlockProcess(
+          processName,
+          direction: 'outbound',
+        );
+  }
+}
+
+Future<void> _confirmUnblockProcess(
+  BuildContext context,
+  String processName,
+  FirewallProcessBlockInfo? block,
+) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (c) => AlertDialog(
+      title: const Text('Unblock app?'),
+      content: Text(
+        'Remove the firewall program rule for $processName?',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(c, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(c, true),
+          child: const Text('Unblock app'),
+        ),
+      ],
+    ),
+  );
+  if (ok != true || !context.mounted) return;
+  final direction = block?.direction ?? 'outbound';
+  context.read<FirewallBloc>().requestUnblockProcess(processName, direction);
 }

@@ -3,6 +3,13 @@ import 'package:endpoint_monitor/connect/connect_path.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('windows service releases uri points at GitHub releases', () {
+    expect(
+      kWindowsServiceReleasesUri,
+      'https://github.com/cycalo/endpoint-monitor/releases',
+    );
+  });
+
   group('connectGuideSteps', () {
     test('wifi guide does not mention Tailscale install', () {
       final steps = connectGuideSteps(ConnectPath.wifi, alreadyPaired: false);

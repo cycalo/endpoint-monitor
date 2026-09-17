@@ -199,18 +199,23 @@ class FirewallBloc extends Cubit<FirewallState> {
   void _handleCommandResult(Map<String, dynamic> m) {
     final cmd = m['command'] as String?;
     final ok = m['success'] == true;
-    final msg = m['message']?.toString() ?? 'Unknown error';
 
     if (cmd == 'isolate_machine' && _pendingIsolate) {
       _pendingIsolate = false;
-      if (!ok) emit(state.copyWith(snackbarMessage: 'Isolation failed: $msg'));
+      emit(state.copyWith(
+        snackbarMessage: ok
+            ? 'Machine isolated'
+            : 'Could not isolate this machine. Try again from a connected session.',
+      ));
       return;
     }
     if (cmd == 'unisolate_machine' && _pendingUnisolate) {
       _pendingUnisolate = false;
-      if (!ok) {
-        emit(state.copyWith(snackbarMessage: 'Failed to unisolate: $msg'));
-      }
+      emit(state.copyWith(
+        snackbarMessage: ok
+            ? 'Isolation removed'
+            : 'Could not remove isolation. Try again, or use the local recovery commands if the app cannot reconnect.',
+      ));
       return;
     }
     if (cmd == 'unblock_ip' && _pendingUnblockIp != null) {
@@ -218,7 +223,8 @@ class FirewallBloc extends Cubit<FirewallState> {
       if (ok) {
         emit(state.copyWith(snackbarMessage: 'Removed block'));
       } else {
-        emit(state.copyWith(snackbarMessage: 'Unblock failed: $msg'));
+        emit(state.copyWith(
+            snackbarMessage: 'Could not remove that block. Try again.'));
       }
       return;
     }
@@ -230,7 +236,8 @@ class FirewallBloc extends Cubit<FirewallState> {
       if (ok) {
         emit(state.copyWith(snackbarMessage: 'Process rule removed'));
       } else {
-        emit(state.copyWith(snackbarMessage: 'Unblock failed: $msg'));
+        emit(state.copyWith(
+            snackbarMessage: 'Could not remove that process rule. Try again.'));
       }
       return;
     }
@@ -240,7 +247,8 @@ class FirewallBloc extends Cubit<FirewallState> {
       if (ok) {
         emit(state.copyWith(snackbarMessage: 'Block added for $ip'));
       } else {
-        emit(state.copyWith(snackbarMessage: 'Block failed: $msg'));
+        emit(state.copyWith(
+            snackbarMessage: 'Could not add that IP block. Check the address and try again.'));
       }
       return;
     }
@@ -250,7 +258,8 @@ class FirewallBloc extends Cubit<FirewallState> {
       if (ok) {
         emit(state.copyWith(snackbarMessage: 'Outbound port $p blocked'));
       } else {
-        emit(state.copyWith(snackbarMessage: 'Port block failed: $msg'));
+        emit(state.copyWith(
+            snackbarMessage: 'Could not block that port. Try again.'));
       }
       return;
     }
@@ -260,7 +269,9 @@ class FirewallBloc extends Cubit<FirewallState> {
       if (ok) {
         emit(state.copyWith(snackbarMessage: 'Blocked $n'));
       } else {
-        emit(state.copyWith(snackbarMessage: 'Process block failed: $msg'));
+        emit(state.copyWith(
+            snackbarMessage:
+                'Could not block that process. It must be running so the agent can resolve its path.'));
       }
     }
   }

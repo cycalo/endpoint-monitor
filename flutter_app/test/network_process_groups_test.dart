@@ -90,4 +90,70 @@ void main() {
       expect(groups.single.establishedCount, 1);
     });
   });
+
+  group('mergeFirewallBlockedProcessGroups', () {
+    test('keeps a blocked app with no live sockets so it can be unblocked', () {
+      final groups = mergeFirewallBlockedProcessGroups(
+        groups: const [],
+        blocks: const [
+          FirewallProcessBlockInfo(
+            processName: 'chrome.exe',
+            direction: 'outbound',
+          ),
+        ],
+        runningPidsByProcessName: {
+          'chrome.exe': {4321},
+        },
+      );
+
+      expect(groups, hasLength(1));
+      expect(groups.single.processName, 'chrome.exe');
+      expect(groups.single.pids, {4321});
+      expect(groups.single.remotes, isEmpty);
+      expect(groups.single.establishedCount, 0);
+      expect(
+        networkGroupVisibleInDefaultAppsView(
+          groups.single,
+          const ['chrome.exe'],
+        ),
+        isTrue,
+      );
+    });
+
+    test('does not duplicate an app that still has sockets', () {
+      final live = buildNetworkProcessGroups([
+        _conn(pid: 9, processName: 'chrome.exe', remoteAddress: '1.2.3.4'),
+      ]);
+      final groups = mergeFirewallBlockedProcessGroups(
+        groups: live,
+        blocks: const [
+          FirewallProcessBlockInfo(
+            processName: 'chrome.exe',
+            direction: 'outbound',
+          ),
+        ],
+      );
+
+      expect(groups, hasLength(1));
+      expect(groups.single.pids, {9});
+      expect(groups.single.establishedCount, 1);
+    });
+
+    test('default apps filter hides silent apps unless firewall-blocked', () {
+      final silent = buildNetworkProcessGroups([
+        _conn(
+          pid: 1,
+          processName: 'svchost.exe',
+          remoteAddress: '0.0.0.0',
+          remotePort: 0,
+          state: '100',
+        ),
+      ]).single;
+      expect(networkGroupVisibleInDefaultAppsView(silent, const []), isFalse);
+      expect(
+        networkGroupVisibleInDefaultAppsView(silent, const ['svchost.exe']),
+        isTrue,
+      );
+    });
+  });
 }

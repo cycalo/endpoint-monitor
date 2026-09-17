@@ -69,6 +69,8 @@ class _FirewallScreenState extends State<FirewallScreen>
   void dispose() {
     _pulseController.dispose();
     _ipController.dispose();
+    _manualPortController.dispose();
+    _processNameController.dispose();
     super.dispose();
   }
 
@@ -145,7 +147,8 @@ class _FirewallScreenState extends State<FirewallScreen>
               ),
               const SizedBox(height: 12),
               Text(
-                'Blocks all network traffic except the monitoring connection — use this to contain a suspected compromise.',
+                'Blocks all network traffic except the Endpoint Monitor channel by changing Windows Firewall default policy. '
+                'If the app cannot still reach this PC within 90 seconds, isolation is automatically removed.',
                 style: Theme.of(c).textTheme.bodyMedium?.copyWith(
                       color: scheme.onSurfaceVariant,
                       height: 1.45,
@@ -176,7 +179,8 @@ class _FirewallScreenState extends State<FirewallScreen>
       builder: (c) => AlertDialog(
         title: const Text('Confirm isolation'),
         content: const Text(
-          'This will apply Windows Firewall rules that block broad traffic while keeping the Endpoint Monitor channel. Continue?',
+          'This changes Windows Firewall default policy to block inbound and outbound traffic while keeping the Endpoint Monitor channel open. '
+          'If the app loses contact within 90 seconds, isolation is automatically removed. Continue?',
         ),
         actions: [
           TextButton(
@@ -205,7 +209,7 @@ class _FirewallScreenState extends State<FirewallScreen>
       builder: (c) => AlertDialog(
         title: const Text('Remove isolation?'),
         content: const Text(
-          'Network restrictions added for isolation will be removed.',
+          'Saved Windows Firewall default policies will be restored and isolation allow rules will be removed.',
         ),
         actions: [
           TextButton(
@@ -365,17 +369,7 @@ class _FirewallScreenState extends State<FirewallScreen>
     return BlocListener<ConnectionBloc, EmConnectionState>(
       listenWhen: (p, c) => c.isConnected && !p.isConnected,
       listener: (context, _) => context.read<FirewallBloc>().refresh(),
-      child: BlocConsumer<FirewallBloc, FirewallState>(
-        listenWhen: (p, c) =>
-            c.snackbarMessage != null && c.snackbarMessage != p.snackbarMessage,
-        listener: (context, state) {
-          final msg = state.snackbarMessage;
-          if (msg == null) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
-          );
-          context.read<FirewallBloc>().clearFeedback();
-        },
+      child: BlocBuilder<FirewallBloc, FirewallState>(
         builder: (context, fw) {
           return BlocBuilder<ConnectionBloc, EmConnectionState>(
             builder: (context, conn) {
@@ -431,7 +425,7 @@ class _FirewallScreenState extends State<FirewallScreen>
                               scheme: scheme,
                               theme: theme,
                               isolated: fw.isolated,
-                              enabled: connected && fw.errorMessage == null,
+                              enabled: connected,
                               pulse: _pulseController,
                               onIsolate: () => _showIsolateBottomSheet(context),
                               onUnisolate: () => _confirmUnisolate(context),
