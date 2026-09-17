@@ -52,6 +52,9 @@ class ControlsBloc extends Cubit<ControlsState> {
     FlutterForegroundTask.addTaskDataCallback(handleTaskData);
   }
 
+  static const _maxEncodedScreenshotLength = 24 * 1024 * 1024;
+  static const _pngSignature = <int>[137, 80, 78, 71, 13, 10, 26, 10];
+
   static const _commands = {
     'lock_screen',
     'logoff_user',
@@ -101,14 +104,8 @@ class ControlsBloc extends Cubit<ControlsState> {
       if (ok) {
         final raw = m['data'];
         if (raw is Map) {
-          final b64 = raw['imageBase64']?.toString();
-          if (b64 != null && b64.isNotEmpty) {
-            try {
-              png = base64Decode(b64);
-            } catch (_) {
-              png = null;
-            }
-          }
+          final b64 = raw['imageBase64'];
+          if (b64 is String) png = _decodeScreenshotPng(b64);
         }
       }
       emit(state.copyWith(
@@ -131,6 +128,22 @@ class ControlsBloc extends Cubit<ControlsState> {
       feedback: ControlsFeedback(
           success: ok, message: msg.isNotEmpty ? msg : (ok ? 'OK' : 'Failed')),
     ));
+  }
+
+  static Uint8List? _decodeScreenshotPng(String encoded) {
+    if (encoded.isEmpty || encoded.length > _maxEncodedScreenshotLength) {
+      return null;
+    }
+    try {
+      final bytes = base64Decode(encoded);
+      if (bytes.length < _pngSignature.length) return null;
+      for (var i = 0; i < _pngSignature.length; i++) {
+        if (bytes[i] != _pngSignature[i]) return null;
+      }
+      return bytes;
+    } on FormatException {
+      return null;
+    }
   }
 
   @override
