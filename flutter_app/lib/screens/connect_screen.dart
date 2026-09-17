@@ -1,6 +1,3 @@
-import 'dart:io';
-
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -12,20 +9,17 @@ import '../bloc/connection_bloc.dart';
 import '../connect/connect_guide.dart';
 import '../connect/connect_path.dart';
 import '../connect/connect_persistence.dart';
+import '../connect/connect_session.dart';
 import '../connect/connect_validation.dart';
 import '../theme/em_design_system.dart';
 import '../utils/agent_health.dart';
 import '../utils/device_token_status.dart';
-import '../utils/export_http_base.dart';
 import '../widgets/em_brand_app_bar.dart';
 import '../widgets/em_loading_states.dart';
 import '../widgets/em_technical_grid.dart';
 import 'connect_chooser.dart';
 import 'connect_guided_page.dart';
-
-/// Same keys as [ConnectionBloc] for host and paired device token.
-const _kEmHost = 'em_host';
-const _kEmToken = 'em_token';
+import 'connect_qr_scan_screen.dart';
 
 class ConnectScreen extends StatefulWidget {
   const ConnectScreen({super.key});
@@ -59,10 +53,10 @@ class _ConnectScreenState extends State<ConnectScreen> {
     final p = await SharedPreferences.getInstance();
     await migrateLegacyConnectPrefs(
       p,
-      secureHost: await secure.read(key: _kEmHost),
+      secureHost: await secure.read(key: kEmHost),
     );
     final persisted = loadConnectPersistedPaths(p);
-    final token = await secure.read(key: _kEmToken);
+    final token = await secure.read(key: kEmToken);
     final pathPref = connectPathFromPref(p.getString(kConnectPathPrefKey));
 
     if (!mounted) return;
@@ -81,7 +75,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
     if (hasToken && rememberedHost != null) {
       final status = await probeDeviceToken(rememberedHost, token);
       if (status == DeviceTokenStatus.revoked) {
-        await secure.delete(key: _kEmToken);
+        await secure.delete(key: kEmToken);
         hasToken = false;
       }
     }
@@ -128,6 +122,21 @@ class _ConnectScreenState extends State<ConnectScreen> {
     });
   }
 
+  Future<void> _openQrScanner() async {
+    setState(() => _inlineError = null);
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (context) => const ConnectQrScanScreen(),
+      ),
+    );
+    if (!mounted) return;
+    const secure = FlutterSecureStorage();
+    final token = await secure.read(key: kEmToken);
+    if (token != null && token.isNotEmpty) {
+      setState(() => _hasDeviceToken = true);
+    }
+  }
+
   Future<void> _saveRememberedHost(String host, ConnectPath path) async {
     const secure = FlutterSecureStorage();
     final p = await SharedPreferences.getInstance();
@@ -135,7 +144,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
     if (remember) {
       await p.setBool(rememberConnectPrefKey(path), true);
       await p.setString(savedHostPrefKey(path), host);
-      await secure.write(key: _kEmHost, value: host);
+      await secure.write(key: kEmHost, value: host);
       if (!mounted) return;
       setState(() {
         _persisted = ConnectPersistedPaths(
@@ -172,7 +181,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
 
   Future<void> _forgetLocalPairing() async {
     const secure = FlutterSecureStorage();
-    await secure.delete(key: _kEmToken);
+    await secure.delete(key: kEmToken);
     if (!mounted) return;
     setState(() {
       _hasDeviceToken = false;
@@ -213,71 +222,34 @@ class _ConnectScreenState extends State<ConnectScreen> {
         }
         return;
       }
+      if (!mounted) return;
 
-      const secure = FlutterSecureStorage();
-      var token = await secure.read(key: _kEmToken) ?? '';
-
-      if (token.isNotEmpty) {
-        final decision =
-            storedTokenConnectDecision(await probeDeviceToken(host, token));
-        if (decision.clearStoredToken) {
-          await secure.delete(key: _kEmToken);
-          token = '';
-          if (mounted) {
-            setState(() {
+      final bloc = context.read<ConnectionBloc>();
+      final result = await completeConnectSession(
+        connectionBloc: bloc,
+        host: host,
+        path: path,
+        pairingCode: hasToken ? null : _code.text.trim(),
+        persistHost: false,
+      );
+      if (!result.success) {
+        if (mounted) {
+          setState(() {
+            _inlineError = result.errorMessage;
+            if (result.clearedStoredToken) {
               _hasDeviceToken = false;
-              _inlineError = decision.errorMessage;
-            });
-          }
-          return;
+            }
+          });
         }
+        return;
       }
-
-      if (token.isEmpty) {
-        token = await _pairDevice(host, _code.text.trim());
-        if (token.isEmpty) return;
-        if (mounted) setState(() => _hasDeviceToken = true);
+      if (result.obtainedNewToken && mounted) {
+        setState(() => _hasDeviceToken = true);
       }
-
       await _saveRememberedHost(host, path);
       await _persistPath(path);
-      if (!mounted) return;
-      context.read<ConnectionBloc>().add(
-            ConnectionConnectRequested(host: host, token: token),
-          );
     } finally {
       if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<String> _pairDevice(String host, String code) async {
-    try {
-      final base = httpBaseFromMonitorHost(host);
-      final dio = Dio(BaseOptions(
-        baseUrl: base,
-        connectTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 15),
-      ));
-      final response = await dio.post<Map<String, dynamic>>(
-        '/api/auth/pairing/complete',
-        data: {
-          'code': code,
-          'deviceName': 'Flutter ${Platform.operatingSystem}',
-        },
-      );
-      final token = response.data?['token']?.toString();
-      if (token == null || token.isEmpty) {
-        throw StateError('No device credential returned.');
-      }
-      const secure = FlutterSecureStorage();
-      await secure.write(key: _kEmToken, value: token);
-      await secure.write(key: _kEmHost, value: host);
-      return token;
-    } catch (e) {
-      if (mounted) {
-        setState(() => _inlineError = pairingFailureMessage(e));
-      }
-      return '';
     }
   }
 
@@ -402,6 +374,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                                 savedPath: _savedPath,
                                                 onContinueSaved: showContinueChip ? _openSavedSession : null,
                                                 onPathSelected: _selectPath,
+                                                onScanQr: _openQrScanner,
                                               )
                                             : ConnectGuidedPage(
                                                 key: ValueKey('guided-${_selectedPath!.name}'),

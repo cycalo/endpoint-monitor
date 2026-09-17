@@ -127,3 +127,29 @@ const kPairingCodeCallout =
 
 /// Label for the continue chip on the chooser when a saved session exists.
 String continueToSavedLabel(String address) => 'Continue to $address';
+
+/// Primary chooser card for QR pairing.
+const kConnectScanQrTitle = 'Scan QR code';
+const kConnectScanQrSubtitle =
+    'Fastest setup. On the PC, open Pair and scan the QR code with this phone.';
+
+/// Shown when a scanned QR is not a valid Endpoint Monitor pairing payload.
+const kPairingQrInvalidMessage =
+    'This QR code is not a valid Endpoint Monitor pairing code. Scan the code from the PC Pair screen.';
+
+/// Shown when `expiresAt` in the QR payload is in the past (client-side check).
+const kPairingQrExpiredMessage =
+    'This pairing code has expired. On the PC, open Pair and tap New code, then scan again.';
+
+/// Scanner screen copy.
+const kConnectQrScanTitle = 'Scan pairing QR';
+const kConnectQrScanSubtitle =
+    'Point your camera at the QR code on the PC Pair screen.';
+
+const kConnectQrCameraDeniedMessage =
+    'Camera access is required to scan the pairing QR code.';
+
+const kConnectQrOpenSettingsLabel = 'Open Settings';
+
+const kConnectQrUnsupportedPlatformMessage =
+    'QR scanning is only available on Android and iOS. Use This Wi-Fi or Away from home to connect manually.';

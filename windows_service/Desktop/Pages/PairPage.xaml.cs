@@ -1,5 +1,9 @@
+using System.IO;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using EndpointMonitorService.Desktop;
 using EndpointMonitorService.Services;
+using QRCoder;
 
 namespace EndpointMonitorService.Desktop.Pages;
 
@@ -13,6 +17,8 @@ public partial class PairPage : UserControl
     private Border _countdownFill = null!;
     private TextBlock _errorText = null!;
     private StackPanel _pathsHost = null!;
+    private System.Windows.Controls.Image _qrImage = null!;
+    private Border _qrFrame = null!;
     private DateTime _expiresAtUtc;
     private TimeSpan _ttl = TimeSpan.FromMinutes(5);
 
@@ -45,10 +51,44 @@ public partial class PairPage : UserControl
         var inner = new StackPanel();
         inner.Children.Add(new TextBlock
         {
-            Text = "Enter this 6-digit code in the phone app on Connect. Same code for This Wi-Fi or Away from home.",
+            Text = "Scan the QR code in the phone app (Connect → Scan QR code), or enter the 6-digit code manually. Same code for This Wi-Fi or Away from home.",
             Style = (Style)Application.Current.FindResource("CsBody"),
             Margin = new Thickness(0, 0, 0, 16),
+            TextWrapping = TextWrapping.Wrap,
         });
+
+        var codeRow = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+        codeRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        codeRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        _qrImage = new System.Windows.Controls.Image
+        {
+            Width = 180,
+            Height = 180,
+            Stretch = Stretch.Uniform,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        RenderOptions.SetBitmapScalingMode(_qrImage, BitmapScalingMode.NearestNeighbor);
+
+        _qrFrame = new Border
+        {
+            Width = 188,
+            Height = 188,
+            Padding = new Thickness(4),
+            CornerRadius = new CornerRadius(8),
+            Background = (Brush)Application.Current.FindResource("CsSurfaceContainerLowBrush"),
+            BorderBrush = (Brush)Application.Current.FindResource("CsOutlineBrush"),
+            BorderThickness = new Thickness(1),
+            Child = _qrImage,
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(0, 0, 16, 0),
+        };
+        Grid.SetColumn(_qrFrame, 0);
+        codeRow.Children.Add(_qrFrame);
+
+        var codeColumn = new StackPanel();
+        Grid.SetColumn(codeColumn, 1);
 
         _codeText = new TextBlock
         {
@@ -57,10 +97,10 @@ public partial class PairPage : UserControl
             FontWeight = FontWeights.Bold,
             Foreground = (Brush)Application.Current.FindResource("CsPrimaryBrush"),
             Text = "------",
-            HorizontalAlignment = HorizontalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Left,
             Margin = new Thickness(0, 8, 0, 8),
         };
-        inner.Children.Add(_codeText);
+        codeColumn.Children.Add(_codeText);
 
         var track = new Border
         {
@@ -80,15 +120,15 @@ public partial class PairPage : UserControl
         };
         track.Child = _countdownFill;
         track.SizeChanged += (_, _) => UpdateCountdown();
-        inner.Children.Add(track);
+        codeColumn.Children.Add(track);
 
         _expiryText = new TextBlock
         {
             Style = (Style)Application.Current.FindResource("CsBody"),
-            HorizontalAlignment = HorizontalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Left,
             Text = "",
         };
-        inner.Children.Add(_expiryText);
+        codeColumn.Children.Add(_expiryText);
 
         _errorText = new TextBlock
         {
@@ -98,7 +138,6 @@ public partial class PairPage : UserControl
             Visibility = Visibility.Collapsed,
             Margin = new Thickness(0, 8, 0, 8),
         };
-        inner.Children.Add(_errorText);
 
         var btnRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
         var copyCode = new Button { Content = "Copy code", Style = (Style)Application.Current.FindResource("CsPrimaryButton"), Margin = new Thickness(0, 0, 8, 0) };
@@ -107,7 +146,11 @@ public partial class PairPage : UserControl
         newCode.Click += async (_, _) => await GenerateCodeAsync().ConfigureAwait(true);
         btnRow.Children.Add(copyCode);
         btnRow.Children.Add(newCode);
-        inner.Children.Add(btnRow);
+        codeColumn.Children.Add(btnRow);
+
+        codeRow.Children.Add(codeColumn);
+        inner.Children.Add(codeRow);
+        inner.Children.Add(_errorText);
 
         card.Child = inner;
         root.Children.Add(card);
@@ -141,6 +184,7 @@ public partial class PairPage : UserControl
             _countdownFill.Width = 0;
             _errorText.Text = "Could not generate a pairing code. Check agent configuration.";
             _errorText.Visibility = Visibility.Visible;
+            ClearQrImage();
             RenderPaths([]);
             return;
         }
@@ -153,7 +197,39 @@ public partial class PairPage : UserControl
         _ttl = remaining > TimeSpan.Zero ? remaining : TimeSpan.FromMinutes(5);
         _countdown.Start();
         UpdateCountdown();
-        RenderPaths(EndpointAddressList.FromPairing(pairing));
+        var endpoints = EndpointAddressList.FromPairing(pairing);
+        UpdateQrImage(PairingQrPayload.BuildUri(pairing.Code, _expiresAtUtc, endpoints, pairing.HttpPort));
+        RenderPaths(endpoints);
+    }
+
+    private void UpdateQrImage(string uri)
+    {
+        try
+        {
+            using var generator = new QRCodeGenerator();
+            using var data = generator.CreateQrCode(uri, QRCodeGenerator.ECCLevel.M);
+            var png = new PngByteQRCode(data).GetGraphic(4);
+            using var stream = new MemoryStream(png);
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.StreamSource = stream;
+            bitmap.EndInit();
+            bitmap.Freeze();
+            _qrImage.Source = bitmap;
+            _qrFrame.Opacity = 1;
+            _qrFrame.Visibility = Visibility.Visible;
+        }
+        catch
+        {
+            ClearQrImage();
+        }
+    }
+
+    private void ClearQrImage()
+    {
+        _qrImage.Source = null;
+        _qrFrame.Opacity = 0.35;
     }
 
     private void RenderPaths(IReadOnlyList<NetworkEndpoint> endpoints)
@@ -204,6 +280,7 @@ public partial class PairPage : UserControl
             _expiryText.Foreground = (Brush)Application.Current.FindResource("CsErrorBrush");
             _countdownFill.Width = 0;
             _countdownFill.Background = (Brush)Application.Current.FindResource("CsErrorBrush");
+            ClearQrImage();
             return;
         }
 
