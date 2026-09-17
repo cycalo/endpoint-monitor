@@ -27,7 +27,7 @@ import '../widgets/pin_unlock_gate.dart';
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, this.focusSection});
 
-  /// When set (e.g. `groq`), scrolls to that section after the first frame.
+  /// When set, scrolls to that section after the first frame.
   final String? focusSection;
 
   @override
@@ -35,12 +35,9 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final _groqSectionKey = GlobalKey();
   final _endpoint = TextEditingController();
   final _jwt = TextEditingController();
-  final _groqApiKey = TextEditingController();
   bool _hideJwt = true;
-  bool _hideGroqApi = true;
   bool _pinLock = false;
   String _autoLock = 'never';
   bool _notifyHigh = true;
@@ -62,42 +59,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   String _savedEndpoint = '';
   String _savedJwt = '';
-  String _savedGroqApi = '';
 
   @override
   void initState() {
     super.initState();
     _load();
-    if (widget.focusSection == 'groq') {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToGroqSection());
-    }
-  }
-
-  void _scrollToGroqSection() {
-    if (!mounted) return;
-    final ctx = _groqSectionKey.currentContext;
-    if (ctx == null) return;
-    Scrollable.ensureVisible(
-      ctx,
-      alignment: 0.08,
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeOutCubic,
-    );
   }
 
   @override
   void dispose() {
     _endpoint.dispose();
     _jwt.dispose();
-    _groqApiKey.dispose();
     super.dispose();
   }
 
   bool get _connectionDirty =>
       _endpoint.text.trim() != _savedEndpoint ||
       (_replacingToken && _jwt.text.trim() != _savedJwt);
-
-  bool get _groqDirty => _groqApiKey.text.trim() != _savedGroqApi;
 
   Future<void> _load() async {
     final p = await SharedPreferences.getInstance();
@@ -107,10 +85,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final token = await s.read(key: 'em_token') ?? '';
     _storedToken = token.isEmpty ? null : token;
     _replacingToken = false;
-    final groqKey = (await s.read(key: AppSettingsKeys.groqApiKey) ?? '').trim();
+    await s.delete(key: AppSettingsKeys.retiredGroqApiKey);
+    await s.delete(key: AppSettingsKeys.retiredZaiApiKey);
     _endpoint.text = host;
     _jwt.text = token.isEmpty ? '' : _maskToken(token);
-    _groqApiKey.text = groqKey;
     _pinLock = p.getBool(AppSettingsKeys.pinLockEnabled) ?? false;
     _autoLock = p.getString(AppSettingsKeys.autoLockTimeout) ?? 'never';
     _notifyHigh = p.getBool(AppSettingsKeys.notifyHighSeverity) ?? true;
@@ -123,37 +101,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _compactProc = p.getBool(AppSettingsKeys.compactProcessCards) ?? false;
     _savedEndpoint = host;
     _savedJwt = token;
-    _savedGroqApi = groqKey.trim();
     if (mounted) setState(() {});
-  }
-
-  Future<void> _saveGroqApiKey() async {
-    const s = FlutterSecureStorage();
-    final key = _groqApiKey.text.trim();
-    if (key == _savedGroqApi) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            key.isEmpty
-                ? 'No Groq API key saved'
-                : 'Groq API key already saved',
-          ),
-        ),
-      );
-      return;
-    }
-    await s.write(key: AppSettingsKeys.groqApiKey, value: key);
-    _savedGroqApi = key;
-    if (!mounted) return;
-    setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          key.isEmpty ? 'Groq API key removed' : 'Groq API key saved',
-        ),
-      ),
-    );
   }
 
   Future<void> _persistPreferences() async {
@@ -383,7 +331,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               subtitle: 'Connection, security, notifications, and display.',
               padding: EdgeInsets.only(bottom: 16),
             ),
-            if (_connectionDirty || _groqDirty)
+            if (_connectionDirty)
               Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(10),
@@ -450,6 +398,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 12),
                   FilledButton(onPressed: _saveConnection, child: const Text('Save connection')),
+                  TextButton(
+                    onPressed: () => context.goNamed('connect'),
+                    child: const Text('Set up connection again'),
+                  ),
                 ],
               ),
             ),
@@ -638,41 +590,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 20),
-            KeyedSubtree(
-              key: _groqSectionKey,
-              child: EmSettingsSection(
-              title: 'GROQ AI',
-              dirty: _groqDirty,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: _groqApiKey,
-                    obscureText: _hideGroqApi,
-                    decoration: InputDecoration(
-                      labelText: 'Groq API Key',
-                      suffixIcon: IconButton(
-                        icon: Icon(_hideGroqApi ? Icons.visibility : Icons.visibility_off),
-                        onPressed: () => setState(() => _hideGroqApi = !_hideGroqApi),
-                      ),
-                    ),
-                    onChanged: (_) => setState(() {}),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Free API key available at console.groq.com',
-                    style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton(
-                    onPressed: _saveGroqApiKey,
-                    child: const Text('Save API key'),
-                  ),
-                ],
-              ),
-            ),
             ),
             const SizedBox(height: 20),
             EmSettingsSection(

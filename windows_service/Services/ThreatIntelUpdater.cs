@@ -9,7 +9,7 @@ namespace EndpointMonitorService.Services;
 public sealed class ThreatIntelUpdater(
     ILogger<ThreatIntelUpdater> logger,
     AppDatabase database,
-    IHttpClientFactory httpClientFactory,
+    System.Net.Http.IHttpClientFactory httpClientFactory,
     IOptionsMonitor<ThreatIntelOptions> optionsMonitor)
 {
     private static readonly Regex IpLine = new(
@@ -66,7 +66,6 @@ public sealed class ThreatIntelUpdater(
         }
 
         var removed = await database.DeleteExpiredBadIpsAsync(cancellationToken).ConfigureAwait(false);
-        await database.PruneAlertHistoryAsync(TimeSpan.FromDays(14), cancellationToken).ConfigureAwait(false);
         logger.LogInformation("Threat intel update: upserted {Written}, removed expired {Removed}", written, removed);
 
         LastEntriesWritten = written;

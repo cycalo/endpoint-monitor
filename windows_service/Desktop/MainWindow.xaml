@@ -1,0 +1,54 @@
+<Window x:Class="EndpointMonitorService.Desktop.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Endpoint Monitor"
+        Width="960" Height="640"
+        MinWidth="840" MinHeight="560"
+        Background="{StaticResource CsSurfaceBrush}"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResizeWithGrip">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Left nav -->
+        <Border Grid.Column="0"
+                Background="{StaticResource CsSurfaceContainerLowestBrush}"
+                BorderBrush="{StaticResource CsGhostBorderBrush}"
+                BorderThickness="0,0,1,0">
+            <DockPanel LastChildFill="True">
+                <StackPanel DockPanel.Dock="Top" Margin="0,24,0,16">
+                    <TextBlock Text="Endpoint Monitor"
+                               FontFamily="{StaticResource CsFontUi}"
+                               FontSize="15"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource CsOnSurfaceBrush}"
+                               Margin="20,0,12,4" />
+                    <TextBlock Text="PC setup console"
+                               FontFamily="{StaticResource CsFontUi}"
+                               FontSize="11.5"
+                               Foreground="{StaticResource CsOnSurfaceVariantBrush}"
+                               Margin="20,0,12,0" />
+                </StackPanel>
+
+                <StackPanel x:Name="NavPanel" Margin="0,8,0,0">
+                    <RadioButton x:Name="NavHome" Content="Home" Style="{StaticResource CsNavButton}" IsChecked="True" GroupName="Nav" />
+                    <RadioButton x:Name="NavPair" Content="Pair" Style="{StaticResource CsNavButton}" GroupName="Nav" />
+                    <RadioButton x:Name="NavDevices" Content="Devices" Style="{StaticResource CsNavButton}" GroupName="Nav" />
+                    <RadioButton x:Name="NavDiagnostics" Content="Diagnostics" Style="{StaticResource CsNavButton}" GroupName="Nav" />
+                    <RadioButton x:Name="NavSettings" Content="Settings" Style="{StaticResource CsNavButton}" GroupName="Nav" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Content -->
+        <ScrollViewer Grid.Column="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Padding="28,24,28,24">
+            <ContentControl x:Name="PageHost" />
+        </ScrollViewer>
+    </Grid>
+</Window>

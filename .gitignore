@@ -5,6 +5,7 @@ windows_service/appsettings.json
 windows_service/GeoLite2-City.mmdb
 # Local API keys — never commit
 flutter_app/lib/settings/groq_testing_defaults.local.dart
+flutter_app/lib/settings/zai_api_key.dart
 **/*.local.secrets.*
 **/.env
 **/.env.*

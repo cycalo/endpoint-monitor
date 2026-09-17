@@ -107,7 +107,7 @@ Inspect ingested Sysmon logs, audit browser history across multiple profiles, an
 
 ### 🔐 Zero-Trust Pairing Protocol
 To prevent unauthorized access on shared local networks, the platform implements a secure pairing protocol:
-1. **PIN Generation**: A temporary 6-digit pairing code is generated via the system tray or loopback-only local web page.
+1. **PIN Generation**: A temporary 6-digit pairing code is generated in the Windows desktop setup console (Pair screen).
 2. **Key Exchange**: The mobile client submits the code and its device name. Upon validation, the Agent generates a cryptographically secure random **Device Token**.
 3. **Token Hashing**: The Agent hashes the token using **SHA-256** combined with a server-side secret pepper (`Auth:DeviceTokenPepper` from `appsettings.json`) and stores the hash in SQLite. The raw token is returned to the mobile app *once* and stored in its secure keychain/keystore.
 4. **WebSocket Session**: Subsequent WebSocket connections pass the raw token in the `Authorization: Bearer <token>` header, which the Agent validates against the stored peppered hash.
@@ -130,7 +130,7 @@ To prevent unauthorized access on shared local networks, the platform implements
   - Rate Limiting: **AspNetCoreRateLimit**
 - **External Integrations**:
   - **VirusTotal API v3** (Reputation scanning)
-  - **Groq API** (Process AI explanation)
+  - **Z.AI GLM-4.7-Flash** (Process AI explanation)
   - **MaxMind GeoLite2** (IP geolocation)
 
 ---
@@ -204,11 +204,20 @@ endpoint-monitor/
    ```
 
 ### 4. Pairing the App
-1. On the monitored PC, generate a pairing code:
-   - Click the system tray icon, or
-   - Open a browser and visit `http://localhost:5000/local/pair` (only accessible from the local machine).
-2. In the Flutter app, enter the Agent's IP address (e.g., `http://192.168.1.50:5000`) and the 6-digit pairing code.
-3. Click **Connect** to establish the secure WebSocket session.
+
+Open the Flutter app and choose how the phone reaches the PC:
+
+**Same Wi-Fi (local)**
+1. On the monitored PC, open the **Endpoint Monitor** desktop app → **Pair** and copy the Wi-Fi address and 6-digit code.
+2. In the app, tap **This Wi-Fi**, enter that address (e.g. `192.168.1.50` or `192.168.1.50:5000`) and the 6-digit code, then tap **Connect**.
+
+**Away from home (Tailscale)**
+1. Install [Tailscale](https://tailscale.com/download) on the PC and phone; sign in with the **same account** on both.
+2. On the PC, copy the Tailscale IP (starts with `100.`) or MagicDNS name (`my-pc.ts.net`) from the Tailscale app.
+3. On the PC, open the Endpoint Monitor desktop app → **Pair** for the pairing code.
+4. In the app, tap **Away from home**, paste the Tailscale address and code, then tap **Connect**.
+
+If this phone was paired before, use **Continue to …** on the connect screen or enter the saved address again. To change setup paths, use **Set up connection again** in Settings → CONNECTION.
 
 ---
 
@@ -241,7 +250,10 @@ endpoint-monitor/
 | Endpoint | Method | Auth Required | Description |
 |----------|--------|---------------|-------------|
 | `/health` | GET | No | Returns service status and version. |
-| `/local/pair` | GET | Loopback Only | Generates and renders a temporary pairing code (HTML). |
+| `/local/status` | GET | Loopback Only | Agent health snapshot for the desktop console. |
+| `/local/pairing` | GET | Loopback Only | JSON pairing code for the desktop console. |
+| `/local/devices` | GET | Loopback Only | Lists paired mobile devices (no token hashes). |
+| `/local/devices/revoke` | POST | Loopback Only | Revokes a paired device by id. |
 | `/api/auth/pairing/complete` | POST | Pairing Code | Exchanges pairing code for an opaque device token. |
 | `/export/events` | GET | Bearer Token | Exports historical Sysmon logs in JSON/CSV format. |
 

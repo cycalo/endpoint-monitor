@@ -1,11 +1,12 @@
 # Building Endpoint Monitor as a single Windows executable
 
-This project is an ASP.NET Core + Windows Service host. You can publish a **self-contained, single-file** `EndpointMonitorService.exe` that:
+This project is an ASP.NET Core + Windows Service host with an optional **desktop setup console** (WPF). You can publish a **self-contained, single-file** `EndpointMonitorService.exe` that:
 
 - Runs the web API and (when installed) the Windows Service.
-- **Requests Administrator** when started interactively (double-click or `dotnet run` with the apphost), via `app.manifest` (`requireAdministrator`). This matches the need for WMI, Sysmon, firewall, and process actions documented in `RUN.txt`.
+- Opens a **desktop console** when launched interactively (pairing, devices, diagnostics, settings). Closing the console does **not** stop the agent.
+- Uses **`asInvoker`** for interactive launches (no UAC on open). Elevation is requested only when you toggle **Start with Windows (Windows Service)** in Settings, or when you run the in-process agent without admin rights.
 
-> **Windows Service accounts:** After you register the app with `sc create`, the SCM starts the process as **Local System** (or whatever account you configure). The UAC manifest applies to **interactive** launches, not to the service’s logon account.
+> **Windows Service accounts:** After you register the app with `sc create`, the SCM starts the process as **Local System** (or whatever account you configure). The service runs headless in Session 0 with no desktop UI.
 
 ## Prerequisites
 
@@ -33,13 +34,19 @@ Copy `appsettings.json` (and optional `GeoLite2-City.mmdb`) next to that exe if 
 
 Trimming can remove code ASP.NET Core discovers only at runtime. For a reliable agent build, keep trimming **off** unless you have tested your scenario thoroughly.
 
-## Run as Administrator (interactive)
+## Desktop console vs Windows Service
 
-The project references **`app.manifest`** with `requestedExecutionLevel` set to **`requireAdministrator`**. Published and regular builds of the **apphost** (`EndpointMonitorService.exe`) will trigger a UAC prompt when launched from Explorer or the console **unless** the shell is already elevated.
+| Launch | What runs |
+|--------|-----------|
+| **Service at boot** (`sc create` + `start= auto`) | Headless agent only (Kestrel, collectors). No window. |
+| **Double-click exe** (service already running) | Desktop console only — talks to `http://127.0.0.1:<port>/local/*`. Does not start a second agent. |
+| **Double-click exe** (service not running) | In-process agent **and** desktop console (`dotnet run` dev path). |
+
+The console can **minimize to the system tray** (Settings). Tray **Exit** closes the UI only; the Windows Service keeps running.
 
 ## Install as a Windows Service with automatic start
 
-You can use the **system tray** (when running interactively): **Start with Windows (Windows Service)**. Approve the UAC prompt; the helper script creates or reconfigures the service **`EndpointMonitor`** and sets **start= auto**.
+Open the desktop app → **Settings** → **Start with Windows (Windows Service)**. Approve the UAC prompt; the helper script creates or reconfigures the service **`EndpointMonitor`** and sets **start= auto**.
 
 Manual equivalent (elevated Command Prompt), after replacing the path:
 
@@ -66,9 +73,9 @@ sc delete EndpointMonitor
 
 Only one process should own the configured HTTP port (see `Server:Port` in `appsettings.json`). If an interactive session is already listening, **`sc start`** may fail or the service may exit until the port is free.
 
-## Pairing when the tray is unavailable
+## Pairing when the desktop app is closed
 
-The system tray only runs in **interactive** sessions. After installing as a Windows Service (Session 0), generate pairing codes by opening **`http://localhost:<port>/local/pair`** in a browser **on the monitored PC** (loopback only). The Flutter app can also reach the agent via **`GET /health`** before pairing.
+After installing as a Windows Service (Session 0), open the desktop app on the monitored PC and use the **Pair** screen. The Flutter app can reach the agent via **`GET /health`** before pairing.
 
 ## Optional: framework-dependent single file
 

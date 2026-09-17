@@ -7,6 +7,7 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../task/task_entry.dart';
+import '../utils/device_token_status.dart';
 import '../utils/ws_url.dart';
 
 enum ConnectionStatus { disconnected, connecting, connected, error }
@@ -226,8 +227,8 @@ class ConnectionBloc extends Bloc<ConnectionEvent, EmConnectionState> {
         jsonEncode({'type': 'get_threat_intel_entries'}));
   }
 
-  void _onTaskMessage(
-      ConnectionTaskMessage event, Emitter<EmConnectionState> emit) {
+  Future<void> _onTaskMessage(
+      ConnectionTaskMessage event, Emitter<EmConnectionState> emit) async {
     final t = event.raw['type']?.toString();
     if (t == 'ping_rtt') {
       final ok = event.raw['ok'] == true;
@@ -260,11 +261,17 @@ class ConnectionBloc extends Bloc<ConnectionEvent, EmConnectionState> {
           break;
         case 'disconnected':
         case 'error':
+          final revoked = msg != null &&
+              deviceTokenStatusFromConnectionError(msg) ==
+                  DeviceTokenStatus.revoked;
+          if (revoked) {
+            await _storage.delete(key: _tokenKey);
+          }
           emit(state.copyWith(
-            status: s == 'error'
+            status: s == 'error' || revoked
                 ? ConnectionStatus.error
                 : ConnectionStatus.disconnected,
-            message: msg,
+            message: revoked ? kDeviceUnpairedMessage : msg,
             clearConnectedAt: true,
           ));
           break;

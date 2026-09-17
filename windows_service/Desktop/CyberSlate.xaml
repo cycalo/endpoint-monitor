@@ -1,0 +1,161 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Cyber Slate — aligned with Flutter app_theme.dart dark scheme -->
+    <Color x:Key="CsSurface">#0B1326</Color>
+    <Color x:Key="CsSurfaceContainer">#171F33</Color>
+    <Color x:Key="CsSurfaceContainerLow">#131B2E</Color>
+    <Color x:Key="CsSurfaceContainerLowest">#060E20</Color>
+    <Color x:Key="CsOnSurface">#DAE2FD</Color>
+    <Color x:Key="CsOnSurfaceVariant">#C1C6D7</Color>
+    <Color x:Key="CsPrimary">#98CBFF</Color>
+    <Color x:Key="CsOnPrimary">#003354</Color>
+    <Color x:Key="CsTertiary">#2FD9F4</Color>
+    <Color x:Key="CsError">#FFB4AB</Color>
+    <Color x:Key="CsOutlineVariant">#414754</Color>
+    <Color x:Key="CsSuccess">#4ADE80</Color>
+
+    <SolidColorBrush x:Key="CsSurfaceBrush" Color="{StaticResource CsSurface}" />
+    <SolidColorBrush x:Key="CsSurfaceContainerBrush" Color="{StaticResource CsSurfaceContainer}" />
+    <SolidColorBrush x:Key="CsSurfaceContainerLowBrush" Color="{StaticResource CsSurfaceContainerLow}" />
+    <SolidColorBrush x:Key="CsSurfaceContainerLowestBrush" Color="{StaticResource CsSurfaceContainerLowest}" />
+    <SolidColorBrush x:Key="CsOnSurfaceBrush" Color="{StaticResource CsOnSurface}" />
+    <SolidColorBrush x:Key="CsOnSurfaceVariantBrush" Color="{StaticResource CsOnSurfaceVariant}" />
+    <SolidColorBrush x:Key="CsPrimaryBrush" Color="{StaticResource CsPrimary}" />
+    <SolidColorBrush x:Key="CsOnPrimaryBrush" Color="{StaticResource CsOnPrimary}" />
+    <SolidColorBrush x:Key="CsTertiaryBrush" Color="{StaticResource CsTertiary}" />
+    <SolidColorBrush x:Key="CsErrorBrush" Color="{StaticResource CsError}" />
+    <SolidColorBrush x:Key="CsSuccessBrush" Color="{StaticResource CsSuccess}" />
+    <SolidColorBrush x:Key="CsGhostBorderBrush" Color="#26414754" />
+
+    <FontFamily x:Key="CsFontUi">Segoe UI</FontFamily>
+    <FontFamily x:Key="CsFontMono">Consolas</FontFamily>
+
+    <Style x:Key="CsCard" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource CsSurfaceContainerBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CsGhostBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="20" />
+    </Style>
+
+    <Style x:Key="CsPageTitle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource CsFontUi}" />
+        <Setter Property="FontSize" Value="22" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{StaticResource CsOnSurfaceBrush}" />
+        <Setter Property="Margin" Value="0,0,0,16" />
+    </Style>
+
+    <Style x:Key="CsBody" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource CsFontUi}" />
+        <Setter Property="FontSize" Value="13.5" />
+        <Setter Property="Foreground" Value="{StaticResource CsOnSurfaceVariantBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="LineHeight" Value="20" />
+    </Style>
+
+    <Style x:Key="CsLabel" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource CsFontUi}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{StaticResource CsOnSurfaceVariantBrush}" />
+        <Setter Property="Margin" Value="0,0,0,4" />
+    </Style>
+
+    <Style x:Key="CsValue" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource CsFontUi}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="{StaticResource CsOnSurfaceBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style x:Key="CsPrimaryButton" TargetType="Button">
+        <Setter Property="Background" Value="{StaticResource CsPrimaryBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource CsOnPrimaryBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource CsFontUi}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Padding" Value="16,10" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}"
+                            CornerRadius="8"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="CsSecondaryButton" TargetType="Button" BasedOn="{StaticResource CsPrimaryButton}">
+        <Setter Property="Background" Value="{StaticResource CsSurfaceContainerLowBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource CsOnSurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CsGhostBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="8"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="CsNavButton" TargetType="RadioButton">
+        <Setter Property="Foreground" Value="{StaticResource CsOnSurfaceVariantBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource CsFontUi}" />
+        <Setter Property="FontSize" Value="13.5" />
+        <Setter Property="Padding" Value="14,10" />
+        <Setter Property="Margin" Value="8,2" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="Bd"
+                            Background="Transparent"
+                            CornerRadius="8"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource CsSurfaceContainerBrush}" />
+                            <Setter Property="Foreground" Value="{StaticResource CsPrimaryBrush}" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#1A222A3D" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="CsStatusPill" TargetType="Border">
+        <Setter Property="CornerRadius" Value="20" />
+        <Setter Property="Padding" Value="12,6" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+
+    <Style x:Key="CsChip" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource CsSurfaceContainerLowBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CsGhostBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="Margin" Value="0,0,8,8" />
+    </Style>
+
+</ResourceDictionary>

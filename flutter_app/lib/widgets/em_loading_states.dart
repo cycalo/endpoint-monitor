@@ -409,7 +409,10 @@ class EmSettingsSection extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(EmDesign.spaceMd),
           decoration: EmDesign.cardShell(scheme),
-          child: child,
+          child: Material(
+            type: MaterialType.transparency,
+            child: child,
+          ),
         ),
       ],
     );

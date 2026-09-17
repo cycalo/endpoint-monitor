@@ -33,7 +33,18 @@ class DashboardScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: scheme.surface,
-      appBar: const EmBrandAppBar(),
+      appBar: EmBrandAppBar(
+        actions: [
+          IconButton(
+            tooltip: 'System vitals',
+            onPressed: () => context.pushNamed('systemMonitor'),
+            icon: Icon(
+              Icons.ssid_chart_rounded,
+              color: scheme.primary,
+            ),
+          ),
+        ],
+      ),
       body: BlocBuilder<SystemInfoBloc, SystemInfoState>(
         builder: (context, s) {
           final i = s.info;

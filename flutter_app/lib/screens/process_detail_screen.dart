@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:dio/dio.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
@@ -16,7 +15,7 @@ import '../bloc/network_bloc.dart';
 import '../bloc/process_bloc.dart';
 import '../bloc/watchlist_bloc.dart';
 import '../models/ws_models.dart';
-import '../settings/app_settings_keys.dart';
+import '../services/process_ai_explain.dart';
 import '../theme/em_design_system.dart';
 import '../widgets/em_loading_states.dart';
 import '../widgets/process_control_buttons.dart';
@@ -117,7 +116,7 @@ String _repairInvalidBackslashesInJsonStrings(String json) {
   return sb.toString();
 }
 
-ProcessExplanation? _parseProcessExplanationFromGroqContent(String raw) {
+ProcessExplanation? _parseProcessExplanationFromContent(String raw) {
   var s = raw.trim();
   if (s.isEmpty) return null;
   if (s.startsWith('\uFEFF')) s = s.substring(1);
@@ -927,10 +926,6 @@ class ExplainResult {
       this.rawError,
       required this.timestamp,
       required this.isError});
-
-  bool get needsGroqApiKeySetup =>
-      isError &&
-      (rawError?.toLowerCase().contains('no groq api key') ?? false);
 }
 
 String _plainTextAiReport(ExplainResult res, ProcessInfo process) {
@@ -941,7 +936,7 @@ String _plainTextAiReport(ExplainResult res, ProcessInfo process) {
   if (res.isError || res.explanation == null) {
     buf.writeln(res.rawError ?? 'Unknown error');
     buf.writeln();
-    buf.writeln('Powered by Groq · llama-3.3-70b-versatile');
+    buf.writeln(kZaiProcessExplainAttribution);
     buf.writeln('AI analysis is a guide only and may not be accurate');
     buf.writeln('Verify findings independently');
     return buf.toString();
@@ -968,7 +963,7 @@ String _plainTextAiReport(ExplainResult res, ProcessInfo process) {
   buf.writeln('AUTHORISED ACTIVITY');
   buf.writeln(e.allowed);
   buf.writeln();
-  buf.writeln('Powered by Groq · llama-3.3-70b-versatile');
+  buf.writeln(kZaiProcessExplainAttribution);
   buf.writeln('AI analysis is a guide only and may not be accurate');
   buf.writeln('Verify findings independently');
   return buf.toString();
@@ -1068,12 +1063,10 @@ class _ExplainProcessSectionState extends State<_ExplainProcessSection> {
 
   Future<void> _explain() async {
     final netBloc = context.read<NetworkBloc>();
-    const storage = FlutterSecureStorage();
-    final key = (await storage.read(key: AppSettingsKeys.groqApiKey) ?? '').trim();
+    final key = resolveZaiApiKey();
     if (key.isEmpty) {
       _explainCache[widget.pid] = ExplainResult(
-        rawError:
-            'No Groq API key configured — add your key in Settings → GROQ AI',
+        rawError: kMissingZaiApiKeyMessage,
         timestamp: DateTime.now(),
         isError: true,
       );
@@ -1131,29 +1124,20 @@ $connText
         receiveTimeout: const Duration(seconds: 20),
       ));
       final res = await dio.post<Map<String, dynamic>>(
-        'https://api.groq.com/openai/v1/chat/completions',
-        data: {
-          "model": "llama-3.3-70b-versatile",
-          "messages": [
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": userMsg}
-          ],
-          "max_tokens": 800,
-          "temperature": 0.3,
-          "response_format": {"type": "json_object"},
-        },
+        kZaiChatCompletionsUrl,
+        data: zaiProcessExplainRequestBody(
+          systemPrompt: prompt,
+          userMessage: userMsg,
+        ),
         options: Options(
-          headers: {
-            'Authorization': 'Bearer $key',
-            'Content-Type': 'application/json',
-          },
+          headers: zaiProcessExplainHeaders(key),
         ),
       );
 
       final content =
           res.data?['choices']?[0]?['message']?['content'] as String?;
       if (content != null) {
-        final explanation = _parseProcessExplanationFromGroqContent(content);
+        final explanation = _parseProcessExplanationFromContent(content);
         if (explanation != null) {
           _explainCache[widget.pid] = ExplainResult(
             explanation: explanation,
@@ -1180,7 +1164,7 @@ $connText
         errStr = 'Request timed out — check your internet connection';
       } else if (e.response != null) {
         if (e.response!.statusCode == 401) {
-          errStr = 'Invalid Groq API key — check the key saved in Settings';
+          errStr = 'Invalid Z.AI API key — check the key saved in Settings';
         } else if (e.response!.statusCode == 429) {
           errStr = 'Rate limit reached — try again in a moment';
           Future.delayed(const Duration(seconds: 8), () {
@@ -1405,7 +1389,7 @@ $connText
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.lightbulb_outline, size: 18),
-          label: const Text('Explain Process'),
+          label: const Text('AI Analysis'),
         ),
         if (res != null) ...[
           KeyedSubtree(
@@ -1493,15 +1477,6 @@ $connText
                             color: Colors.amber,
                           ),
                     ),
-                    if (res.needsGroqApiKeySetup) ...[
-                      const SizedBox(height: 12),
-                      FilledButton.tonalIcon(
-                        onPressed: () =>
-                            context.push('/settings?section=groq'),
-                        icon: const Icon(Icons.settings_outlined, size: 18),
-                        label: const Text('Add Groq API key in Settings'),
-                      ),
-                    ],
                   ] else ...[
                     _buildVerdictBanner(res.explanation!, scheme),
                     const SizedBox(height: 20),
@@ -1660,7 +1635,7 @@ $connText
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Powered by Groq · llama-3.3-70b-versatile\nAI analysis is a guide only\nVerify findings independently',
+                    '$kZaiProcessExplainAttribution\nAI analysis is a guide only\nVerify findings independently',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: scheme.onSurfaceVariant,
                           fontSize: 10,

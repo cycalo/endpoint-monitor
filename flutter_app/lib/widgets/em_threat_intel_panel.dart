@@ -96,12 +96,12 @@ class EmThreatIntelPanel extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 10),
-              FilledButton.tonal(
+              FilledButton(
                 onPressed: ti.loading
                     ? null
                     : () =>
                         context.read<ThreatIntelBloc>().requestRefreshFeeds(),
-                child: Text(ti.loading ? 'Updating…' : 'Update feeds now'),
+                child: Text(ti.loading ? 'Updating…' : 'Update feeds'),
               ),
             ],
           ),

@@ -1,0 +1,3 @@
+/// Copy to `zai_api_key.dart` and paste the project Z.AI key.
+/// `zai_api_key.dart` is gitignored and must not be committed.
+const String kEmbeddedZaiApiKey = '';

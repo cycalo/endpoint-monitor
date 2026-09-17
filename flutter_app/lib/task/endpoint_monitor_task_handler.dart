@@ -208,6 +208,9 @@ class EndpointMonitorTaskHandler extends TaskHandler {
 
   static String _sanitizeConnectionError(Object error) {
     final text = error.toString().toLowerCase();
+    if (text.contains('401') || text.contains('unauthorized')) {
+      return 'unauthorized';
+    }
     if (text.contains('timed out')) {
       return 'Connection timed out.';
     }

@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../bloc/connection_bloc.dart';
 import '../bloc/blocked_remote_ips_cubit.dart';
+import '../bloc/firewall_bloc.dart';
 import '../bloc/network_bloc.dart';
 import '../bloc/system_info_bloc.dart';
 import '../bloc/threat_intel_bloc.dart';
@@ -16,10 +17,13 @@ import '../theme/em_design_system.dart';
 import '../utils/country_flag_emoji.dart';
 import '../utils/ip_normalize.dart';
 import '../utils/network_endpoint_display.dart';
+import '../utils/network_process_groups.dart';
+import '../utils/network_tcp_state.dart';
 import '../utils/throughput_format.dart';
 import '../utils/em_snapshot_cache.dart';
 import '../widgets/em_brand_app_bar.dart';
 import '../widgets/em_loading_states.dart';
+import '../widgets/em_network_app_card.dart';
 import '../widgets/em_threat_intel_panel.dart';
 
 class NetworkScreen extends StatefulWidget {
@@ -48,6 +52,19 @@ class _NetworkScreenState extends State<NetworkScreen>
   /// When false, rows whose remote address is IPv6 are hidden (IPv4-first list).
   bool _showIpv6 = false;
 
+  /// `apps` (default) | `sockets`
+  String _listMode = 'apps';
+
+  Future<void> _persistShowIpv6(bool value) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(AppSettingsKeys.showIpv6Network, value);
+  }
+
+  Future<void> _persistListMode(String value) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(AppSettingsKeys.networkListMode, value);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -55,12 +72,14 @@ class _NetworkScreenState extends State<NetworkScreen>
       if (!mounted) return;
       setState(() {
         _showIpv6 = p.getBool(AppSettingsKeys.showIpv6Network) ?? false;
+        _listMode = p.getString(AppSettingsKeys.networkListMode) ?? 'apps';
       });
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (context.read<ConnectionBloc>().state.isConnected) {
         context.read<ThreatIntelBloc>().refreshEntries();
+        context.read<FirewallBloc>().refresh();
       }
     });
   }
@@ -206,6 +225,12 @@ class _NetworkScreenState extends State<NetworkScreen>
                                       setModalState(() => tempState = 'LISTEN'),
                                 ),
                                 _SheetRadioRow(
+                                  label: 'Bound',
+                                  selected: tempState == 'BOUND',
+                                  onTap: () => setModalState(
+                                      () => tempState = 'BOUND'),
+                                ),
+                                _SheetRadioRow(
                                   label: 'Time wait',
                                   selected: tempState == 'TIME_WAIT',
                                   onTap: () => setModalState(
@@ -348,7 +373,22 @@ class _NetworkScreenState extends State<NetworkScreen>
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    return Scaffold(
+    return BlocListener<ConnectionBloc, EmConnectionState>(
+      listenWhen: (p, c) => c.isConnected && !p.isConnected,
+      listener: (context, _) => context.read<FirewallBloc>().refresh(),
+      child: BlocConsumer<FirewallBloc, FirewallState>(
+        listenWhen: (p, c) =>
+            c.snackbarMessage != null && c.snackbarMessage != p.snackbarMessage,
+        listener: (context, state) {
+          final msg = state.snackbarMessage;
+          if (msg == null) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
+          );
+          context.read<FirewallBloc>().clearFeedback();
+        },
+        builder: (context, fw) {
+          return Scaffold(
       backgroundColor: scheme.surface,
       appBar: EmBrandAppBar(
         actions: [
@@ -410,7 +450,7 @@ class _NetworkScreenState extends State<NetworkScreen>
                   if (_protocol != 'all' && n.protocol != _protocol) {
                     return false;
                   }
-                  final normalizedState = _normalizeStateForFilter(n.state);
+                  final normalizedState = normalizeCimTcpState(n.state);
                   if (_state != 'all') {
                     if (n.protocol.toUpperCase() == 'TCP') {
                       if (normalizedState != _state) return false;
@@ -466,6 +506,43 @@ class _NetworkScreenState extends State<NetworkScreen>
                 } else {
                   list.sort((a, b) => b.remoteAddress.compareTo(a.remoteAddress));
                 }
+
+                final processBlocks = fw.processBlocks
+                    .map(
+                      (e) => FirewallProcessBlockInfo(
+                        processName: e.processName ?? '',
+                        direction: e.direction,
+                      ),
+                    )
+                    .where((e) => e.processName.isNotEmpty)
+                    .toList();
+
+                var groups = buildNetworkProcessGroups(list)
+                    .where((g) => networkGroupMatchesSearch(g, q))
+                    .toList();
+
+                if (_listMode == 'apps' && _state == 'all') {
+                  groups =
+                      groups.where(networkGroupIsTalkingByDefault).toList();
+                } else if (_state != 'all') {
+                  groups = groups
+                      .where(
+                        (g) => g.allConnections.any(
+                          (n) => normalizeCimTcpState(n.state) == _state ||
+                              (_state == 'BLOCKED' &&
+                                  _rowIsBlocked(n, blockedMap)),
+                        ),
+                      )
+                      .toList();
+                }
+
+                final establishedTotal = groups.fold<int>(
+                  0,
+                  (sum, g) => sum + g.establishedCount,
+                );
+                final appsBadgeText = groups.isEmpty
+                    ? '0 apps'
+                    : '${groups.length} app${groups.length == 1 ? '' : 's'} · $establishedTotal up';
 
                 return BlocBuilder<ConnectionBloc, EmConnectionState>(
                   builder: (context, conn) {
@@ -691,14 +768,85 @@ class _NetworkScreenState extends State<NetworkScreen>
                     ),
                     SliverPersistentHeader(
                       pinned: true,
-                      delegate: _ActiveConnectionsBarDelegate(
+                      delegate: _NetworkListBarDelegate(
                         scheme: scheme,
-                        activeCount: list.length,
+                        listMode: _listMode,
+                        badgeText: _listMode == 'apps'
+                            ? appsBadgeText
+                            : '${list.length} active',
                         showIpv6: _showIpv6,
-                        onIpv6Changed: (v) => setState(() => _showIpv6 = v),
+                        onIpv6Changed: (v) {
+                          setState(() => _showIpv6 = v);
+                          _persistShowIpv6(v);
+                        },
+                        onListModeChanged: (mode) {
+                          setState(() => _listMode = mode);
+                          _persistListMode(mode);
+                        },
                       ),
                     ),
-                    if (list.isEmpty)
+                    if (_listMode == 'apps')
+                      if (groups.isEmpty)
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: EmEmptyState(
+                            icon: _search.text.trim().isNotEmpty ||
+                                    _hasActiveFilters
+                                ? Icons.search_off_rounded
+                                : Icons.lan_outlined,
+                            title: 'No matching apps',
+                            message: _hasActiveFilters ||
+                                    _search.text.trim().isNotEmpty
+                                ? 'Adjust filters or clear search to see more apps.'
+                                : 'Apps with active connections will appear here.',
+                          ),
+                        )
+                      else
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, i) {
+                                final g = groups[i];
+                                final block = processFirewallBlockForName(
+                                  g.processName,
+                                  processBlocks,
+                                );
+                                final autoExpand = q.isNotEmpty &&
+                                    !g.processName.toLowerCase().contains(q) &&
+                                    g.allConnections.any(
+                                      (c) =>
+                                          c.remoteAddress
+                                              .toLowerCase()
+                                              .contains(q) ||
+                                          c.city.toLowerCase().contains(q) ||
+                                          c.countryName
+                                              .toLowerCase()
+                                              .contains(q),
+                                    );
+                                return EmNetworkAppCard(
+                                  group: g,
+                                  scheme: scheme,
+                                  blockedMap: blockedMap,
+                                  processBlocked: block != null,
+                                  processBlockDirection: block?.direction,
+                                  threatLookup: (ip) => ti.lookupIp(ip),
+                                  rowIcon: _rowIcon,
+                                  initiallyExpanded: autoExpand,
+                                  stripeIndex: i,
+                                  onBlockProcess: (name) =>
+                                      _blockProcess(context, name),
+                                  onUnblockProcess: (name) =>
+                                      _unblockProcess(context, name, block),
+                                  onBlockIp: (n) => _block(context, n),
+                                  onUnblockIp: (n) => _unblock(context, n),
+                                );
+                              },
+                              childCount: groups.length,
+                            ),
+                          ),
+                        )
+                    else if (list.isEmpty)
                       SliverFillRemaining(
                         hasScrollBody: false,
                         child: EmEmptyState(
@@ -725,12 +873,12 @@ class _NetworkScreenState extends State<NetworkScreen>
                               final threat = ti.lookupIp(
                                   normalizeIpForBlockList(n.remoteAddress));
                               final normalizedState =
-                                  _normalizeStateForFilter(n.state);
+                                  normalizeCimTcpState(n.state);
                               final stateColor = blocked
                                   ? scheme.error
                                   : (threat != null
                                       ? scheme.tertiary
-                                      : _stateColor(
+                                      : networkStateColor(
                                           scheme, normalizedState));
                               final bg = i.isEven
                                   ? scheme.surfaceContainer
@@ -1203,7 +1351,7 @@ class _NetworkScreenState extends State<NetworkScreen>
                                                                 : 'No remote endpoint')
                                                             : blocked
                                                                 ? 'Unblock IP'
-                                                                : 'Block connection',
+                                                                : 'Block IP',
                                                         style:
                                                             GoogleFonts.manrope(
                                                           fontSize: 13,
@@ -1254,15 +1402,20 @@ class _NetworkScreenState extends State<NetworkScreen>
         ],
       ),
     );
+        },
+      ),
+    );
   }
 
   Future<void> _block(BuildContext context, NetworkConnection n) async {
+    final endpoint = formatNetworkEndpoint(n.remoteAddress, n.remotePort);
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         title: const Text('Block remote IP?'),
         content: Text(
-          formatNetworkEndpoint(n.remoteAddress, n.remotePort),
+          'This applies a machine-wide Windows Firewall rule for outbound traffic to $endpoint. '
+          'Other apps using the same IP may be affected.',
         ),
         actions: [
           TextButton(
@@ -1270,7 +1423,7 @@ class _NetworkScreenState extends State<NetworkScreen>
               child: const Text('Cancel')),
           FilledButton(
               onPressed: () => Navigator.pop(c, true),
-              child: const Text('Block')),
+              child: const Text('Block IP')),
         ],
       ),
     );
@@ -1295,6 +1448,64 @@ class _NetworkScreenState extends State<NetworkScreen>
       'ip': n.remoteAddress,
     });
     await context.read<BlockedRemoteIpsCubit>().remove(n.remoteAddress);
+  }
+
+  Future<void> _blockProcess(BuildContext context, String processName) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Block app network access?'),
+        content: Text(
+          'Apply a Windows Firewall program rule to block outbound network access for '
+          '$processName? This covers every running instance and future sockets from that executable.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Block app'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && context.mounted) {
+      context.read<FirewallBloc>().requestBlockProcess(
+            processName,
+            direction: 'outbound',
+          );
+    }
+  }
+
+  Future<void> _unblockProcess(
+    BuildContext context,
+    String processName,
+    FirewallProcessBlockInfo? block,
+  ) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Unblock app?'),
+        content: Text(
+          'Remove the firewall program rule for $processName?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Unblock app'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    final direction = block?.direction ?? 'outbound';
+    context.read<FirewallBloc>().requestUnblockProcess(processName, direction);
   }
 }
 
@@ -1325,68 +1536,147 @@ bool _rowIsBlocked(
   return k.isNotEmpty && blockedMap.containsKey(k);
 }
 
-String _normalizeStateForFilter(String rawState) {
-  final s = rawState.trim();
-  if (s.isEmpty) return '';
-  final n = int.tryParse(s);
-  if (n == null) return s.toUpperCase();
-  switch (n) {
-    case 1:
-      return 'CLOSED';
-    case 2:
-      return 'LISTEN';
-    case 3:
-      return 'SYN_SENT';
-    case 4:
-      return 'SYN_RECV';
-    case 5:
-      return 'ESTABLISHED';
-    case 6:
-      return 'FIN_WAIT1';
-    case 7:
-      return 'FIN_WAIT2';
-    case 8:
-      return 'CLOSE_WAIT';
-    case 9:
-      return 'CLOSING';
-    case 10:
-      return 'LAST_ACK';
-    case 11:
-      return 'TIME_WAIT';
-    case 12:
-      return 'DELETE_TCB';
-    default:
-      return 'STATE_$n';
-  }
-}
+class _NetworkListBarDelegate extends SliverPersistentHeaderDelegate {
+  _NetworkListBarDelegate({
+    required this.scheme,
+    required this.listMode,
+    required this.badgeText,
+    required this.showIpv6,
+    required this.onIpv6Changed,
+    required this.onListModeChanged,
+  });
 
-Color _stateColor(ColorScheme scheme, String state) {
-  switch (state) {
-    case 'ESTABLISHED':
-      // Bright cyan: clear "active" signal.
-      return const Color(0xFF2FD9F4);
-    case 'LISTEN':
-      // Amber/yellow: distinct from ESTABLISHED at quick glance.
-      return const Color(0xFFFFC857);
-    case 'TIME_WAIT':
-      return const Color(0xFF6CD3FF);
-    case 'CLOSE_WAIT':
-      return scheme.error; // pink/red is already high contrast
-    case 'SYN_SENT':
-    case 'SYN_RECV':
-      return const Color(0xFF4D7CFE);
-    case 'FIN_WAIT1':
-    case 'FIN_WAIT2':
-    case 'CLOSING':
-    case 'LAST_ACK':
-      return const Color(0xFF9B8CFF);
-    case 'CLOSED':
-    case 'DELETE_TCB':
-      return scheme.outline;
-    case 'BLOCKED':
-      return scheme.error;
-    default:
-      return scheme.onSurfaceVariant;
+  final ColorScheme scheme;
+  final String listMode;
+  final String badgeText;
+  final bool showIpv6;
+  final ValueChanged<bool> onIpv6Changed;
+  final ValueChanged<String> onListModeChanged;
+
+  static const double _height = 72;
+
+  @override
+  double get minExtent => _height;
+
+  @override
+  double get maxExtent => _height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return Material(
+      color: scheme.surface,
+      elevation: overlapsContent ? 2 : 0,
+      shadowColor: Colors.black.withValues(alpha: 0.15),
+      child: Container(
+        height: _height,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: scheme.outlineVariant.withValues(alpha: 0.15),
+            ),
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          listMode == 'apps'
+                              ? 'Apps on the network'
+                              : 'Active connections',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.manrope(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: scheme.onSurface,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(
+                        Icons.bolt_rounded,
+                        size: 16,
+                        color: scheme.tertiary,
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: scheme.tertiary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    badgeText,
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.tertiary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(value: 'apps', label: Text('Apps')),
+                      ButtonSegment(value: 'sockets', label: Text('Sockets')),
+                    ],
+                    selected: {listMode},
+                    onSelectionChanged: (s) => onListModeChanged(s.first),
+                    showSelectedIcon: false,
+                    style: ButtonStyle(
+                      visualDensity: VisualDensity.compact,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'IPv6',
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Switch.adaptive(
+                  value: showIpv6,
+                  onChanged: onIpv6Changed,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _NetworkListBarDelegate oldDelegate) {
+    return oldDelegate.scheme != scheme ||
+        oldDelegate.listMode != listMode ||
+        oldDelegate.badgeText != badgeText ||
+        oldDelegate.showIpv6 != showIpv6;
   }
 }
 
@@ -1507,118 +1797,6 @@ bool _matchesGeoFilter(NetworkConnection n, String geo) {
       }.contains(cc);
     default:
       return true;
-  }
-}
-
-class _ActiveConnectionsBarDelegate extends SliverPersistentHeaderDelegate {
-  _ActiveConnectionsBarDelegate({
-    required this.scheme,
-    required this.activeCount,
-    required this.showIpv6,
-    required this.onIpv6Changed,
-  });
-
-  final ColorScheme scheme;
-  final int activeCount;
-  final bool showIpv6;
-  final ValueChanged<bool> onIpv6Changed;
-
-  static const double _height = 56;
-
-  @override
-  double get minExtent => _height;
-
-  @override
-  double get maxExtent => _height;
-
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) {
-    return Material(
-      color: scheme.surface,
-      elevation: overlapsContent ? 2 : 0,
-      shadowColor: Colors.black.withValues(alpha: 0.15),
-      child: Container(
-        height: _height,
-        alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: scheme.outlineVariant.withValues(alpha: 0.15),
-            ),
-          ),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      'Active connections',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.manrope(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: scheme.onSurface,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.bolt_rounded,
-                    size: 18,
-                    color: scheme.tertiary,
-                  ),
-                ],
-              ),
-            ),
-            Text(
-              'IPv6',
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Switch.adaptive(
-              value: showIpv6,
-              onChanged: onIpv6Changed,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: scheme.tertiary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                '$activeCount active',
-                style: GoogleFonts.inter(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: scheme.tertiary,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  @override
-  bool shouldRebuild(covariant _ActiveConnectionsBarDelegate oldDelegate) {
-    return oldDelegate.scheme != scheme ||
-        oldDelegate.activeCount != activeCount ||
-        oldDelegate.showIpv6 != showIpv6;
   }
 }
 

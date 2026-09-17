@@ -2,6 +2,7 @@
 library;
 
 import '../models/ws_models.dart';
+import 'network_tcp_state.dart';
 
 /// Listening sockets and “no remote peer” rows — there is no specific remote IP to block.
 bool isListeningStyleSocket(NetworkConnection n) {
@@ -11,7 +12,10 @@ bool isListeningStyleSocket(NetworkConnection n) {
   final st = n.state.trim();
   final mib = int.tryParse(st);
   if (mib == 2) return true;
+  if (mib == 100) return true;
   if (mib == null && st.toUpperCase() == 'LISTEN') return true;
+  if (mib == null && st.toUpperCase() == 'BOUND') return true;
+  if (isBoundTcpState(st)) return true;
   return false;
 }
 

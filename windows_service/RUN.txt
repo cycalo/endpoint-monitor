@@ -4,7 +4,7 @@ Endpoint Monitor Windows service
 2. Run as Administrator (required for WMI, Sysmon, firewall, process actions).
 3. From this folder: dotnet run
 4. Listen port: Server:Port in appsettings (default 5000).
-5. Pair a phone: tray icon → Pairing code, or open http://localhost:<port>/local/pair in a browser on this PC, then complete pairing in the Flutter app.
-6. Tray: “Start with Windows (Windows Service)” registers or sets the EndpointMonitor service to start automatically (UAC). When running as a service only, use the local pairing page (step 5) — the tray is not available. See BUILD-SINGLE-EXE.md to publish a single self-contained exe (runs elevated when launched interactively via app.manifest).
+5. Pair a phone: open the Endpoint Monitor desktop app → Pair, then complete pairing in the Flutter app.
+6. Settings → “Start with Windows (Windows Service)” registers or sets the EndpointMonitor service to start automatically (UAC). When running as a service only, open the desktop app on the PC to pair. See BUILD-SINGLE-EXE.md to publish a single self-contained exe.
 7. Health check: GET http://localhost:<port>/health returns {"ok":true} (no auth).
 8. WebSocket: ws://<host>:<port>/ws with header Authorization: Bearer <device token from pairing>

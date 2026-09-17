@@ -92,16 +92,6 @@ public sealed class BadIpRow
     public string Category { get; set; } = "";
 }
 
-[Table("AlertHistory")]
-public sealed class AlertHistoryRow
-{
-    [PrimaryKey, AutoIncrement]
-    public int Id { get; set; }
-
-    public string OccurredAt { get; set; } = "";
-    public string Type { get; set; } = "";
-}
-
 [Table("AlertAck")]
 public sealed class AlertAckRow
 {

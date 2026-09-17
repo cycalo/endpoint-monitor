@@ -24,7 +24,6 @@ public sealed class AppDatabase(ILogger<AppDatabase> logger)
         await _db.CreateTableAsync<IsolationStateRow>().ConfigureAwait(false);
         await _db.CreateTableAsync<BadIpRow>().ConfigureAwait(false);
         await TryMigrateBadIpColumnsAsync().ConfigureAwait(false);
-        await _db.CreateTableAsync<AlertHistoryRow>().ConfigureAwait(false);
         await _db.CreateTableAsync<AlertAckRow>().ConfigureAwait(false);
         await _db.CreateTableAsync<InstalledSoftwareStateRow>().ConfigureAwait(false);
         await _db.CreateTableAsync<DeviceAuthTokenRow>().ConfigureAwait(false);
@@ -322,86 +321,6 @@ public sealed class AppDatabase(ILogger<AppDatabase> logger)
                 await _db.UpdateAsync(r).ConfigureAwait(false);
             }
         }
-    }
-
-    public async Task AppendAlertHistoryAsync(string type, string occurredAtIso, CancellationToken cancellationToken = default)
-    {
-        if (_db == null) return;
-        await _db.InsertAsync(new AlertHistoryRow
-        {
-            OccurredAt = occurredAtIso,
-            Type = type
-        }).ConfigureAwait(false);
-    }
-
-    public async Task PruneAlertHistoryAsync(TimeSpan retain, CancellationToken cancellationToken = default)
-    {
-        if (_db == null) return;
-        var cutoff = DateTime.UtcNow - retain;
-        var cutoffIso = cutoff.ToString("O");
-        await _db.ExecuteAsync("DELETE FROM AlertHistory WHERE OccurredAt < ?", cutoffIso).ConfigureAwait(false);
-    }
-
-    public async Task<IReadOnlyList<TimelineHourDto>> GetTimelineAsync(int hours, CancellationToken cancellationToken = default)
-    {
-        if (_db == null) return [];
-        hours = Math.Clamp(hours, 1, 168);
-        var now = DateTime.UtcNow;
-        var floor = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, DateTimeKind.Utc);
-        var bucketStarts = new List<DateTime>();
-        for (var i = hours - 1; i >= 0; i--)
-            bucketStarts.Add(floor.AddHours(-i));
-
-        static DateTime FloorHour(DateTime t) =>
-            new(t.Year, t.Month, t.Day, t.Hour, 0, 0, DateTimeKind.Utc);
-
-        var minTime = bucketStarts[0];
-        var dict = bucketStarts.ToDictionary(
-            x => x.ToString("O"),
-            x => new TimelineHourDto { HourStart = x.ToString("O") });
-
-        var minTimeIso = minTime.ToString("O");
-        var evs = await _db.QueryAsync<SysmonEventRow>(
-            "SELECT * FROM SysmonEvents WHERE Timestamp >= ?",
-            minTimeIso).ConfigureAwait(false);
-        foreach (var e in evs)
-        {
-            if (!DateTime.TryParse(e.Timestamp, null, System.Globalization.DateTimeStyles.RoundtripKind, out var t))
-                continue;
-            var utc = t.Kind == DateTimeKind.Utc ? t : t.ToUniversalTime();
-            if (utc < minTime) continue;
-            var fh = FloorHour(utc);
-            var k = fh.ToString("O");
-            if (!dict.TryGetValue(k, out var dto)) continue;
-            switch (e.Type)
-            {
-                case "ProcessCreate":
-                    dto.ProcessCreate++;
-                    break;
-                case "NetworkConnect":
-                    dto.NetworkConnect++;
-                    break;
-                case "DnsQuery":
-                    dto.DnsQuery++;
-                    break;
-            }
-        }
-
-        var ah = await _db.QueryAsync<AlertHistoryRow>(
-            "SELECT * FROM AlertHistory WHERE OccurredAt >= ?",
-            minTimeIso).ConfigureAwait(false);
-        foreach (var a in ah)
-        {
-            if (!DateTime.TryParse(a.OccurredAt, null, System.Globalization.DateTimeStyles.RoundtripKind, out var t))
-                continue;
-            var utc = t.Kind == DateTimeKind.Utc ? t : t.ToUniversalTime();
-            if (utc < minTime) continue;
-            var k = FloorHour(utc).ToString("O");
-            if (dict.TryGetValue(k, out var dto))
-                dto.Alerts++;
-        }
-
-        return dict.Values.OrderBy(x => x.HourStart).ToList();
     }
 
     public async Task<int> CountEventsSinceAsync(DateTime utcFrom, CancellationToken cancellationToken = default)

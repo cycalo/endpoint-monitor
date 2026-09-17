@@ -8,7 +8,7 @@ namespace EndpointMonitorService.Services;
 
 public sealed class VirusTotalReputationService(
     ILogger<VirusTotalReputationService> logger,
-    IHttpClientFactory httpClientFactory,
+    System.Net.Http.IHttpClientFactory httpClientFactory,
     IOptions<VirusTotalOptions> options)
 {
     private readonly ConcurrentDictionary<string, CacheEntry> _cache = new();

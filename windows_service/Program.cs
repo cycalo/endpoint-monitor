@@ -9,6 +9,7 @@ using EndpointMonitorService.Browser;
 using EndpointMonitorService.Collectors;
 using EndpointMonitorService.Commands;
 using EndpointMonitorService.Database;
+using EndpointMonitorService.Desktop;
 using EndpointMonitorService.Hosted;
 using EndpointMonitorService.Options;
 using EndpointMonitorService.Services;
@@ -16,6 +17,18 @@ using EndpointMonitorService.Sysmon;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Options;
 using SQLitePCL;
+
+var isTesting = string.Equals(
+    Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"),
+    "Testing",
+    StringComparison.OrdinalIgnoreCase);
+
+var launch = LaunchModeDetector.Detect();
+if (!isTesting && launch.Mode == LaunchMode.UiOnly)
+{
+    DesktopShell.RunUiOnly(launch.Port);
+    return;
+}
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseWindowsService();
@@ -65,7 +78,6 @@ builder.Services.AddSingleton<ThreatIntelUpdater>();
 builder.Services.AddHostedService<MonitorBroadcastHostedService>();
 builder.Services.AddHostedService<SystemInfoHostedService>();
 builder.Services.AddHostedService<SysmonHostedService>();
-builder.Services.AddHostedService<TrayIconHostedService>();
 builder.Services.AddHostedService<FirewallBlockExpiryHostedService>();
 builder.Services.AddHostedService<ThreatIntelHostedService>();
 builder.Services.AddHostedService<InstalledSoftwareDetectionHostedService>();
@@ -133,17 +145,7 @@ app.MapGet("/health", () => Results.Json(new
     version = agentVersion
 }));
 
-app.MapGet("/local/pair", (HttpContext ctx, PairingAuthService pairing) =>
-{
-    if (!LocalNetworkHelper.IsLoopbackRequest(ctx))
-        return Results.StatusCode(StatusCodes.Status403Forbidden);
-
-    var (code, expiresAtUtc) = pairing.CreatePairingCode(TimeSpan.FromMinutes(5));
-    var port = ctx.RequestServices.GetRequiredService<IOptions<ServerOptions>>().Value.Port;
-    var lan = LocalNetworkHelper.GetLanIPv4Addresses();
-    var html = LocalPairPage.Render(code, expiresAtUtc.ToLocalTime(), port, lan);
-    return Results.Content(html, "text/html; charset=utf-8");
-});
+EndpointMonitorService.LocalConsoleApi.MapLocalConsoleEndpoints(app);
 
 app.MapPost("/api/auth/pairing/complete", async (HttpContext ctx, PairingCompleteRequest body) =>
 {
@@ -291,6 +293,9 @@ app.Map("/ws", async context =>
     }
 });
 
+if (!isTesting && launch.Mode == LaunchMode.InProcessHost && Environment.UserInteractive)
+    DesktopShell.StartInProcess(app.Services, app.Services.GetRequiredService<IHostApplicationLifetime>());
+
 await app.RunAsync();
 
 static string BuildOutboundJson(string originalType, CommandResult r)
@@ -303,8 +308,6 @@ static string BuildOutboundJson(string originalType, CommandResult r)
         return JsonSerializer.Serialize(new { type = "firewall", data = r.Data }, AppJson.Options);
     if (originalType == "get_flagged_processes" && r is { Success: true, Data: not null })
         return JsonSerializer.Serialize(new { type = "flagged_processes", data = r.Data }, AppJson.Options);
-    if (originalType == "get_timeline" && r is { Success: true, Data: not null })
-        return JsonSerializer.Serialize(new { type = "timeline", data = r.Data }, AppJson.Options);
     if (originalType is "get_threat_intel_status" or "refresh_threat_intel" && r is { Success: true, Data: not null })
         return JsonSerializer.Serialize(new { type = "threat_intel_status", data = r.Data }, AppJson.Options);
     if (originalType == "get_threat_intel_entries" && r is { Success: true, Data: not null })
@@ -332,3 +335,5 @@ static string Escape(object? o)
 
 internal sealed record PairingCompleteRequest(string Code, string? DeviceName);
 internal sealed record RevokeDeviceRequest(string Id);
+
+public partial class Program;

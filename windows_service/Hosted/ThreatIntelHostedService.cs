@@ -139,7 +139,6 @@ public sealed class InstalledSoftwareDetectionHostedService(
                 RelatedPid = null
             };
 
-            await database.AppendAlertHistoryAsync(alert.Type, alert.Timestamp, cancellationToken).ConfigureAwait(false);
             await database.AppendAuditAsync("software_install_detected", alert.Message, null, cancellationToken).ConfigureAwait(false);
             var payload = JsonSerializer.Serialize(new { type = "alert", data = alert }, Json);
             await ws.BroadcastAsync(Encoding.UTF8.GetBytes(payload), cancellationToken).ConfigureAwait(false);

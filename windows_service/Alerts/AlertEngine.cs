@@ -60,7 +60,6 @@ public sealed class AlertEngine(
 
             foreach (var a in alerts)
             {
-                await database.AppendAlertHistoryAsync(a.Type, a.Timestamp, cancellationToken).ConfigureAwait(false);
                 var payload = JsonSerializer.Serialize(new { type = "alert", data = a }, Json);
                 await ws.BroadcastAsync(System.Text.Encoding.UTF8.GetBytes(payload), cancellationToken).ConfigureAwait(false);
             }

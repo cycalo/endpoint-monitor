@@ -15,6 +15,7 @@ import '../utils/network_endpoint_display.dart'
         formatNetworkEndpoint,
         hasBlockableRemoteEndpoint,
         isListeningStyleSocket;
+import '../utils/network_tcp_state.dart';
 import '../widgets/em_brand_app_bar.dart';
 
 class NetworkConnectionDetailScreen extends StatelessWidget {
@@ -629,38 +630,9 @@ String _protocolState(String protocol, String state) {
 }
 
 String _readableState(String raw) {
-  final v = raw.trim();
-  if (v.isEmpty) return 'UNKNOWN';
-  final n = int.tryParse(v);
-  if (n == null) return v.toUpperCase();
-  switch (n) {
-    case 1:
-      return 'CLOSED';
-    case 2:
-      return 'LISTEN';
-    case 3:
-      return 'SYN-SENT';
-    case 4:
-      return 'SYN-RECEIVED';
-    case 5:
-      return 'ESTABLISHED';
-    case 6:
-      return 'FIN-WAIT-1';
-    case 7:
-      return 'FIN-WAIT-2';
-    case 8:
-      return 'CLOSE-WAIT';
-    case 9:
-      return 'CLOSING';
-    case 10:
-      return 'LAST-ACK';
-    case 11:
-      return 'TIME-WAIT';
-    case 12:
-      return 'DELETE-TCB';
-    default:
-      return 'STATE-$n';
-  }
+  final s = normalizeCimTcpState(raw);
+  if (s.isEmpty) return 'UNKNOWN';
+  return s.replaceAll('_', '-');
 }
 
 bool _isListeningSocket(NetworkConnection n) {

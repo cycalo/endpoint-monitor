@@ -48,7 +48,7 @@ graph TD
     subgraph External_Integrations["External Security Services"]
         VT["VirusTotal API v3 (Reputation Lookups)"]
         Feeds["Threat Intel Feeds (Malicious IP Blocklists)"]
-        Groq["Groq API (Process AI Explanation)"]
+        Zai["Z.AI GLM-4.7-Flash (Process AI Explanation)"]
     end
 
     %% Client-Server Communication
@@ -78,7 +78,7 @@ graph TD
     %% External Connections
     CmdService -->|HTTPS| VT
     IntelWorker -->|HTTPS| Feeds
-    UI -->|HTTPS| Groq
+    UI -->|HTTPS| Zai
 ```
 
 ---
@@ -102,7 +102,7 @@ Endpoint Monitor is designed to operate securely in untrusted network environmen
 
 ### 3.1 Pairing Protocol & Authentication Flow
 1. **Pairing Code Generation**:
-   - When the agent runs, a user can generate a temporary **Pairing Code** (6-digit PIN) from the system tray icon, or by visiting `http://localhost:5000/local/pair` (restricted to loopback requests only).
+   - When the agent runs, a user can generate a temporary **Pairing Code** (6-digit PIN) from the **desktop setup console** (Pair screen).
    - The code is stored in-memory with a short expiry (default: 5 minutes).
 2. **Key Exchange & Pairing Completion**:
    - The mobile client sends a `POST /api/auth/pairing/complete` request containing the pairing code and its device name.
@@ -184,7 +184,9 @@ The agent implements powerful, low-level operating system controls to contain th
 
 | Directory / File | Responsibility |
 |------------------|----------------|
-| `Program.cs` | Composition root, dependency injection, REST endpoint mapping, and middleware setup. |
+| `Program.cs` | Composition root, dependency injection, REST endpoint mapping, middleware, and interactive launch fork (service vs desktop console). |
+| `Desktop/` | WPF setup console (Home, Pair, Devices, Diagnostics, Settings) and system tray integration. |
+| `LocalConsoleApi.cs` | Loopback-only JSON endpoints consumed by the desktop console. |
 | `Collectors/` | Telemetry collection: `ProcessCollector` (CPU, RAM, threads), `NetworkCollector` (IPHlpApi active connections), `SystemInfoCollector` (hardware specs). |
 | `Hosted/` | Background workers: `MonitorBroadcastHostedService` (broadcasts live process/network states to WebSockets every 1s), `SysmonHostedService` (event log watcher). |
 | `Services/` | Core business logic: `PairingAuthService` (security tokens), `VirusTotalReputationService` (hash scanning), `ThreatIntelUpdater` (malicious IP feed downloader). |
@@ -198,6 +200,7 @@ The agent implements powerful, low-level operating system controls to contain th
 |------------------|----------------|
 | `main.dart` | Application entry point. Initializes secure storage and settings. |
 | `app_router.dart` | Central routing hub using `go_router`. Implements redirect guards (sends unauthenticated users to `/connect`). |
+| `screens/connect_screen.dart` | Connect chooser (Wi-Fi vs Tailscale) plus one guided page per path with inline pairing and a single Connect action. |
 | `bloc/` | **State Management**: Consumes real-time WebSocket streams and manages UI state. Key blocs include `ConnectionBloc`, `ProcessBloc`, `NetworkBloc`, `EventsBloc`, `FirewallBloc`. |
 | `screens/` | UI Routes: `dashboard_screen.dart` (health & heatmap), `process_detail_screen.dart` (forensics & actions), `network_screen.dart` (connections & threat highlights), `events_screen.dart` (timeline). |
 | `task/` | `endpoint_monitor_task_handler.dart` — Background service handler that maintains the WebSocket connection when the app is minimized. |

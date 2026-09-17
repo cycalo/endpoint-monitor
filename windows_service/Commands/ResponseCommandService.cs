@@ -122,7 +122,6 @@ public sealed class ResponseCommandService(
                 "block_outbound_port" => await BlockOutboundPortAsync(root, clientIp, cancellationToken).ConfigureAwait(false),
                 "block_process" => await BlockProcessAsync(root, clientIp, cancellationToken).ConfigureAwait(false),
                 "unblock_process" => await UnblockProcessAsync(root, clientIp, cancellationToken).ConfigureAwait(false),
-                "get_timeline" => await GetTimelineAsync(root, cancellationToken).ConfigureAwait(false),
                 "check_reputation" => await CheckReputationAsync(root, cancellationToken).ConfigureAwait(false),
                 "get_threat_intel_status" => await GetThreatIntelStatusAsync(cancellationToken).ConfigureAwait(false),
                 "get_threat_intel_entries" => await GetThreatIntelEntriesAsync(cancellationToken).ConfigureAwait(false),
@@ -763,41 +762,6 @@ public sealed class ResponseCommandService(
         return new CommandResult(true, "ack_alert", "ok");
     }
 
-    private async Task<CommandResult> GetTimelineAsync(JsonElement root, CancellationToken cancellationToken)
-    {
-        var hours = root.TryGetProperty("hours", out var h) && h.TryGetInt32(out var hv) ? Math.Clamp(hv, 1, 168) : 24;
-        var raw = await database.GetTimelineAsync(hours, cancellationToken).ConfigureAwait(false);
-        var ordered = raw.OrderBy(x => x.HourStart, StringComparer.Ordinal).ToList();
-        var sums = ordered
-            .Select(d => d.ProcessCreate + d.NetworkConnect + d.DnsQuery)
-            .ToList();
-        var maxSum = sums.Count == 0 ? 0 : sums.Max();
-        var heatmap = new List<object>(ordered.Count);
-        for (var i = 0; i < ordered.Count; i++)
-        {
-            var d = ordered[i];
-            var sum = sums[i];
-            var activityLevel = maxSum <= 0
-                ? 0
-                : (int)Math.Round(10.0 * sum / maxSum, MidpointRounding.AwayFromZero);
-            activityLevel = Math.Clamp(activityLevel, 0, 10);
-            heatmap.Add(new
-            {
-                hour = i,
-                hourStartUtc = d.HourStart,
-                activityLevel,
-                hasAlert = d.Alerts > 0
-            });
-        }
-
-        var data = JsonSerializer.SerializeToElement(new
-        {
-            buckets = heatmap,
-            generatedAt = DateTime.UtcNow.ToString("O")
-        }, AppJson.Options);
-        return new CommandResult(true, "get_timeline", "ok", data);
-    }
-
     private async Task<CommandResult> CheckReputationAsync(JsonElement root, CancellationToken cancellationToken)
     {
         if (!root.TryGetProperty("pid", out var pidEl) || !pidEl.TryGetInt32(out var pid))
@@ -1097,12 +1061,12 @@ internal static class DesktopScreenshot
         var tw = Math.Max(1, (int)Math.Round(sw * scale));
         var th = Math.Max(1, (int)Math.Round(sh * scale));
 
-        using var output = new Bitmap(tw, th, PixelFormat.Format32bppArgb);
+        using var output = new Bitmap(tw, th, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
         using (var g = Graphics.FromImage(output))
         {
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
             g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-            using var full = new Bitmap(sw, sh, PixelFormat.Format32bppArgb);
+            using var full = new Bitmap(sw, sh, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
             using (var gFull = Graphics.FromImage(full))
             {
                 gFull.CopyFromScreen(bounds.Left, bounds.Top, 0, 0, full.Size, CopyPixelOperation.SourceCopy);

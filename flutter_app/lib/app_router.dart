@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import 'bloc/connection_bloc.dart';
+import 'bloc/system_info_bloc.dart';
+import 'bloc/system_vitals_history_cubit.dart';
 import 'models/ws_models.dart';
 import 'router/go_router_refresh.dart';
 import 'screens/alerts_screen.dart';
@@ -18,6 +21,7 @@ import 'screens/paired_devices_screen.dart';
 import 'screens/process_detail_screen.dart';
 import 'screens/processes_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/system_monitor_screen.dart';
 import 'screens/software_detail_screen.dart';
 import 'screens/software_screen.dart';
 import 'screens/watchlist_screen.dart';
@@ -34,10 +38,13 @@ GoRouter createAppRouter(ConnectionBloc connectionBloc) {
       final loc = state.matchedLocation;
       final onConnect = loc == '/connect';
       final onDashboard = loc == '/dashboard';
+      final onSystemMonitor = loc == '/system-monitor';
       final canReconnect = connectionBloc.state.host != null &&
           connectionBloc.state.host!.trim().isNotEmpty;
       if (!connected && !onConnect) {
-        if (canReconnect && !onDashboard) return '/dashboard';
+        if (canReconnect && !onDashboard && !onSystemMonitor) {
+          return '/dashboard';
+        }
         if (!canReconnect) return '/connect';
       }
       if (connected && onConnect) return '/dashboard';
@@ -199,6 +206,35 @@ GoRouter createAppRouter(ConnectionBloc connectionBloc) {
         path: '/settings',
         builder: (context, state) => SettingsScreen(
           focusSection: state.uri.queryParameters['section'],
+        ),
+      ),
+      GoRoute(
+        name: 'systemMonitor',
+        path: '/system-monitor',
+        pageBuilder: (context, state) => CustomTransitionPage<void>(
+          key: state.pageKey,
+          transitionDuration: const Duration(milliseconds: 280),
+          reverseTransitionDuration: const Duration(milliseconds: 240),
+          child: BlocProvider(
+            create: (ctx) =>
+                SystemVitalsHistoryCubit.fromBloc(ctx.read<SystemInfoBloc>())
+                  ..prime(),
+            child: const SystemMonitorScreen(),
+          ),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            final curved = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            );
+            return FadeTransition(
+              opacity: curved,
+              child: ScaleTransition(
+                scale: Tween<double>(begin: 0.96, end: 1).animate(curved),
+                child: child,
+              ),
+            );
+          },
         ),
       ),
     ],

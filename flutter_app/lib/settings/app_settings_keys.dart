@@ -12,12 +12,17 @@ abstract final class AppSettingsKeys {
   static const eventsDefaultRange = 'em_events_default_range';
   static const eventsMaxLoad = 'em_events_max_load';
   static const showIpv6Network = 'em_show_ipv6_network';
+  /// `apps` (default) | `sockets` — Network tab list mode.
+  static const networkListMode = 'em_network_list_mode';
   static const compactProcessCards = 'em_compact_process_cards';
   static const pinLockEnabled = 'em_pin_lock_enabled';
   static const autoLockTimeout = 'em_auto_lock_timeout';
 
-  /// FlutterSecureStorage key for optional Groq API key (process AI explain).
-  static const groqApiKey = 'groq_api_key';
+  /// Retired user-entered Z.AI storage key; deleted on Settings load.
+  static const retiredZaiApiKey = 'zai_api_key';
+
+  /// Retired Groq storage key; deleted on Settings load so it is not left behind.
+  static const retiredGroqApiKey = 'groq_api_key';
 
   /// Comma-separated default noise list (lowercase .exe names).
   static const defaultNoiseCsv =
@@ -52,6 +57,9 @@ abstract final class AppSettingsKeys {
     }
     if (!p.containsKey(showIpv6Network)) {
       await p.setBool(showIpv6Network, false);
+    }
+    if (!p.containsKey(networkListMode)) {
+      await p.setString(networkListMode, 'apps');
     }
     if (!p.containsKey(compactProcessCards)) {
       await p.setBool(compactProcessCards, false);
