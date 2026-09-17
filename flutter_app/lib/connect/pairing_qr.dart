@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'connect_guide.dart';
+import 'connect_path.dart';
 import 'connect_validation.dart';
 
 /// Parsed pairing payload from a desktop QR code.
@@ -174,4 +175,12 @@ String encodePairingQrUri({
   final json = jsonEncode(payload);
   final data = base64Url.encode(utf8.encode(json)).replaceAll('=', '');
   return 'endpointmonitor://pair?data=$data';
+}
+
+/// Hosts from a pairing QR that match [path] (LAN vs Tailscale).
+List<String> hostsMatchingConnectPath(List<String> hosts, ConnectPath path) {
+  return [
+    for (final origin in hosts)
+      if (inferConnectPathFromHost(origin) == path) origin,
+  ];
 }

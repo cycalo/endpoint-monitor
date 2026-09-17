@@ -11,14 +11,12 @@ class ConnectChooser extends StatelessWidget {
   const ConnectChooser({
     super.key,
     required this.onPathSelected,
-    required this.onScanQr,
     this.savedHost,
     this.savedPath,
     this.onContinueSaved,
   });
 
   final ValueChanged<ConnectPath> onPathSelected;
-  final VoidCallback onScanQr;
   final String? savedHost;
   final ConnectPath? savedPath;
   final VoidCallback? onContinueSaved;
@@ -82,8 +80,6 @@ class ConnectChooser extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 22),
-        _ConnectScanQrCard(onTap: onScanQr),
-        const SizedBox(height: 12),
         _ConnectPathCard(
           path: ConnectPath.wifi,
           icon: Icons.wifi_rounded,
@@ -160,71 +156,6 @@ class _WindowsServiceDownloadRow extends StatelessWidget {
                 ),
               ),
               Icon(Icons.open_in_new_rounded, size: 18, color: scheme.outline),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ConnectScanQrCard extends StatelessWidget {
-  const _ConnectScanQrCard({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-
-    return Material(
-      color: scheme.primaryContainer.withValues(alpha: 0.35),
-      borderRadius: BorderRadius.circular(EmDesign.radiusLg),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(EmDesign.radiusLg),
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: EmDesign.cardShell(
-            scheme,
-            color: scheme.primaryContainer.withValues(alpha: 0.35),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: scheme.primary.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(EmDesign.radiusMd),
-                  border: EmDesign.ghostBorder(scheme),
-                ),
-                child: Icon(Icons.qr_code_scanner_rounded, color: scheme.primary, size: 24),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      kConnectScanQrTitle,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      kConnectScanQrSubtitle,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right_rounded, color: scheme.outline),
             ],
           ),
         ),

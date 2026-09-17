@@ -24,6 +24,7 @@ void main() {
               onRememberChanged: (_) {},
               onBack: () {},
               onConnect: () {},
+              onScanQr: () {},
             ),
           ),
         ),
@@ -31,8 +32,10 @@ void main() {
     );
 
     expect(find.text('Connect over Wi-Fi'), findsOneWidget);
+    expect(find.text('Scan QR code'), findsOneWidget);
+    expect(find.textContaining('not Tailscale'), findsOneWidget);
     expect(find.text('6-DIGIT CODE'), findsOneWidget);
-    expect(find.textContaining('Tailscale'), findsNothing);
+    expect(find.textContaining('install Tailscale'), findsNothing);
   });
 
   testWidgets('tailscale guided page shows tailscale title and install copy', (tester) async {
@@ -55,6 +58,7 @@ void main() {
               onRememberChanged: (_) {},
               onBack: () {},
               onConnect: () {},
+              onScanQr: () {},
             ),
           ),
         ),
@@ -62,6 +66,8 @@ void main() {
     );
 
     expect(find.text('Connect with Tailscale'), findsOneWidget);
+    expect(find.text('Scan QR code'), findsOneWidget);
+    expect(find.textContaining('even if you are on the same Wi-Fi'), findsOneWidget);
     expect(find.text('install Tailscale'), findsNWidgets(2));
     expect(find.text('6-DIGIT CODE'), findsOneWidget);
   });
@@ -86,6 +92,7 @@ void main() {
               onRememberChanged: (_) {},
               onBack: () {},
               onConnect: () {},
+              onScanQr: () {},
               onPairAgain: () {},
             ),
           ),
@@ -96,5 +103,39 @@ void main() {
     expect(find.text('6-DIGIT CODE'), findsNothing);
     expect(find.textContaining('already paired'), findsOneWidget);
     expect(find.text('Use a new pairing code'), findsOneWidget);
+    expect(find.text('Scan QR code'), findsOneWidget);
+  });
+
+  testWidgets('scan qr on wifi page invokes callback', (tester) async {
+    var scanned = false;
+    final address = TextEditingController();
+    final code = TextEditingController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: ConnectGuidedPage(
+              path: ConnectPath.wifi,
+              alreadyPaired: false,
+              addressController: address,
+              codeController: code,
+              rememberAddress: true,
+              busy: false,
+              connecting: false,
+              errorMessage: null,
+              onRememberChanged: (_) {},
+              onBack: () {},
+              onConnect: () {},
+              onScanQr: () => scanned = true,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Scan QR code'));
+    await tester.pump();
+    expect(scanned, isTrue);
   });
 }

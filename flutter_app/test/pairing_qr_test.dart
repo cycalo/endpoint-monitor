@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:endpoint_monitor/connect/connect_guide.dart';
+import 'package:endpoint_monitor/connect/connect_path.dart';
 import 'package:endpoint_monitor/connect/pairing_qr.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -46,15 +47,18 @@ void main() {
     });
 
     test('rejects unsupported version', () {
-      final uri = sampleUri();
-      final data = uri.split('data=').last;
-      final padded = data.replaceAll('-', '+').replaceAll('_', '/');
-      final json = utf8.decode(base64.decode('$padded=='));
-      final map = Map<String, dynamic>.from(jsonDecode(json) as Map);
-      map['v'] = 2;
-      final bad =
-          'endpointmonitor://pair?data=${base64Url.encode(utf8.encode(jsonEncode(map))).replaceAll('=', '')}';
-      expect(parsePairingQr(bad), isA<PairingQrParseInvalid>());
+      final expiresAt = '${futureExpiry.year.toString().padLeft(4, '0')}-01-01T00:00:00Z';
+      final payload = jsonEncode({
+        'v': 2,
+        'code': '123456',
+        'hosts': ['http://192.168.1.50:5000'],
+        'expiresAt': expiresAt,
+      });
+      final data = base64Url.encode(utf8.encode(payload)).replaceAll('=', '');
+      expect(
+        parsePairingQr('endpointmonitor://pair?data=$data'),
+        isA<PairingQrParseInvalid>(),
+      );
     });
 
     test('rejects invalid pairing code', () {
@@ -82,6 +86,34 @@ void main() {
     test('expired message constant is user-facing', () {
       expect(kPairingQrExpiredMessage, contains('expired'));
       expect(kPairingQrInvalidMessage, contains('valid'));
+    });
+  });
+
+  group('hostsMatchingConnectPath', () {
+    const hosts = [
+      'http://192.168.1.50:5000',
+      'http://100.64.0.5:5000',
+    ];
+
+    test('wifi keeps lan and drops tailscale', () {
+      expect(
+        hostsMatchingConnectPath(hosts, ConnectPath.wifi),
+        ['http://192.168.1.50:5000'],
+      );
+    });
+
+    test('tailscale keeps cgnat and drops lan', () {
+      expect(
+        hostsMatchingConnectPath(hosts, ConnectPath.tailscale),
+        ['http://100.64.0.5:5000'],
+      );
+    });
+
+    test('returns empty when qr has no hosts for path', () {
+      expect(
+        hostsMatchingConnectPath(['http://192.168.1.50:5000'], ConnectPath.tailscale),
+        isEmpty,
+      );
     });
   });
 }

@@ -123,10 +123,12 @@ class _ConnectScreenState extends State<ConnectScreen> {
   }
 
   Future<void> _openQrScanner() async {
+    final path = _selectedPath;
+    if (path == null) return;
     setState(() => _inlineError = null);
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (context) => const ConnectQrScanScreen(),
+        builder: (context) => ConnectQrScanScreen(path: path),
       ),
     );
     if (!mounted) return;
@@ -374,7 +376,6 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                                 savedPath: _savedPath,
                                                 onContinueSaved: showContinueChip ? _openSavedSession : null,
                                                 onPathSelected: _selectPath,
-                                                onScanQr: _openQrScanner,
                                               )
                                             : ConnectGuidedPage(
                                                 key: ValueKey('guided-${_selectedPath!.name}'),
@@ -414,6 +415,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                                 },
                                                 onBack: _backToChooser,
                                                 onConnect: _connect,
+                                                onScanQr: _openQrScanner,
                                                 onPairAgain: _forgetLocalPairing,
                                               ),
                                       ),

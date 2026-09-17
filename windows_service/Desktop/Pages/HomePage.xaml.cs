@@ -152,7 +152,7 @@ public partial class HomePage : UserControl
         _chipsPanel.Children.Clear();
         AddChip(status.SysmonInstalled ? "Sysmon installed" : "Sysmon not detected",
             status.SysmonInstalled ? "CsSuccessBrush" : "CsOnSurfaceVariantBrush");
-        AddChip(status.RunningAsAdministrator ? "Administrator" : "Not elevated",
+        AddChip(status.RunningAsAdministrator ? "Running as Administrator" : "Not running as Administrator",
             status.RunningAsAdministrator ? "CsSuccessBrush" : "CsErrorBrush");
 
         ApplyNextStep(HomeDashboard.NextStep(true, pairedCount, status.WebSocketClients));

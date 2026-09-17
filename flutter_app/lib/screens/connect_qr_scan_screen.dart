@@ -8,7 +8,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../bloc/connection_bloc.dart';
 import '../connect/connect_guide.dart';
-import '../connect/connect_path.dart' show inferConnectPathFromHost;
+import '../connect/connect_path.dart';
 import '../connect/connect_session.dart';
 import '../connect/pairing_qr.dart';
 import '../theme/em_design_system.dart';
@@ -17,7 +17,10 @@ import '../widgets/em_loading_states.dart';
 import '../widgets/em_technical_grid.dart';
 
 class ConnectQrScanScreen extends StatefulWidget {
-  const ConnectQrScanScreen({super.key});
+  const ConnectQrScanScreen({super.key, required this.path});
+
+  /// Only hosts matching this path are probed after a scan.
+  final ConnectPath path;
 
   @override
   State<ConnectQrScanScreen> createState() => _ConnectQrScanScreenState();
@@ -111,20 +114,23 @@ class _ConnectQrScanScreenState extends State<ConnectQrScanScreen>
           setState(() => _errorMessage = kPairingQrExpiredMessage);
           return;
         case PairingQrParseOk(:final data):
-          final host = await probeFirstReachableHost(data.hosts);
+          final matching = hostsMatchingConnectPath(data.hosts, widget.path);
+          if (matching.isEmpty) {
+            setState(() => _errorMessage = pairingQrNoHostsForPathMessage(widget.path));
+            return;
+          }
+          final host = await probeFirstReachableHost(matching);
           if (!mounted) return;
           if (host == null) {
-            final path = inferConnectPathFromHost(data.hosts.first);
-            setState(() => _errorMessage = connectUnreachableMessage(path));
+            setState(() => _errorMessage = connectUnreachableMessage(widget.path));
             return;
           }
 
-          final path = inferConnectPathFromHost(host);
           final bloc = context.read<ConnectionBloc>();
           final result = await completeConnectSession(
             connectionBloc: bloc,
             host: host,
-            path: path,
+            path: widget.path,
             pairingCode: data.code,
             persistHost: true,
           );
@@ -192,7 +198,7 @@ class _ConnectQrScanScreenState extends State<ConnectQrScanScreen>
                       children: [
                         EmPageIntro(
                           title: kConnectQrScanTitle,
-                          subtitle: kConnectQrScanSubtitle,
+                          subtitle: connectQrScanSubtitle(widget.path),
                         ),
                         if (!_isMobile)
                           Container(

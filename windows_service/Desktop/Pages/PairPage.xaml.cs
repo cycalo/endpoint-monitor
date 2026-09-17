@@ -51,7 +51,7 @@ public partial class PairPage : UserControl
         var inner = new StackPanel();
         inner.Children.Add(new TextBlock
         {
-            Text = "Scan the QR code in the phone app (Connect → Scan QR code), or enter the 6-digit code manually. Same code for This Wi-Fi or Away from home.",
+            Text = "Scan the QR in the phone app after choosing This Wi-Fi or Away from home. Same QR for both — the phone uses the matching address. You can also type the 6-digit code.",
             Style = (Style)Application.Current.FindResource("CsBody"),
             Margin = new Thickness(0, 0, 0, 16),
             TextWrapping = TextWrapping.Wrap,
@@ -78,7 +78,7 @@ public partial class PairPage : UserControl
             Padding = new Thickness(4),
             CornerRadius = new CornerRadius(8),
             Background = (Brush)Application.Current.FindResource("CsSurfaceContainerLowBrush"),
-            BorderBrush = (Brush)Application.Current.FindResource("CsOutlineBrush"),
+            BorderBrush = (Brush)Application.Current.FindResource("CsGhostBorderBrush"),
             BorderThickness = new Thickness(1),
             Child = _qrImage,
             VerticalAlignment = VerticalAlignment.Top,
@@ -242,14 +242,14 @@ public partial class PairPage : UserControl
         _pathsHost.Children.Add(EndpointAddressList.PathCard(
             "This Wi-Fi",
             "Phone and PC on the same Wi-Fi. Fastest first-time setup.",
-            "On the phone: Connect → This Wi-Fi. Paste one local address below, then the code.",
+            "On the phone: Connect → This Wi-Fi. Scan the QR, or paste one local address below and the code.",
             lan,
             "No local Wi-Fi or Ethernet address detected. Check the PC is on Wi-Fi or Ethernet."));
 
         _pathsHost.Children.Add(EndpointAddressList.PathCard(
             "Away from home",
             "Reach this PC over Tailscale from any network. Both devices must use the same Tailscale account.",
-            "On the phone: Connect → Away from home. Paste the 100. address (not a 192.168 address), then the code.",
+            "On the phone: Connect → Away from home. Scan the QR, or paste the 100. address (not a 192.168 address) and the code.",
             tailscale,
             "Tailscale is not connected on this PC. Install Tailscale, sign in, then generate a new code."));
 

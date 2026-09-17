@@ -23,6 +23,7 @@ class ConnectGuidedPage extends StatelessWidget {
     required this.onRememberChanged,
     required this.onBack,
     required this.onConnect,
+    required this.onScanQr,
     this.onPairAgain,
   });
 
@@ -37,6 +38,7 @@ class ConnectGuidedPage extends StatelessWidget {
   final ValueChanged<bool> onRememberChanged;
   final VoidCallback onBack;
   final VoidCallback onConnect;
+  final VoidCallback onScanQr;
   final VoidCallback? onPairAgain;
 
   Future<void> _openUri(BuildContext context, String uri) async {
@@ -116,7 +118,59 @@ class ConnectGuidedPage extends StatelessWidget {
             ),
           );
         }),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
+        Material(
+          color: scheme.primaryContainer.withValues(alpha: 0.35),
+          borderRadius: BorderRadius.circular(EmDesign.radiusLg),
+          child: InkWell(
+            onTap: busy ? null : onScanQr,
+            borderRadius: BorderRadius.circular(EmDesign.radiusLg),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: EmDesign.cardShell(
+                scheme,
+                color: scheme.primaryContainer.withValues(alpha: 0.35),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.qr_code_scanner_rounded, color: scheme.primary),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          kConnectScanQrTitle,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          connectScanQrSubtitle(path),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded, color: scheme.outline),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+        Text(
+          'Or enter the address',
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: scheme.onSurfaceVariant,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 10),
         _LabeledField(
           label: 'PC address',
           child: TextField(

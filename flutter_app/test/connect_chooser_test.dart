@@ -4,15 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('shows scan qr first and both path cards', (tester) async {
+  testWidgets('shows both path cards and chooser copy', (tester) async {
     ConnectPath? selected;
-    var scanned = false;
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: ConnectChooser(
             onPathSelected: (path) => selected = path,
-            onScanQr: () => scanned = true,
           ),
         ),
       ),
@@ -20,15 +18,11 @@ void main() {
 
     expect(find.text('Connect to your PC'), findsOneWidget);
     expect(find.text('How should this phone reach the PC?'), findsOneWidget);
-    expect(find.text('Scan QR code'), findsOneWidget);
+    expect(find.text('Scan QR code'), findsNothing);
     expect(find.text('This Wi-Fi'), findsOneWidget);
     expect(find.text('Away from home'), findsOneWidget);
     expect(find.text('Download Windows service'), findsOneWidget);
     expect(find.textContaining('Install Endpoint Monitor on the PC'), findsOneWidget);
-
-    await tester.tap(find.text('Scan QR code'));
-    await tester.pump();
-    expect(scanned, isTrue);
 
     await tester.tap(find.text('This Wi-Fi'));
     await tester.pump();
@@ -45,7 +39,6 @@ void main() {
             savedPath: ConnectPath.wifi,
             onContinueSaved: () => continued = true,
             onPathSelected: (_) {},
-            onScanQr: () {},
           ),
         ),
       ),
@@ -63,7 +56,6 @@ void main() {
         home: Scaffold(
           body: ConnectChooser(
             onPathSelected: (_) {},
-            onScanQr: () {},
           ),
         ),
       ),

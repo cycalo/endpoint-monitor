@@ -35,7 +35,7 @@ String connectGuidedTitle(ConnectPath path) => switch (path) {
 
 /// Short description under each chooser card.
 String connectPathCardSubtitle(ConnectPath path) => switch (path) {
-      ConnectPath.wifi => 'Phone and PC on the same network. Fastest first-time setup.',
+      ConnectPath.wifi => 'Phone and PC on the same local network.',
       ConnectPath.tailscale => 'Reach the PC over Tailscale from any network.',
     };
 
@@ -57,12 +57,12 @@ List<ConnectGuideStep> connectGuideSteps(ConnectPath path, {required bool alread
           'This phone is on the same Wi-Fi as the PC.',
         ),
         const ConnectGuideStep(
-          'On the PC, open the Endpoint Monitor desktop app → Pair. Copy the Wi-Fi address shown there.',
+          'On the PC, open Endpoint Monitor → Pair. Scan the QR, or copy the This Wi-Fi address.',
         ),
         ConnectGuideStep(
           alreadyPaired
-              ? 'Enter that address, then tap Connect.'
-              : 'Enter that address and the 6-digit code, then tap Connect.',
+              ? 'Scan the QR, or enter that address and tap Connect.'
+              : 'Scan the QR, or enter that address and the 6-digit code, then tap Connect.',
         ),
       ];
     case ConnectPath.tailscale:
@@ -81,18 +81,11 @@ List<ConnectGuideStep> connectGuideSteps(ConnectPath path, {required bool alread
           'In Tailscale on the PC, copy the Tailscale IP (starts with 100.) or MagicDNS name (something.ts.net).',
         ),
       ];
-      if (!alreadyPaired) {
-        steps.add(
-          const ConnectGuideStep(
-            'On the PC, open the Endpoint Monitor desktop app → Pair. Copy the Tailscale address (starts with 100.) from Away from home.',
-          ),
-        );
-      }
       steps.add(
         ConnectGuideStep(
           alreadyPaired
-              ? 'Paste the Tailscale address, then tap Connect.'
-              : 'Paste the Tailscale address and the code, then tap Connect.',
+              ? 'On the PC, open Pair. Scan the QR (this uses the Tailscale address) or paste a 100. / .ts.net address, then tap Connect.'
+              : 'On the PC, open Pair. Scan the QR (this uses the Tailscale address) or paste a 100. / .ts.net address and the code, then tap Connect.',
         ),
       );
       return steps;
@@ -128,10 +121,30 @@ const kPairingCodeCallout =
 /// Label for the continue chip on the chooser when a saved session exists.
 String continueToSavedLabel(String address) => 'Continue to $address';
 
-/// Primary chooser card for QR pairing.
+/// Scan QR control on a guided connect page.
 const kConnectScanQrTitle = 'Scan QR code';
-const kConnectScanQrSubtitle =
-    'Fastest setup. On the PC, open Pair and scan the QR code with this phone.';
+
+String connectScanQrSubtitle(ConnectPath path) => switch (path) {
+      ConnectPath.wifi =>
+        'Uses the This Wi-Fi address from Pair — not Tailscale, even if both are in the QR.',
+      ConnectPath.tailscale =>
+        'Uses the Away from home (Tailscale) address from Pair — even if you are on the same Wi-Fi.',
+    };
+
+String connectQrScanSubtitle(ConnectPath path) => switch (path) {
+      ConnectPath.wifi =>
+        'Point your camera at the Pair QR. This phone will connect over local Wi-Fi.',
+      ConnectPath.tailscale =>
+        'Point your camera at the Pair QR. This phone will connect over Tailscale.',
+    };
+
+/// QR parsed, but it had no hosts for the path the user chose.
+String pairingQrNoHostsForPathMessage(ConnectPath path) => switch (path) {
+      ConnectPath.wifi =>
+        'That QR has no local Wi-Fi address. On the PC, check This Wi-Fi on the Pair screen, or go back and choose Away from home.',
+      ConnectPath.tailscale =>
+        'That QR has no Tailscale address. On the PC, connect Tailscale and tap New code, or go back and choose This Wi-Fi.',
+    };
 
 /// Shown when a scanned QR is not a valid Endpoint Monitor pairing payload.
 const kPairingQrInvalidMessage =
@@ -143,8 +156,6 @@ const kPairingQrExpiredMessage =
 
 /// Scanner screen copy.
 const kConnectQrScanTitle = 'Scan pairing QR';
-const kConnectQrScanSubtitle =
-    'Point your camera at the QR code on the PC Pair screen.';
 
 const kConnectQrCameraDeniedMessage =
     'Camera access is required to scan the pairing QR code.';
@@ -152,4 +163,4 @@ const kConnectQrCameraDeniedMessage =
 const kConnectQrOpenSettingsLabel = 'Open Settings';
 
 const kConnectQrUnsupportedPlatformMessage =
-    'QR scanning is only available on Android and iOS. Use This Wi-Fi or Away from home to connect manually.';
+    'QR scanning is only available on Android and iOS. Enter the address below instead.';

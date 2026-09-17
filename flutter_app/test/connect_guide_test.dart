@@ -38,6 +38,7 @@ void main() {
     test('paired tailscale guide omits pairing code step', () {
       final steps = connectGuideSteps(ConnectPath.tailscale, alreadyPaired: true);
       expect(steps.any((s) => s.text.contains('pairing code')), isFalse);
+      expect(steps.any((s) => s.text.contains('Scan the QR')), isTrue);
       expect(steps.length, 4);
     });
   });
