@@ -42,7 +42,7 @@ Do not set `do_sample: false`. Keep sampling with low temperature.
 - Retarget the existing Dio call in `process_detail_screen.dart`
 - Rename Groq-specific helpers/flags (`_parseProcessExplanationFromGroqContent`, `needsGroqApiKeySetup`)
 - Update error strings, report footer, and Settings labels to `Z.AI · glm-4.7-flash`
-- Update `README.md` and `AGENT_ONBOARDING.md` Groq references
+- Update `README.md` and `AGENTS.md` Groq references
 
 ## Out of scope
 

@@ -128,7 +128,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                   ),
                   const SizedBox(height: EmDesign.spaceSm),
                   Text(
-                    'Thanks — we got your feedback.',
+                    'Thanks - we got your feedback.',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,

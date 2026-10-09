@@ -1,20 +1,36 @@
+using System.Windows.Media.Animation;
 using EndpointMonitorService.Services;
 
 namespace EndpointMonitorService.Desktop.Pages;
 
 public partial class HomePage : UserControl
 {
+    private const int SeriesCap = 48;
+
     private readonly AgentDataService _data;
     private readonly Action _navigateToPair;
     private readonly Action _navigateToDevices;
+    private readonly List<double> _cpuSeries = new();
+    private readonly List<double> _ramSeries = new();
 
-    private Border _statusPill = null!;
-    private TextBlock _statusText = null!;
-    private TextBlock _connectedPhones = null!;
-    private TextBlock _pairedDevices = null!;
+    private TextBlock _agentText = null!;
+    private TextBlock _agentIcon = null!;
+    private TextBlock _elevationText = null!;
+    private TextBlock _elevationIcon = null!;
+    private TextBlock _sysmonText = null!;
+    private TextBlock _sysmonIcon = null!;
+    private TextBlock _wsCount = null!;
+    private TextBlock _pairedCount = null!;
+    private System.Windows.Shapes.Ellipse _pulse = null!;
+    private bool _pulseLive;
     private TextBlock _wifiStatus = null!;
     private TextBlock _tailscaleStatus = null!;
-    private StackPanel _chipsPanel = null!;
+    private WrapPanel _wifiChips = null!;
+    private WrapPanel _tailscaleChips = null!;
+    private TextBlock _cpuLabel = null!;
+    private TextBlock _ramLabel = null!;
+    private TextBlock _telemetryHint = null!;
+    private SparklineChart _spark = null!;
     private TextBlock _nextTitle = null!;
     private TextBlock _nextBody = null!;
     private Button _pairBtn = null!;
@@ -30,132 +46,215 @@ public partial class HomePage : UserControl
 
     private void BuildUi()
     {
-        var root = new StackPanel();
-        root.Children.Add(new TextBlock { Text = "Home", Style = (Style)Application.Current.FindResource("CsPageTitle") });
-        root.Children.Add(new TextBlock
-        {
-            Text = "Agent health, connected phones, and whether this PC can be reached.",
-            Style = (Style)Application.Current.FindResource("CsBody"),
-            Margin = new Thickness(0, -8, 0, 16),
-        });
+        var root = new Grid();
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
-        var statusCard = new Border { Style = (Style)Application.Current.FindResource("CsCard"), Margin = new Thickness(0, 0, 0, 12) };
-        var statusInner = new StackPanel();
-
-        _statusPill = new Border
+        var title = new TextBlock { Text = "Home", Style = CsUi.Style("CsPageTitle") };
+        Grid.SetRow(title, 0);
+        root.Children.Add(title);
+        var lead = new TextBlock
         {
-            Style = (Style)Application.Current.FindResource("CsStatusPill"),
-            Background = new SolidColorBrush(Color.FromRgb(0x17, 0x1F, 0x33)),
+            Text = "Agent health, live sessions, and whether this PC can be reached.",
+            Style = CsUi.Style("CsBody"),
+            Margin = new Thickness(0, 0, 0, 16),
         };
-        _statusText = new TextBlock
+        Grid.SetRow(lead, 1);
+        root.Children.Add(lead);
+
+        var tiles = new Grid { Margin = new Thickness(0, 0, 0, 12) };
+        tiles.ColumnDefinitions.Add(new ColumnDefinition());
+        tiles.ColumnDefinitions.Add(new ColumnDefinition());
+        tiles.ColumnDefinitions.Add(new ColumnDefinition());
+
+        var core = Tile();
+        core.Margin = new Thickness(0, 0, 12, 0);
+        var coreInner = new StackPanel();
+        coreInner.Children.Add(Kicker("Core service"));
+        coreInner.Children.Add(StatusRow(out _agentIcon, out _agentText, "Checking agent"));
+        coreInner.Children.Add(StatusRow(out _elevationIcon, out _elevationText, "Elevation -"));
+        coreInner.Children.Add(StatusRow(out _sysmonIcon, out _sysmonText, "Sysmon -"));
+        core.Child = coreInner;
+        Grid.SetColumn(core, 0);
+        tiles.Children.Add(core);
+
+        var connection = Tile();
+        connection.Margin = new Thickness(0, 0, 12, 0);
+        var connectionInner = new StackPanel();
+        connectionInner.Children.Add(Kicker("Connections"));
+        var stats = new Grid { Margin = new Thickness(0, 12, 0, 0), ClipToBounds = true };
+        stats.ColumnDefinitions.Add(new ColumnDefinition());
+        stats.ColumnDefinitions.Add(new ColumnDefinition());
+        _pulse = new System.Windows.Shapes.Ellipse();
+        var wsBlock = StatBlock(_pulse, out _wsCount, "Active WebSockets");
+        Grid.SetColumn(wsBlock, 0);
+        stats.Children.Add(wsBlock);
+        var pairedBlock = StatBlock(null, out _pairedCount, "Paired devices");
+        Grid.SetColumn(pairedBlock, 1);
+        stats.Children.Add(pairedBlock);
+        connectionInner.Children.Add(stats);
+        connection.Child = connectionInner;
+        Grid.SetColumn(connection, 1);
+        tiles.Children.Add(connection);
+
+        var network = Tile();
+        var networkInner = new StackPanel();
+        networkInner.Children.Add(Kicker("Network readiness"));
+        networkInner.Children.Add(ReadinessBlock("This Wi-Fi", "\uE701", out _wifiStatus, out _wifiChips));
+        networkInner.Children.Add(ReadinessBlock("Away from home", "\uE72E", out _tailscaleStatus, out _tailscaleChips));
+        network.Child = networkInner;
+        Grid.SetColumn(network, 2);
+        tiles.Children.Add(network);
+        Grid.SetRow(tiles, 2);
+        root.Children.Add(tiles);
+
+        var lower = new Grid();
+        lower.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.35, GridUnitType.Star) });
+        lower.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var telemetry = Tile();
+        telemetry.Margin = new Thickness(0, 0, 12, 0);
+        var telemetryInner = new Grid();
+        telemetryInner.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        telemetryInner.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        telemetryInner.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        telemetryInner.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var telemetryTitle = Kicker("Live telemetry");
+        Grid.SetRow(telemetryTitle, 0);
+        telemetryInner.Children.Add(telemetryTitle);
+        var legend = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 10, 0, 8) };
+        legend.Children.Add(LegendDot("CsPrimaryBrush"));
+        _cpuLabel = LegendValue("CPU -");
+        legend.Children.Add(_cpuLabel);
+        legend.Children.Add(LegendDot("CsTertiaryBrush"));
+        _ramLabel = LegendValue("RAM -");
+        legend.Children.Add(_ramLabel);
+        Grid.SetRow(legend, 1);
+        telemetryInner.Children.Add(legend);
+        _spark = new SparklineChart { Margin = new Thickness(0, 4, 0, 0) };
+        Grid.SetRow(_spark, 2);
+        telemetryInner.Children.Add(_spark);
+        _telemetryHint = new TextBlock
         {
-            FontFamily = new FontFamily("Segoe UI"),
-            FontSize = 12.5,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = (Brush)Application.Current.FindResource("CsOnSurfaceVariantBrush"),
-            Text = "Checking agent…",
+            Text = "Sampling this PC…",
+            Style = CsUi.Style("CsBody"),
+            FontSize = 12,
+            Margin = new Thickness(0, 6, 0, 0),
         };
-        _statusPill.Child = _statusText;
-        statusInner.Children.Add(_statusPill);
+        Grid.SetRow(_telemetryHint, 3);
+        telemetryInner.Children.Add(_telemetryHint);
+        telemetry.Child = telemetryInner;
+        Grid.SetColumn(telemetry, 0);
+        lower.Children.Add(telemetry);
 
-        statusInner.Children.Add(MakeRow("Connected phones", out _connectedPhones));
-        statusInner.Children.Add(MakeRow("Paired devices", out _pairedDevices));
-        statusInner.Children.Add(MakeRow("This Wi-Fi", out _wifiStatus));
-        statusInner.Children.Add(MakeRow("Away from home", out _tailscaleStatus));
-
-        _chipsPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 12, 0, 0) };
-        statusInner.Children.Add(_chipsPanel);
-
-        statusCard.Child = statusInner;
-        root.Children.Add(statusCard);
-
-        var nextCard = new Border { Style = (Style)Application.Current.FindResource("CsCard") };
+        var next = Tile();
         var nextInner = new StackPanel();
+        nextInner.Children.Add(Kicker("Next step"));
         _nextTitle = new TextBlock
         {
-            FontFamily = new FontFamily("Segoe UI"),
-            FontSize = 15,
+            FontFamily = CsUi.Font("CsFontUi"),
+            FontSize = 16,
             FontWeight = FontWeights.SemiBold,
-            Foreground = (Brush)Application.Current.FindResource("CsOnSurfaceBrush"),
+            Foreground = CsUi.Brush("CsOnSurfaceBrush"),
             Text = "Checking…",
+            Margin = new Thickness(0, 10, 0, 0),
+            TextWrapping = TextWrapping.Wrap,
         };
         nextInner.Children.Add(_nextTitle);
         _nextBody = new TextBlock
         {
-            Style = (Style)Application.Current.FindResource("CsBody"),
+            Style = CsUi.Style("CsBody"),
             Margin = new Thickness(0, 6, 0, 0),
-            Text = "",
         };
         nextInner.Children.Add(_nextBody);
-
-        var btnRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 16, 0, 0) };
+        var btnRow = new WrapPanel { Margin = new Thickness(0, 16, 0, 0) };
         _pairBtn = new Button
         {
-            Content = "Open Pair",
-            Style = (Style)Application.Current.FindResource("CsPrimaryButton"),
-            Margin = new Thickness(0, 0, 8, 0),
-            HorizontalAlignment = HorizontalAlignment.Left,
+            Content = CsUi.Labeled("\uE71B", "Open Pair"),
+            Style = CsUi.Style("CsPrimaryButton"),
+            Margin = new Thickness(0, 0, 8, 8),
             Visibility = Visibility.Collapsed,
         };
         _pairBtn.Click += (_, _) => _navigateToPair();
         _devicesBtn = new Button
         {
-            Content = "View devices",
-            Style = (Style)Application.Current.FindResource("CsSecondaryButton"),
-            HorizontalAlignment = HorizontalAlignment.Left,
+            Content = CsUi.Labeled("\uE717", "View devices"),
+            Style = CsUi.Style("CsSecondaryButton"),
+            Margin = new Thickness(0, 0, 8, 8),
             Visibility = Visibility.Collapsed,
         };
         _devicesBtn.Click += (_, _) => _navigateToDevices();
         btnRow.Children.Add(_pairBtn);
         btnRow.Children.Add(_devicesBtn);
         nextInner.Children.Add(btnRow);
-
-        nextCard.Child = nextInner;
-        root.Children.Add(nextCard);
+        next.Child = nextInner;
+        Grid.SetColumn(next, 1);
+        lower.Children.Add(next);
+        Grid.SetRow(lower, 3);
+        root.Children.Add(lower);
         Content = root;
     }
 
-    private static StackPanel MakeRow(string label, out TextBlock value)
+    public async Task RefreshAsync(LocalStatusDto? status)
     {
-        var panel = new StackPanel { Margin = new Thickness(0, 14, 0, 0) };
-        panel.Children.Add(new TextBlock { Text = label, Style = (Style)Application.Current.FindResource("CsLabel") });
-        value = new TextBlock { Style = (Style)Application.Current.FindResource("CsValue"), Text = "—" };
-        panel.Children.Add(value);
-        return panel;
-    }
+        SampleHost();
 
-    public async Task RefreshAsync()
-    {
-        var statusTask = _data.GetStatusAsync();
-        var devicesTask = _data.GetDevicesAsync();
-        await Task.WhenAll(statusTask, devicesTask).ConfigureAwait(true);
-
-        var status = statusTask.Result;
-        var pairedCount = devicesTask.Result.Count(d => !d.Revoked);
-
+        var devices = await _data.GetDevicesAsync().ConfigureAwait(true);
+        var pairedCount = devices.Count(d => !d.Revoked);
         if (status == null)
         {
             SetUnreachable(pairedCount);
             return;
         }
 
-        SetRunning();
-        _connectedPhones.Text = status.WebSocketClients.ToString();
-        _pairedDevices.Text = pairedCount.ToString();
+        SetStatusRow(_agentIcon, _agentText, "Agent running", ok: true);
+        SetStatusRow(_elevationIcon, _elevationText,
+            status.RunningAsAdministrator ? "Administrator" : "Not elevated",
+            ok: status.RunningAsAdministrator,
+            bad: !status.RunningAsAdministrator);
+        SetStatusRow(_sysmonIcon, _sysmonText,
+            status.SysmonInstalled ? "Sysmon installed" : "Sysmon not detected",
+            ok: status.SysmonInstalled);
+
+        _wsCount.Text = status.WebSocketClients.ToString();
+        _pairedCount.Text = pairedCount.ToString();
+        SetPulse(status.WebSocketClients > 0);
 
         var endpoints = EndpointAddressList.FromStatus(status);
         var wifiReady = HomeDashboard.WifiReady(endpoints);
         var tailscale = HomeDashboard.TailscaleConnected(endpoints);
         SetReadiness(_wifiStatus, HomeDashboard.WifiStatus(wifiReady), wifiReady);
         SetReadiness(_tailscaleStatus, HomeDashboard.TailscaleStatus(tailscale), tailscale);
-
-        _chipsPanel.Children.Clear();
-        AddChip(status.SysmonInstalled ? "Sysmon installed" : "Sysmon not detected",
-            status.SysmonInstalled ? "CsSuccessBrush" : "CsOnSurfaceVariantBrush");
-        AddChip(status.RunningAsAdministrator ? "Running as Administrator" : "Not running as Administrator",
-            status.RunningAsAdministrator ? "CsSuccessBrush" : "CsErrorBrush");
+        FillIpChips(_wifiChips, endpoints.Where(e => e.Kind == NetworkEndpointKind.Lan).Take(2));
+        FillIpChips(_tailscaleChips, endpoints.Where(e => e.Kind == NetworkEndpointKind.Tailscale).Take(1));
 
         ApplyNextStep(HomeDashboard.NextStep(true, pairedCount, status.WebSocketClients));
+    }
+
+    private void SampleHost()
+    {
+        var sample = HostTelemetrySampler.Read();
+        _ramLabel.Text = sample.HasRam ? $"RAM {sample.RamPercent:0}%" : "RAM -";
+        if (!sample.HasCpu)
+        {
+            _cpuLabel.Text = "CPU -";
+            return;
+        }
+
+        _cpuLabel.Text = $"CPU {sample.CpuPercent:0}%";
+        Push(_cpuSeries, sample.CpuPercent);
+        Push(_ramSeries, sample.HasRam ? sample.RamPercent : 0);
+        _spark.SetSeries(_cpuSeries, _ramSeries);
+        _telemetryHint.Visibility = _cpuSeries.Count >= 2 ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private static void Push(List<double> series, double value)
+    {
+        series.Add(value);
+        if (series.Count > SeriesCap)
+            series.RemoveAt(0);
     }
 
     private void ApplyNextStep(HomeNextStep step)
@@ -164,46 +263,212 @@ public partial class HomePage : UserControl
         _nextBody.Text = step.Body;
         _pairBtn.Visibility = step.ShowPair ? Visibility.Visible : Visibility.Collapsed;
         _devicesBtn.Visibility = step.ShowDevices ? Visibility.Visible : Visibility.Collapsed;
-        _pairBtn.Content = step.ShowDevices ? "Pair another" : "Open Pair";
-    }
-
-    private void AddChip(string text, string brushKey)
-    {
-        var chip = new Border { Style = (Style)Application.Current.FindResource("CsChip") };
-        chip.Child = new TextBlock
-        {
-            Text = text,
-            FontSize = 11.5,
-            Foreground = (Brush)Application.Current.FindResource(brushKey),
-        };
-        _chipsPanel.Children.Add(chip);
-    }
-
-    private void SetRunning()
-    {
-        _statusPill.Background = new SolidColorBrush(Color.FromArgb(0x33, 0x4A, 0xDE, 0x80));
-        _statusText.Text = "Agent running";
-        _statusText.Foreground = (Brush)Application.Current.FindResource("CsSuccessBrush");
+        _pairBtn.Content = CsUi.Labeled("\uE71B", step.ShowDevices ? "Pair another" : "Open Pair");
     }
 
     private void SetUnreachable(int pairedCount)
     {
-        _statusPill.Background = new SolidColorBrush(Color.FromArgb(0x33, 0xFF, 0xB4, 0xAB));
-        _statusText.Text = "Agent unreachable";
-        _statusText.Foreground = (Brush)Application.Current.FindResource("CsErrorBrush");
-        _connectedPhones.Text = "—";
-        _pairedDevices.Text = pairedCount > 0 ? pairedCount.ToString() : "—";
-        SetReadiness(_wifiStatus, "—", ok: false);
-        SetReadiness(_tailscaleStatus, "—", ok: false);
-        _chipsPanel.Children.Clear();
+        SetStatusRow(_agentIcon, _agentText, "Agent unreachable", ok: false, bad: true);
+        SetStatusRow(_elevationIcon, _elevationText, "Elevation -", ok: false);
+        SetStatusRow(_sysmonIcon, _sysmonText, "Sysmon -", ok: false);
+        _wsCount.Text = "-";
+        _pairedCount.Text = pairedCount > 0 ? pairedCount.ToString() : "-";
+        SetPulse(false);
+        SetReadiness(_wifiStatus, "-", ok: false);
+        SetReadiness(_tailscaleStatus, "-", ok: false);
+        _wifiChips.Children.Clear();
+        _tailscaleChips.Children.Clear();
         ApplyNextStep(HomeDashboard.NextStep(false, pairedCount, 0));
+    }
+
+    private void SetPulse(bool live)
+    {
+        if (live)
+        {
+            _pulse.Fill = CsUi.Brush("CsSuccessBrush");
+            if (_pulseLive)
+                return;
+            _pulseLive = true;
+            _pulse.BeginAnimation(OpacityProperty, new DoubleAnimation(1, 0.25, TimeSpan.FromMilliseconds(850))
+            {
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever,
+            });
+            return;
+        }
+
+        _pulseLive = false;
+        _pulse.BeginAnimation(OpacityProperty, null);
+        _pulse.Opacity = 0.45;
+        _pulse.Fill = CsUi.Brush("CsOnSurfaceVariantBrush");
+    }
+
+    private static void SetStatusRow(TextBlock icon, TextBlock label, string text, bool ok, bool bad = false)
+    {
+        icon.Text = ok ? "\uE73E" : "\uE711";
+        icon.Foreground = ok
+            ? CsUi.Brush("CsSuccessBrush")
+            : CsUi.Brush(bad ? "CsErrorBrush" : "CsOnSurfaceVariantBrush");
+        label.Text = text;
+        label.Foreground = ok
+            ? CsUi.Brush("CsOnSurfaceBrush")
+            : CsUi.Brush(bad ? "CsErrorBrush" : "CsOnSurfaceVariantBrush");
     }
 
     private static void SetReadiness(TextBlock target, string text, bool ok)
     {
         target.Text = text;
         target.Foreground = ok
-            ? (Brush)Application.Current.FindResource("CsSuccessBrush")
-            : (Brush)Application.Current.FindResource("CsOnSurfaceVariantBrush");
+            ? CsUi.Brush("CsSuccessBrush")
+            : CsUi.Brush("CsOnSurfaceVariantBrush");
     }
+
+    private static void FillIpChips(WrapPanel host, IEnumerable<NetworkEndpoint> endpoints)
+    {
+        host.Children.Clear();
+        foreach (var endpoint in endpoints)
+        {
+            var ip = ConsoleFormat.SafeInline(endpoint.Ip, 64);
+            if (ip.Length == 0)
+                continue;
+            var chip = new Border { Style = CsUi.Style("CsChip"), Margin = new Thickness(0, 8, 8, 0) };
+            chip.Child = new TextBlock
+            {
+                Text = ip,
+                FontFamily = CsUi.Font("CsFontMono"),
+                FontSize = 12,
+                Foreground = CsUi.Brush("CsPrimaryBrush"),
+            };
+            host.Children.Add(chip);
+        }
+    }
+
+    private static Border Tile() => new()
+    {
+        Style = CsUi.Style("CsCard"),
+        VerticalAlignment = VerticalAlignment.Stretch,
+    };
+
+    private static TextBlock Kicker(string text) => new()
+    {
+        Text = text,
+        Style = CsUi.Style("CsKicker"),
+    };
+
+    private static StackPanel StatusRow(out TextBlock icon, out TextBlock label, string text)
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 12, 0, 0) };
+        icon = CsUi.Icon("\uE73E", 14);
+        icon.Width = 16;
+        icon.Foreground = CsUi.Brush("CsOnSurfaceVariantBrush");
+        label = new TextBlock
+        {
+            Text = text,
+            Margin = new Thickness(8, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            FontFamily = CsUi.Font("CsFontUi"),
+            FontSize = 13.5,
+            Foreground = CsUi.Brush("CsOnSurfaceBrush"),
+            TextWrapping = TextWrapping.Wrap,
+        };
+        row.Children.Add(icon);
+        row.Children.Add(label);
+        return row;
+    }
+
+    private static StackPanel StatBlock(System.Windows.Shapes.Ellipse? pulse, out TextBlock value, string caption)
+    {
+        var block = new StackPanel();
+        var numberRow = new StackPanel { Orientation = Orientation.Horizontal };
+        if (pulse != null)
+        {
+            pulse.Width = 8;
+            pulse.Height = 8;
+            pulse.Margin = new Thickness(0, 0, 8, 0);
+            pulse.VerticalAlignment = VerticalAlignment.Center;
+            pulse.Fill = CsUi.Brush("CsOnSurfaceVariantBrush");
+            pulse.Opacity = 0.45;
+            numberRow.Children.Add(pulse);
+        }
+
+        value = new TextBlock
+        {
+            Text = "-",
+            FontFamily = CsUi.Font("CsFontMono"),
+            FontSize = 36,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = CsUi.Brush("CsOnSurfaceBrush"),
+        };
+        numberRow.Children.Add(value);
+        block.Children.Add(numberRow);
+        block.Children.Add(new TextBlock
+        {
+            Text = caption,
+            Style = CsUi.Style("CsKicker"),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(pulse == null ? 0 : 16, 4, 12, 0),
+        });
+        return block;
+    }
+
+    private static StackPanel ReadinessBlock(string title, string glyph, out TextBlock status, out WrapPanel chips)
+    {
+        var block = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
+        var row = new Grid();
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var icon = CsUi.Icon(glyph, 14);
+        icon.Margin = new Thickness(0, 0, 8, 0);
+        icon.Foreground = CsUi.Brush("CsPrimaryBrush");
+        Grid.SetColumn(icon, 0);
+        row.Children.Add(icon);
+        var name = new TextBlock
+        {
+            Text = title,
+            FontFamily = CsUi.Font("CsFontUi"),
+            FontSize = 13,
+            Foreground = CsUi.Brush("CsOnSurfaceBrush"),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        Grid.SetColumn(name, 1);
+        row.Children.Add(name);
+        status = new TextBlock
+        {
+            Text = "-",
+            FontFamily = CsUi.Font("CsFontUi"),
+            FontSize = 12,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = CsUi.Brush("CsOnSurfaceVariantBrush"),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        Grid.SetColumn(status, 2);
+        row.Children.Add(status);
+        block.Children.Add(row);
+        chips = new WrapPanel();
+        block.Children.Add(chips);
+        return block;
+    }
+
+    private static System.Windows.Shapes.Ellipse LegendDot(string brushKey)
+    {
+        return new System.Windows.Shapes.Ellipse
+        {
+            Width = 8,
+            Height = 8,
+            Fill = CsUi.Brush(brushKey),
+            Margin = new Thickness(0, 0, 6, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+    }
+
+    private static TextBlock LegendValue(string text) => new()
+    {
+        Text = text,
+        FontFamily = CsUi.Font("CsFontMono"),
+        FontSize = 12.5,
+        Foreground = CsUi.Brush("CsOnSurfaceBrush"),
+        Margin = new Thickness(0, 0, 16, 0),
+        VerticalAlignment = VerticalAlignment.Center,
+    };
 }

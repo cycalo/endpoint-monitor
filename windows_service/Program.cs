@@ -244,7 +244,8 @@ app.Map("/ws", async context =>
     var dispatcher = context.RequestServices.GetRequiredService<ResponseCommandService>();
     var ws = await context.WebSockets.AcceptWebSocketAsync();
     var id = Guid.NewGuid();
-    manager.Add(id, ws);
+    var deviceId = await TryReadLiveDeviceIdAsync(context).ConfigureAwait(false);
+    manager.Add(id, ws, deviceId, FormatRemoteIp(context.Connection.RemoteIpAddress));
 
     var buffer = new byte[1024 * 128];
     var jsonOptions = new JsonDocumentOptions { MaxDepth = 32, AllowTrailingCommas = false };
@@ -271,7 +272,7 @@ app.Map("/ws", async context =>
                 long? clientTs = null;
                 if (root.TryGetProperty("clientTs", out var tsEl) && tsEl.TryGetInt64(out var cts))
                     clientTs = cts;
-                // Avoid ternary with two anonymous types — .NET 10 overload resolution picks the wrong Serialize overload.
+                // Avoid ternary with two anonymous types - .NET 10 overload resolution picks the wrong Serialize overload.
                 string pong;
                 if (clientTs.HasValue)
                     pong = JsonSerializer.Serialize(new { type = "pong", clientTs = clientTs.Value }, AppJson.Options);
@@ -326,6 +327,56 @@ static string BuildOutboundJson(string originalType, CommandResult r)
         data = r.Data,
         pid = r.Pid
     }, AppJson.Options);
+}
+
+static async Task<string?> TryReadLiveDeviceIdAsync(HttpContext context)
+{
+    try
+    {
+        var header = context.Request.Headers.Authorization.ToString();
+        if (string.IsNullOrWhiteSpace(header) ||
+            !header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        var token = header["Bearer ".Length..].Trim();
+        if (token.Length == 0 || token.Length > 256)
+            return null;
+
+        var pairing = context.RequestServices.GetRequiredService<PairingAuthService>();
+        var id = await pairing.GetActiveDeviceIdAsync(token, context.RequestAborted).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(id) || id.Length > 64)
+            return null;
+
+        foreach (var c in id)
+        {
+            if (!char.IsAsciiLetterOrDigit(c) && c != '-')
+                return null;
+        }
+
+        return id;
+    }
+    catch
+    {
+        return null;
+    }
+}
+
+static string? FormatRemoteIp(IPAddress? ip)
+{
+    if (ip == null)
+        return null;
+
+    try
+    {
+        if (ip.IsIPv4MappedToIPv6)
+            ip = ip.MapToIPv4();
+        var text = ip.ToString();
+        return text.Length == 0 || text.Length > 64 ? null : text;
+    }
+    catch
+    {
+        return null;
+    }
 }
 
 static string Escape(object? o)

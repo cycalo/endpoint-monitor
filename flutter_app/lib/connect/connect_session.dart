@@ -72,7 +72,7 @@ Future<void> persistConnectHost(String host, ConnectPath path) async {
   await secure.write(key: kEmHost, value: host);
 }
 
-/// Pairing code exchange — same contract as the manual connect screen.
+/// Pairing code exchange - same contract as the manual connect screen.
 Future<ConnectSessionResult> exchangePairingCode({
   required String host,
   required String code,

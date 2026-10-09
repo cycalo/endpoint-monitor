@@ -659,12 +659,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       final i = si.info;
                       if (i == null) return const Text('Service version: waiting…');
                       final v = i.agentVersion.trim().isNotEmpty ? i.agentVersion : i.osVersion;
-                      return Text('Service version: ${v.isNotEmpty ? v : "—"}');
+                      return Text('Service version: ${v.isNotEmpty ? v : "-"}');
                     },
                   ),
                   BlocBuilder<ConnectionBloc, EmConnectionState>(
                     builder: (context, c) {
-                      if (c.connectedAt == null) return const Text('Connection uptime: —');
+                      if (c.connectedAt == null) return const Text('Connection uptime: -');
                       final d = DateTime.now().difference(c.connectedAt!);
                       return Text('Connection uptime: ${d.inHours}h ${d.inMinutes.remainder(60)}m');
                     },
@@ -672,12 +672,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   BlocBuilder<SystemInfoBloc, SystemInfoState>(
                     builder: (context, si) {
                       final s = si.info?.sysmonStatus.trim();
-                      return Text('Sysmon: ${(s == null || s.isEmpty) ? "—" : s}');
+                      return Text('Sysmon: ${(s == null || s.isEmpty) ? "-" : s}');
                     },
                   ),
                   BlocBuilder<SystemInfoBloc, SystemInfoState>(
                     builder: (context, si) {
-                      final h = si.info?.systemName ?? '—';
+                      final h = si.info?.systemName ?? '-';
                       return Text('Monitoring agent: $h');
                     },
                   ),

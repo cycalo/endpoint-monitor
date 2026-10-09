@@ -12,7 +12,7 @@ abstract final class AppSettingsKeys {
   static const eventsDefaultRange = 'em_events_default_range';
   static const eventsMaxLoad = 'em_events_max_load';
   static const showIpv6Network = 'em_show_ipv6_network';
-  /// `apps` (default) | `sockets` — Network tab list mode.
+  /// `apps` (default) | `sockets` - Network tab list mode.
   static const networkListMode = 'em_network_list_mode';
   static const compactProcessCards = 'em_compact_process_cards';
   static const pinLockEnabled = 'em_pin_lock_enabled';

@@ -49,7 +49,7 @@ public sealed class NetworkCollector(ILogger<NetworkCollector> logger, GeoIpLook
 
     /// <summary>
     /// <see cref="MSFT_NetTCPConnection.OwningProcess"/> can be 0; Win32_Process then resolves PID 0
-    /// to "System Idle Process", which is misleading — idle does not own sockets. Show a neutral label.
+    /// to "System Idle Process", which is misleading - idle does not own sockets. Show a neutral label.
     /// </summary>
     private static string FormatOwningProcess(int pid, string? nameFromWmi)
     {

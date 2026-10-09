@@ -320,7 +320,7 @@ class _FirewallScreenState extends State<FirewallScreen>
         final p = int.tryParse(pt);
         _portError = (p != null && p >= 1 && p <= 65535)
             ? null
-            : 'Port must be 1–65535';
+            : 'Port must be 1-65535';
       }
     });
     if (_ipError != null || _portError != null) return;
@@ -1339,7 +1339,7 @@ class _ProcessBlockNameAutocompleteState
                           vertical: 12,
                         ),
                         child: Text(
-                          'No running processes match — process must be running for path lookup',
+                          'No running processes match - process must be running for path lookup',
                           style: muted,
                         ),
                       );

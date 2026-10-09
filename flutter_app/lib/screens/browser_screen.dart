@@ -175,7 +175,7 @@ class _HistoryCard extends StatelessWidget {
 
   static String _displayHost(String url) {
     final t = url.trim();
-    if (t.isEmpty) return '—';
+    if (t.isEmpty) return '-';
     try {
       final u = Uri.parse(t);
       if (u.host.isNotEmpty) return u.host;
@@ -212,7 +212,7 @@ class _HistoryCard extends StatelessWidget {
         : scheme.surfaceContainerLow;
     final browserLabel =
         entry.browser.isEmpty ? 'Browser' : entry.browser.toUpperCase();
-    final timeLabel = entry.visitTime.isEmpty ? '—' : entry.visitTime;
+    final timeLabel = entry.visitTime.isEmpty ? '-' : entry.visitTime;
     final visitsLabel = '${entry.visitCount}× visits';
 
     return Material(

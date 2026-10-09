@@ -31,31 +31,53 @@ internal static class EndpointAddressList
         string subtitle,
         string phoneHint,
         IReadOnlyList<NetworkEndpoint> addresses,
-        string emptyText)
+        string emptyText,
+        string glyph,
+        string accentBrushKey)
     {
-        var card = new Border { Style = (Style)Application.Current.FindResource("CsCard"), Margin = new Thickness(0, 0, 0, 12) };
+        var card = new Border
+        {
+            Style = (Style)Application.Current.FindResource("CsCard"),
+            Margin = new Thickness(0, 0, 12, 12),
+            VerticalAlignment = VerticalAlignment.Stretch,
+        };
         var inner = new StackPanel();
-        inner.Children.Add(new TextBlock
+
+        var header = new Grid { Margin = new Thickness(0, 0, 0, 10) };
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var badge = CsUi.Badge(glyph, accentBrushKey);
+        badge.Margin = new Thickness(0, 0, 12, 0);
+        badge.VerticalAlignment = VerticalAlignment.Top;
+        Grid.SetColumn(badge, 0);
+        header.Children.Add(badge);
+
+        var titles = new StackPanel();
+        titles.Children.Add(new TextBlock
         {
             Text = title,
-            FontFamily = new FontFamily("Segoe UI"),
+            FontFamily = CsUi.Font("CsFontUi"),
             FontSize = 15,
             FontWeight = FontWeights.SemiBold,
-            Foreground = (Brush)Application.Current.FindResource("CsOnSurfaceBrush"),
+            Foreground = CsUi.Brush("CsOnSurfaceBrush"),
+            TextWrapping = TextWrapping.Wrap,
         });
-        inner.Children.Add(new TextBlock
+        titles.Children.Add(new TextBlock
         {
             Text = subtitle,
-            Style = (Style)Application.Current.FindResource("CsBody"),
-            Margin = new Thickness(0, 4, 0, 12),
+            Style = CsUi.Style("CsBody"),
+            Margin = new Thickness(0, 4, 0, 0),
         });
+        Grid.SetColumn(titles, 1);
+        header.Children.Add(titles);
+        inner.Children.Add(header);
 
         if (addresses.Count == 0)
         {
             inner.Children.Add(new TextBlock
             {
                 Text = emptyText,
-                Style = (Style)Application.Current.FindResource("CsBody"),
+                Style = CsUi.Style("CsBody"),
             });
         }
         else
@@ -70,8 +92,8 @@ internal static class EndpointAddressList
             inner.Children.Add(new TextBlock
             {
                 Text = phoneHint,
-                Style = (Style)Application.Current.FindResource("CsBody"),
-                Margin = new Thickness(0, 12, 0, 0),
+                Style = CsUi.Style("CsBody"),
+                Margin = new Thickness(0, 8, 0, 0),
             });
         }
 
@@ -88,16 +110,16 @@ internal static class EndpointAddressList
         var info = new StackPanel();
         info.Children.Add(new TextBlock
         {
-            Text = endpoint.Adapter,
-            Style = (Style)Application.Current.FindResource("CsLabel"),
+            Text = ConsoleFormat.SafeInline(endpoint.Adapter, 80),
+            Style = CsUi.Style("CsLabel"),
         });
         info.Children.Add(new TextBlock
         {
-            Text = endpoint.Ip,
-            FontFamily = new FontFamily("Consolas"),
-            FontSize = 15,
+            Text = ConsoleFormat.SafeInline(endpoint.Ip, 64),
+            FontFamily = CsUi.Font("CsFontMono"),
+            FontSize = 14,
             FontWeight = FontWeights.SemiBold,
-            Foreground = (Brush)Application.Current.FindResource("CsPrimaryBrush"),
+            Foreground = CsUi.Brush("CsPrimaryBrush"),
         });
         Grid.SetColumn(info, 0);
         row.Children.Add(info);
@@ -106,10 +128,11 @@ internal static class EndpointAddressList
         {
             var copy = new Button
             {
-                Content = "Copy",
-                Style = (Style)Application.Current.FindResource("CsSecondaryButton"),
+                Content = CsUi.Labeled("\uE8C8", "Copy"),
+                Style = CsUi.Style("CsSecondaryButton"),
                 Tag = endpoint.Ip,
                 VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 0, 0),
             };
             copy.Click += (_, _) =>
             {
@@ -119,7 +142,7 @@ internal static class EndpointAddressList
             Grid.SetColumn(copy, 1);
             row.Children.Add(copy);
         }
+
         return row;
     }
-
 }

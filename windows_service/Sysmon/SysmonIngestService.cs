@@ -47,7 +47,7 @@ public sealed class SysmonIngestService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Sysmon backfill failed — is Sysmon installed?");
+            logger.LogWarning(ex, "Sysmon backfill failed - is Sysmon installed?");
         }
     }
 

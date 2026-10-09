@@ -40,7 +40,7 @@ class DashboardScreen extends StatelessWidget {
           return BlocBuilder<ConnectionBloc, EmConnectionState>(
             builder: (context, conn) {
               final hostDisplay = emDisplayConnectionHost(conn.host);
-              final ipLine = _looksLikeIpv4(hostDisplay) ? hostDisplay : '—';
+              final ipLine = _looksLikeIpv4(hostDisplay) ? hostDisplay : '-';
 
               return SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
@@ -1050,14 +1050,14 @@ class _RamDiskCardState extends State<_RamDiskCard> {
 
   static String _driveTitle(String path) {
     final t = path.trim();
-    if (t.isEmpty) return '—';
+    if (t.isEmpty) return '-';
     final letter = t.replaceAll(r'\', '').replaceAll('/', '');
     if (letter.isEmpty) return t;
     return '$letter:';
   }
 
   static String _ramLine(SystemInfo i) {
-    if (i.ramTotalGb <= 0) return '—';
+    if (i.ramTotalGb <= 0) return '-';
     return '${i.ramUsedGb.toStringAsFixed(1)} GB / ${i.ramTotalGb.toStringAsFixed(0)} GB';
   }
 
@@ -1066,7 +1066,7 @@ class _RamDiskCardState extends State<_RamDiskCard> {
   }
 
   static String _storageLine(double u, double t) {
-    if (t <= 0) return '—';
+    if (t <= 0) return '-';
     if (t >= 1024) {
       return '${(u / 1024).toStringAsFixed(1)} TB / ${(t / 1024).toStringAsFixed(1)} TB';
     }
@@ -1095,7 +1095,7 @@ class _SystemInformationCard extends StatelessWidget {
 
   static String _dash(String? s) {
     final t = s?.trim() ?? '';
-    return t.isEmpty ? '—' : t;
+    return t.isEmpty ? '-' : t;
   }
 
   @override
@@ -1103,11 +1103,11 @@ class _SystemInformationCard extends StatelessWidget {
     final patch = info.patchLevel;
     final isLatest = patch.isNotEmpty && patch.toLowerCase().contains('latest');
     final usersLine = info.loggedInUsers.isEmpty
-        ? '—'
+        ? '-'
         : '${info.loggedInUsers.take(8).join(', ')}${info.loggedInUsers.length > 8 ? '…' : ''}';
     final archDisplay = _formatArchitecture(info.osArchitecture);
     final powerOnLine = _dash(info.lastBootTime);
-    final uptimeLine = info.uptime.trim().isEmpty ? '—' : info.uptime.trim();
+    final uptimeLine = info.uptime.trim().isEmpty ? '-' : info.uptime.trim();
     final networkLine = _primaryNetworkLine(info, ipLine);
 
     return Container(
@@ -1151,7 +1151,7 @@ class _SystemInformationCard extends StatelessWidget {
           _infoRow('UPTIME', uptimeLine, valueMono: true),
           _infoRow('PATCH LEVEL', _patchValue(patch, isLatest)),
           _infoRow('PRIMARY NETWORK', networkLine),
-          if (hostDisplay != '—' && ipLine == '—')
+          if (hostDisplay != '-' && ipLine == '-')
             _infoRow('MGMT ENDPOINT', hostDisplay, valueMono: true),
           _infoRow(
             'MONITORING SERVICE',
@@ -1169,7 +1169,7 @@ class _SystemInformationCard extends StatelessWidget {
   /// WMI often already includes "64-bit"; avoid appending a duplicate suffix.
   static String _formatArchitecture(String raw) {
     final t = raw.trim();
-    if (t.isEmpty) return '—';
+    if (t.isEmpty) return '-';
     return t;
   }
 
@@ -1178,8 +1178,8 @@ class _SystemInformationCard extends StatelessWidget {
     final ip = info.primaryNetworkIpv4.trim().isNotEmpty
         ? info.primaryNetworkIpv4.trim()
         : ipFallback.trim();
-    final ipShow = ip.isEmpty || ip == '—' ? '' : ip;
-    if (a.isEmpty && ipShow.isEmpty) return '—';
+    final ipShow = ip.isEmpty || ip == '-' ? '' : ip;
+    if (a.isEmpty && ipShow.isEmpty) return '-';
     if (a.isEmpty) return ipShow;
     if (ipShow.isEmpty) return a;
     return '$a  •  $ipShow';
@@ -1188,7 +1188,7 @@ class _SystemInformationCard extends StatelessWidget {
   Widget _sysmonValueWidget(String status) {
     final s = status.trim();
     if (s.isEmpty) {
-      return Text('—', style: theme.textTheme.bodySmall);
+      return Text('-', style: theme.textTheme.bodySmall);
     }
     final lower = s.toLowerCase();
     final color = lower == 'running'
@@ -1206,7 +1206,7 @@ class _SystemInformationCard extends StatelessWidget {
 
   Widget _patchValue(String patch, bool isLatest) {
     if (patch.isEmpty) {
-      return Text('—', style: theme.textTheme.bodySmall);
+      return Text('-', style: theme.textTheme.bodySmall);
     }
     if (isLatest) {
       return Row(
@@ -1433,7 +1433,7 @@ class _AlertsStrip extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    '$count unread alert${count == 1 ? '' : 's'} — tap to review.',
+                    '$count unread alert${count == 1 ? '' : 's'} - tap to review.',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: scheme.onSurfaceVariant,
                     ),

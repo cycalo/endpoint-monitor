@@ -1,12 +1,12 @@
-# Endpoint Monitor (EDR) — Self-Hosted Endpoint Detection, Response & Forensics Platform
+# Endpoint Monitor (EDR) - Self-Hosted Endpoint Detection, Response & Forensics Platform
 
 [![Platform: Windows Service](https://img.shields.io/badge/Agent-Windows_Service_--_.NET_10-purple.svg)]()
 [![Client: Flutter](https://img.shields.io/badge/Client-Flutter_--_Dart-blue.svg)]()
 [![Security: Zero--Trust_Pairing](https://img.shields.io/badge/Security-Zero--Trust_Pairing-green.svg)]()
 
-**Endpoint Monitor** is a self-hosted, lightweight **Endpoint Detection and Response (EDR)** and digital forensics platform. It allows security analysts and administrators to monitor, audit, and remotely control a Windows host directly from a mobile device — without relying on a third-party cloud control plane. 
+**Endpoint Monitor** is a self-hosted, lightweight **Endpoint Detection and Response (EDR)** and digital forensics platform. It allows security analysts and administrators to monitor, audit, and remotely control a Windows host directly from a mobile device - without relying on a third-party cloud control plane.
 
-The system consists of an elevated **C# .NET 10 Windows Service (Agent)** running on the monitored host and a **Flutter Mobile Application (Client)**. Communication occurs directly over local networks or VPNs via secure REST APIs and high-frequency WebSockets.
+The system consists of an elevated **C# .NET 10 Windows agent** (Kestrel + optional Windows Service) with a local **WPF desktop console** for pairing and ops, plus a **Flutter mobile client**. Communication runs over LAN or VPN (e.g. Tailscale) via secure REST APIs and a WebSocket for live telemetry and commands.
 
 ---
 
@@ -59,8 +59,8 @@ Inspect ingested Sysmon logs, audit browser history across multiple profiles, an
 ## 🛡️ Core SOC & EDR Capabilities
 
 ### 1. Real-Time Telemetry Streaming
-- **Telemetry Loop**: The C# Agent broadcasts system health, process metrics, and active network connections every **1 second** over a stateful WebSocket connection.
-- **State Management**: The Flutter client utilizes the **Bloc pattern** to parse high-frequency JSON payloads and update the UI smoothly without performance degradation.
+- **Telemetry Loop**: The agent broadcasts system health, process metrics, and active network connections over a stateful WebSocket. Intervals are configurable under `Monitoring` in `appsettings.json` (example defaults: **5s** active broadcast, **30s** idle, **10s** system info; active interval is clamped 2–120s).
+- **State Management**: The Flutter client uses the **Bloc/Cubit** pattern to parse JSON payloads and update the UI without jank.
 
 ### 2. Sysmon XML Ingestion Pipeline
 - **Automated Setup**: The Agent contains an automated installer that deploys and configures **Microsoft System Monitor (Sysmon)** with a security-hardened configuration file.
@@ -79,6 +79,12 @@ Inspect ingested Sysmon logs, audit browser history across multiple profiles, an
 ### 4. Threat Intelligence & Reputation Lookups
 - **VirusTotal Integration**: Queries the VirusTotal API v3 using the SHA-256 hash of any running process's executable to retrieve its global reputation and detection ratio.
 - **Threat Intel Feeds**: Automatically polls public malicious IP blocklists (C2 nodes, botnets, spam sources) on a background thread, caching them in SQLite to highlight suspicious active connections instantly.
+- **GeoIP**: Optional MaxMind GeoLite2 lookup for remote connection geography.
+
+### 5. Forensics, Inventory & Host Controls
+- **Browser history** across common Chromium/Firefox-style profiles; **installed software** inventory with optional new-install alerts and remote uninstall.
+- **Watchlist / process flags** and **alert acknowledgements** driven by the agent's alert engine (e.g. bad-IP connections, flagged process starts).
+- **Remote host controls**: lock, logoff, restart/shutdown (with cancel), sleep, display off, volume/mute, and desktop screenshot over the WebSocket.
 
 ---
 
@@ -87,27 +93,27 @@ Inspect ingested Sysmon logs, audit browser history across multiple profiles, an
 ```
 +---------------------------------------------------------------------------------------+
 |                                  FLUTTER MOBILE APP                                   |
-|  - UI Screens (Dashboard, Processes, Network, Events, Controls, More)                 |
-|  - Blocs (ConnectionBloc, ProcessBloc, NetworkBloc, EventsBloc, FirewallBloc)         |
-|  - Secure Storage (em_host, em_token)                                                 |
+|  - Screens (Dashboard, Processes, Network, Events, Firewall, Controls, More, …)       |
+|  - Blocs/Cubits (Connection, Process, Network, Events, Firewall, Alerts, …)           |
+|  - Secure storage (em_host, em_token) · guided Wi-Fi / Tailscale / QR connect          |
 +---------------------------------------------------------------------------------------+
                                            |
-                                           |  (Direct LAN / VPN Connection)
-                                           |  - REST APIs (Pairing, Log Export)
-                                           |  - WebSockets (1s Telemetry & Commands)
+                                           |  LAN / VPN (e.g. Tailscale)
+                                           |  - REST (pairing, devices, Sysmon export)
+                                           |  - WebSocket /ws (telemetry + commands)
                                            v
 +---------------------------------------------------------------------------------------+
-|                                WINDOWS AGENT SERVICE                                  |
-|  - Kestrel Web Server (ASP.NET Core Minimal APIs / WebSockets)                        |
-|  - SQLite Database (endpoint_monitor.db - Sysmon events, Device tokens, Audit logs)   |
-|  - Background Hosted Services (Telemetry Broadcast, Sysmon Ingest, Threat Intel)      |
-|  - Low-Level OS Integration (Win32 P/Invokes, WMI, Windows Firewall, Registry)        |
+|                         WINDOWS AGENT (.NET 10 / Kestrel)                             |
+|  - Minimal APIs + /ws · SQLite (%LocalAppData%\EndpointMonitor\endpoint_monitor.db)   |
+|  - Hosted workers (broadcast, Sysmon, threat intel, firewall expiry, isolation)       |
+|  - Win32 / WMI / Firewall / Registry / Event Log                                      |
+|  - WPF desktop console (loopback /local/*): Pair, Devices, Diagnostics, Settings      |
 +---------------------------------------------------------------------------------------+
 ```
 
 ### 🔐 Zero-Trust Pairing Protocol
 To prevent unauthorized access on shared local networks, the platform implements a secure pairing protocol:
-1. **PIN Generation**: A temporary 6-digit pairing code is generated in the Windows desktop setup console (Pair screen).
+1. **PIN Generation**: A temporary 6-digit pairing code (and optional QR payload) is generated in the Windows desktop console (**Pair** screen).
 2. **Key Exchange**: The mobile client submits the code and its device name. Upon validation, the Agent generates a cryptographically secure random **Device Token**.
 3. **Token Hashing**: The Agent hashes the token using **SHA-256** combined with a server-side secret pepper (`Auth:DeviceTokenPepper` from `appsettings.json`) and stores the hash in SQLite. The raw token is returned to the mobile app *once* and stored in its secure keychain/keystore.
 4. **WebSocket Session**: Subsequent WebSocket connections pass the raw token in the `Authorization: Bearer <token>` header, which the Agent validates against the stored peppered hash.
@@ -117,21 +123,26 @@ To prevent unauthorized access on shared local networks, the platform implements
 ## 💻 Tech Stack
 
 - **Frontend (Mobile Client)**:
-  - Framework: **Flutter (Dart ^3.5)**
+  - Framework: **Flutter (Dart ^3.7)**
   - State Management: **Bloc & Cubit**
   - Navigation: **go_router**
   - Networking: **Dio** & **web_socket_channel**
-  - Storage: **flutter_secure_storage** & **shared_preferences**
+  - Storage: **flutter_secure_storage** (tokens) & **shared_preferences** (non-secrets)
+  - Other: foreground task, local notifications, mobile QR scanner
 - **Backend (Windows Agent)**:
-  - Runtime: **.NET 10** (Windows Service)
+  - Runtime: **.NET 10** (`net10.0-windows`) — Windows Service and/or interactive host
+  - UI: **WPF** desktop console (Pair, Devices, Diagnostics, Settings)
   - Web Server: **Kestrel** (ASP.NET Core Minimal APIs)
-  - Database: **SQLite** (via sqlite-net ORM)
-  - OS Integration: **Win32 P/Invokes** (NtSuspendProcess, SendMonitorPowerOff), **WMI** (ManagementObjectSearcher), **Windows Firewall** (netsh)
-  - Rate Limiting: **AspNetCoreRateLimit**
+  - Database: **SQLite** (sqlite-net) at `%LocalAppData%\EndpointMonitor\endpoint_monitor.db`
+  - OS Integration: **Win32 P/Invokes** (e.g. `NtSuspendProcess`), **WMI**, **Windows Firewall** (`netsh`)
+  - Hardening: **AspNetCoreRateLimit**, security headers, optional `AllowedIpAddresses`
 - **External Integrations**:
-  - **VirusTotal API v3** (Reputation scanning)
-  - **Z.AI GLM-4.7-Flash** (Process AI explanation)
+  - **VirusTotal API v3** (Reputation scanning; key in agent `appsettings`)
+  - **Z.AI GLM** (Process AI explanation; client-side)
   - **MaxMind GeoLite2** (IP geolocation)
+  - Threat feeds (e.g. Abuse.ch Feodo, Emerging Threats) via agent config
+
+Default agent ports: HTTP **5000**, optional HTTPS **5001** (`Server` section).
 
 ---
 
@@ -139,29 +150,35 @@ To prevent unauthorized access on shared local networks, the platform implements
 
 ```
 endpoint-monitor/
-├── flutter_app/                     # Flutter Mobile Application
+├── README.md                        # Product docs, quick start, playbooks
+├── AGENTS.md                        # Instructions for coding agents
+├── Program Summary[2026-10-09].md   # Full project snapshot
+├── secure-coding-standing-instructions.md
+├── flutter_app/                     # Flutter mobile client
 │   ├── lib/
-│   │   ├── bloc/                    # State management (Connection, Processes, Network, Events, etc.)
-│   │   ├── screens/                 # UI Routes (Dashboard, Processes, Network, Events, More, etc.)
-│   │   ├── widgets/                 # Shared UI components (PIN gate, branded app bar)
-│   │   ├── task/                    # Background execution & WebSocket task handlers
-│   │   ├── theme/                   # Material design theme configurations
-│   │   ├── app.dart                 # Application entry and Bloc providers
-│   │   └── app_router.dart          # Central routing configuration and redirect guards
-│   └── pubspec.yaml                 # Flutter package dependencies
-│
-├── windows_service/                 # .NET 10 Windows Agent Service
-│   ├── Program.cs                   # Composition root, DI, REST endpoints, and middleware
-│   ├── Collectors/                  # Telemetry collectors (Process, Network, System Info)
-│   ├── Hosted/                      # Background workers (Broadcast loop, Sysmon watcher, Threat Intel)
-│   ├── Services/                    # Core business logic (Pairing, VirusTotal, GeoIP, WebSockets)
-│   ├── Commands/                    # ResponseCommandService.cs (EDR response command orchestrator)
-│   ├── Database/                    # SQLite database connection and table definitions
-│   ├── Sysmon/                      # Sysmon auto-installer and XML event parser
-│   ├── Alerts/                      # Alert engine for detecting suspicious activity
-│   └── appsettings.example.json     # Configuration template
-│
-└── screenshots/                     # Platform UI screenshots
+│   │   ├── bloc/                    # Connection, processes, network, events, firewall, …
+│   │   ├── connect/                 # Guided Wi-Fi / Tailscale / QR pairing flow
+│   │   ├── screens/                 # Dashboard, Processes, Network, Events, More, …
+│   │   ├── widgets/                 # Shared UI (PIN gate, branded app bar, …)
+│   │   ├── task/                    # Foreground task / WebSocket keep-alive
+│   │   ├── app.dart / app_router.dart
+│   │   └── …
+│   ├── test/                        # Dart unit/widget tests
+│   └── pubspec.yaml
+├── windows_service/                 # .NET 10 agent + WPF desktop console
+│   ├── Program.cs                   # DI, Kestrel, REST, /ws, middleware
+│   ├── Desktop/                     # WPF Pair / Devices / Diagnostics / Settings
+│   ├── Collectors/ · Hosted/ · Services/ · Commands/
+│   ├── Database/ · Sysmon/ · Browser/ · Alerts/
+│   ├── LocalConsoleApi.cs           # Loopback /local/* for the desktop UI
+│   ├── appsettings.example.json
+│   ├── BUILD-SINGLE-EXE.md          # Publish + Windows Service install
+│   └── RUN.txt
+├── windows_service.Tests/           # xUnit tests for the agent
+├── flutter_design/                  # Design references
+├── docs/superpowers/                # Specs / plans
+├── tools/                           # Helper projects (e.g. NetworkTestProbe)
+└── screenshots/                     # README showcase images
 ```
 
 ---
@@ -169,9 +186,9 @@ endpoint-monitor/
 ## 🚀 Quick Start Guide
 
 ### 1. Prerequisites
-- **Flutter SDK** (Dart ^3.5)
+- **Flutter SDK** (Dart ^3.7)
 - **.NET 10 SDK**
-- **Windows 10/11 x64** (Administrator privileges are required to run the Agent for firewall and process controls)
+- **Windows 10/11 x64** (Administrator privileges are required for firewall, Sysmon, and process controls)
 
 ### 2. Windows Agent Setup
 1. Open an **elevated** PowerShell or Command Prompt (Run as Administrator).
@@ -183,11 +200,14 @@ endpoint-monitor/
    ```bash
    copy appsettings.example.json appsettings.json
    ```
-4. Open `appsettings.json` and configure `Auth:DeviceTokenPepper` with a random string of 32+ characters.
-5. Run the Agent:
+4. Open `appsettings.json` and set `Auth:DeviceTokenPepper` to a random string of **32+ characters**. Optionally set `VirusTotal:ApiKey` and place a GeoLite2 DB beside the exe if you use GeoIP.
+5. Run the agent (starts Kestrel and opens the desktop console in typical interactive launches):
    ```bash
    dotnet run
    ```
+6. Confirm health: `GET http://localhost:5000/health` should report OK.
+
+For a **single-file publish** and installing the Windows Service named **`EndpointMonitor`**, see [`windows_service/BUILD-SINGLE-EXE.md`](windows_service/BUILD-SINGLE-EXE.md). You can also enable **Start with Windows (Windows Service)** from the desktop console **Settings** page.
 
 ### 3. Mobile Client Setup
 1. Navigate to the mobile app directory:
@@ -208,7 +228,7 @@ endpoint-monitor/
 Open the Flutter app and choose how the phone reaches the PC:
 
 **Same Wi-Fi (local)**
-1. On the monitored PC, open the **Endpoint Monitor** desktop app → **Pair** and copy the Wi-Fi address and 6-digit code.
+1. On the monitored PC, open the **Endpoint Monitor** desktop app → **Pair** and copy the Wi-Fi address and 6-digit code (or scan the QR where supported).
 2. In the app, tap **This Wi-Fi**, enter that address (e.g. `192.168.1.50` or `192.168.1.50:5000`) and the 6-digit code, then tap **Connect**.
 
 **Away from home (Tailscale)**
@@ -250,16 +270,18 @@ If this phone was paired before, use **Continue to …** on the connect screen o
 | Endpoint | Method | Auth Required | Description |
 |----------|--------|---------------|-------------|
 | `/health` | GET | No | Returns service status and version. |
-| `/local/status` | GET | Loopback Only | Agent health snapshot for the desktop console. |
-| `/local/pairing` | GET | Loopback Only | JSON pairing code for the desktop console. |
-| `/local/devices` | GET | Loopback Only | Lists paired mobile devices (no token hashes). |
-| `/local/devices/revoke` | POST | Loopback Only | Revokes a paired device by id. |
-| `/api/auth/pairing/complete` | POST | Pairing Code | Exchanges pairing code for an opaque device token. |
-| `/export/events` | GET | Bearer Token | Exports historical Sysmon logs in JSON/CSV format. |
+| `/local/status` | GET | Loopback only | Agent health snapshot for the desktop console. |
+| `/local/pairing` | GET | Loopback only | JSON pairing code / QR payload for the desktop console. |
+| `/local/devices` | GET | Loopback only | Lists paired mobile devices (no token hashes). |
+| `/local/devices/revoke` | POST | Loopback only | Revokes a paired device by id. |
+| `/api/auth/pairing/complete` | POST | Pairing code | Exchanges pairing code for an opaque device token. |
+| `/api/auth/devices` | GET | Bearer token | Lists paired devices for the authenticated client. |
+| `/api/auth/devices/revoke` | POST | Bearer token | Revokes a paired device by id. |
+| `/export/events` | GET | Bearer token | Exports historical Sysmon logs (`from` / `to` / `format` JSON|CSV). |
 
 ### WebSocket Commands (`/ws`)
 
-The mobile client dispatches commands as JSON payloads over the WebSocket. The Agent processes them asynchronously via `ResponseCommandService`.
+The mobile client dispatches commands as JSON payloads over the WebSocket. The agent handles them in `ResponseCommandService`. Telemetry and alerts are server-pushed message types (e.g. `telemetry`, `alert`), not the command switch below.
 
 ```json
 // Example: Block IP Address
@@ -272,23 +294,21 @@ The mobile client dispatches commands as JSON payloads over the WebSocket. The A
 }
 ```
 
-| Command `type` | Payload Parameters | Action |
-|----------------|--------------------|--------|
-| `kill_process` | `{"pid": 1234}` | Terminates the process tree. |
-| `suspend_process` | `{"pid": 1234}` | Suspends process execution threads. |
-| `resume_process` | `{"pid": 1234}` | Resumes a suspended process. |
-| `block_ip` | `{"ip": "x.x.x.x", "direction": "both", "expiresInHours": 2}` | Blocks an IP in the Windows Firewall. |
-| `unblock_ip` | `{"ip": "x.x.x.x"}` | Removes an IP block rule. |
-| `isolate_machine` | *None* | Sets all firewall profiles to block inbound/outbound except a scoped allow for the agent executable and monitor port(s). Auto-unisolates after 90s if no authenticated app connection remains. |
-| `unisolate_machine`| *None* | Restores saved firewall default policies and removes isolation allow rules. |
-| `block_process` | `{"name": "app.exe", "direction": "outbound"}` | Blocks an executable path from network access. |
-| `capture_desktop_screenshot` | *None* | Captures and returns a base64 PNG of the desktop. |
+| Category | Command `type` values |
+|----------|------------------------|
+| Process / watchlist | `kill_process`, `suspend_process`, `resume_process`, `flag_process`, `unflag_process`, `get_flagged_processes` |
+| Firewall / isolation | `block_ip`, `unblock_ip`, `block_outbound_port`, `block_process`, `unblock_process`, `isolate_machine`, `unisolate_machine`, `get_firewall_snapshot` |
+| Intel / reputation | `check_reputation`, `get_threat_intel_status`, `get_threat_intel_entries`, `refresh_threat_intel` |
+| Forensics / inventory | `get_recent_events`, `get_browser_history`, `get_installed_software`, `uninstall_software`, `ack_alert`, `get_system_info` |
+| Host controls | `lock_screen`, `logoff_user`, `restart_machine`, `shutdown_machine`, `sleep_machine`, `cancel_shutdown`, `turn_off_display`, `set_volume`, `toggle_mute`, `capture_desktop_screenshot` |
+
+Common payloads: `kill_process` / `suspend_process` / `resume_process` use `{"pid": 1234}`; `block_ip` uses `ip`, optional `direction` / `expiresInHours` / `port`; `block_process` uses `name` + optional `direction`. **`isolate_machine`** applies default-deny firewall profiles with scoped allows for the agent; it **auto-unisolates after ~90s** if no authenticated WebSocket client remains. **`unisolate_machine`** restores saved policies.
 
 ---
 
 ## Emergency recovery: machine isolation
 
-If **Isolate Machine** was used and the Flutter app can no longer reach the Windows agent, recovery requires **local access** to the PC (physical keyboard, iDRAC/IPMI, or hypervisor console — not the phone app).
+If **Isolate Machine** was used and the Flutter app can no longer reach the Windows agent, recovery requires **local access** to the PC (physical keyboard, iDRAC/IPMI, or hypervisor console - not the phone app).
 
 Run in an **elevated Command Prompt**:
 
@@ -319,4 +339,9 @@ Then reconnect the app and tap **Unisolate Machine** on the Firewall screen so t
 
 ## 📄 Context
 
-This repository is designed to demonstrate secure client-server architectures, low-level systems code in C#, integration with Windows operating system internals, and responsive, real-time security tools in Flutter.
+This repository demonstrates secure client-server architectures, low-level systems code in C#, Windows internals integration, and a real-time Flutter security client.
+
+- Day-to-day product docs: this `README.md`
+- Full project snapshot (features, data model, ops): [`Program Summary[2026-10-09].md`](Program%20Summary%5B2026-10-09%5D.md)
+- Agent working instructions: [`AGENTS.md`](AGENTS.md)
+- Secure coding standing rules: [`secure-coding-standing-instructions.md`](secure-coding-standing-instructions.md)

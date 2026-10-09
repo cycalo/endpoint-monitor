@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace EndpointMonitorService.Desktop;
 
-/// <summary>Unified data access for WPF pages — HTTP in UI-only mode, DI in in-process mode.</summary>
+/// <summary>Unified data access for WPF pages - HTTP in UI-only mode, DI in in-process mode.</summary>
 public sealed class AgentDataService : IDisposable
 {
     private readonly bool _uiOnly;
@@ -91,7 +91,9 @@ public sealed class AgentDataService : IDisposable
 
         var diag = AgentDiagnosticsBuilder.Build(server, threatIntel, ws, sysmon, intel, entryCount);
         var endpoints = LocalNetworkHelper.GetNetworkEndpoints();
-        return LocalStatusMapper.FromDiagnostics(diag, endpoints);
+        var dto = LocalStatusMapper.FromDiagnostics(diag, endpoints);
+        LocalStatusMapper.ApplyLiveClients(dto, ws.LiveClients);
+        return dto;
     }
 
     private LocalPairingDto CreatePairingInProcess()

@@ -5,7 +5,7 @@ import '../bloc/threat_intel_bloc.dart';
 import '../theme/em_design_system.dart';
 import '../utils/relative_time.dart';
 
-/// Threat feed status and manual refresh — belongs on Network, not Settings.
+/// Threat feed status and manual refresh - belongs on Network, not Settings.
 class EmThreatIntelPanel extends StatelessWidget {
   const EmThreatIntelPanel({super.key, this.compact = false});
 

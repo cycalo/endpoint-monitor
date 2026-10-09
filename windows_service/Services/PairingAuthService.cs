@@ -79,6 +79,18 @@ public sealed class PairingAuthService(AppDatabase db, IOptions<AuthOptions> opt
         return true;
     }
 
+    /// <summary>Resolves a bearer token to a device id. Does not log the token.</summary>
+    public async Task<string?> GetActiveDeviceIdAsync(string token, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(token) || token.Length > 256)
+            return null;
+
+        var hash = HashToken(token);
+        var row = await db.FindActiveDeviceTokenByHashAsync(hash, cancellationToken).ConfigureAwait(false);
+        var id = row?.Id;
+        return string.IsNullOrWhiteSpace(id) ? null : id;
+    }
+
     public async Task<IReadOnlyList<DeviceAuthTokenRow>> ListDeviceTokensAsync(CancellationToken cancellationToken = default)
     {
         return await db.ListDeviceTokensAsync(cancellationToken).ConfigureAwait(false);

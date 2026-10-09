@@ -30,7 +30,7 @@ import '../widgets/em_threat_intel_panel.dart';
 class NetworkScreen extends StatefulWidget {
   const NetworkScreen({super.key, this.highlightThreats = false});
 
-  /// Deep link from dashboard — prioritize rows that match the threat IP list.
+  /// Deep link from dashboard - prioritize rows that match the threat IP list.
   final bool highlightThreats;
 
   @override
@@ -47,7 +47,7 @@ class _NetworkScreenState extends State<NetworkScreen>
   String _state = 'all';
   String _geo = 'all';
 
-  /// `all` | `blocked` | `unblocked` — client-tracked firewall blocks.
+  /// `all` | `blocked` | `unblocked` - client-tracked firewall blocks.
   String _blockedScope = 'all';
 
   /// When false, rows whose remote address is IPv6 are hidden (IPv4-first list).
@@ -640,7 +640,7 @@ class _NetworkScreenState extends State<NetworkScreen>
                           builder: (context, si) {
                             final uptime =
                                 si.info?.uptime.trim().isEmpty ?? true
-                                    ? '—'
+                                    ? '-'
                                     : si.info!.uptime.trim();
                             final upMbps = formatMbpsFromBytesPerSec(
                                 si.info?.networkBytesSentPerSec ?? 0);
@@ -1106,7 +1106,7 @@ class _NetworkScreenState extends State<NetworkScreen>
                                                                             'BLOCKED' &&
                                                                         n.pid <=
                                                                             0
-                                                                        ? 'PID: —'
+                                                                        ? 'PID: -'
                                                                         : 'PID: ${n.pid}',
                                                                     style: GoogleFonts
                                                                         .inter(
@@ -1126,7 +1126,7 @@ class _NetworkScreenState extends State<NetworkScreen>
                                                                       height:
                                                                           4),
                                                                   Text(
-                                                                    'No live socket in snapshot — showing process/PID from when you blocked',
+                                                                    'No live socket in snapshot - showing process/PID from when you blocked',
                                                                     style: GoogleFonts.inter(
                                                                       fontSize:
                                                                           10,

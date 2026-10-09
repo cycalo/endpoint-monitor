@@ -33,13 +33,13 @@
 
 ## File structure
 
-- Create: `flutter_app/lib/services/process_ai_explain.dart` — Z.AI URL, headers, request body, missing-key copy
-- Create: `flutter_app/test/process_ai_explain_test.dart` — contract tests
-- Modify: `flutter_app/lib/settings/app_settings_keys.dart` — replace Groq key with `zaiApiKey`; keep a retired Groq key name only for delete-on-load
-- Modify: `flutter_app/lib/screens/process_detail_screen.dart` — call Z.AI, rename Groq helpers/copy
-- Modify: `flutter_app/lib/screens/settings_screen.dart` — Z.AI settings section
-- Modify: `README.md` — drop Groq, document Z.AI
-- Modify: `AGENT_ONBOARDING.md` — replace Groq nodes/edges in the mermaid diagram
+- Create: `flutter_app/lib/services/process_ai_explain.dart` - Z.AI URL, headers, request body, missing-key copy
+- Create: `flutter_app/test/process_ai_explain_test.dart` - contract tests
+- Modify: `flutter_app/lib/settings/app_settings_keys.dart` - replace Groq key with `zaiApiKey`; keep a retired Groq key name only for delete-on-load
+- Modify: `flutter_app/lib/screens/process_detail_screen.dart` - call Z.AI, rename Groq helpers/copy
+- Modify: `flutter_app/lib/screens/settings_screen.dart` - Z.AI settings section
+- Modify: `README.md` - drop Groq, document Z.AI
+- Modify: `AGENTS.md` - replace Groq nodes/edges in the mermaid diagram
 
 ---
 
@@ -136,7 +136,7 @@ const String kZaiProcessExplainModel = 'glm-4.7-flash';
 const String kZaiProcessExplainAttribution = 'Powered by Z.AI · glm-4.7-flash';
 
 const String kMissingZaiApiKeyMessage =
-    'No Z.AI API key configured — add your key in Settings → Z.AI';
+    'No Z.AI API key configured - add your key in Settings → Z.AI';
 
 const double kZaiProcessExplainTemperature = 0.2;
 
@@ -297,7 +297,7 @@ Keep parsing via `_parseProcessExplanationFromContent(content)`.
 Replace the 401 message:
 
 ```dart
-          errStr = 'Invalid Z.AI API key — check the key saved in Settings';
+          errStr = 'Invalid Z.AI API key - check the key saved in Settings';
 ```
 
 Replace the missing-key CTA:
@@ -516,7 +516,7 @@ EOF
 
 **Files:**
 - Modify: `README.md`
-- Modify: `AGENT_ONBOARDING.md`
+- Modify: `AGENTS.md`
 
 **Interfaces:**
 - Consumes: none
@@ -536,9 +536,9 @@ with:
   - **Z.AI GLM-4.7-Flash** (Process AI explanation)
 ```
 
-- [ ] **Step 2: Replace Groq in the AGENT_ONBOARDING mermaid diagram**
+- [ ] **Step 2: Replace Groq in the AGENTS.md mermaid diagram**
 
-In `AGENT_ONBOARDING.md`, replace:
+In `AGENTS.md`, replace:
 
 ```mermaid
         Groq["Groq API (Process AI Explanation)"]
@@ -567,7 +567,7 @@ with:
 Skip unless the user asked to commit.
 
 ```bash
-git add README.md AGENT_ONBOARDING.md
+git add README.md AGENTS.md
 git commit -m "$(cat <<'EOF'
 Document Z.AI as the process AI explanation provider.
 
@@ -606,7 +606,7 @@ Expected: no issues in those files.
 From repo root:
 
 ```bash
-rg -n -i "groq" flutter_app/lib README.md AGENT_ONBOARDING.md
+rg -n -i "groq" flutter_app/lib README.md AGENTS.md
 ```
 
 Expected matches: only `AppSettingsKeys.retiredGroqApiKey = 'groq_api_key'` (the delete-on-load leftover key). No Groq API URL, no Groq Settings copy, no Groq mermaid node.
@@ -631,5 +631,5 @@ Manual check after implementation (user device): paste a Z.AI key in Settings �
 | Settings title `Z.AI`, deep link `?section=zai` | Task 2 CTA + Task 3 |
 | Signup copy points at `z.ai` | Task 3 |
 | Rename Groq helpers/flags and attribution copy | Task 2 |
-| README + AGENT_ONBOARDING | Task 4 |
+| README + AGENTS.md | Task 4 |
 | No fallback, streaming, schema, or layout change | Tasks 2–3 leave prompt/UI/cache unchanged |

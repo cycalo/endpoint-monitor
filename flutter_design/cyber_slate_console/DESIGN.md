@@ -2,7 +2,7 @@
 # Design System Specification: High-Density Windows Monitoring Console
 
 ## 1. Overview & Creative North Star: "The Orchestrator"
-The objective of this design system is to transform raw technical data into an authoritative, editorial-grade monitoring experience. We are moving away from the "clunky dashboard" trope toward **"The Orchestrator"**—a visual metaphor for a high-end command center that feels both surgically precise and aesthetically sophisticated.
+The objective of this design system is to transform raw technical data into an authoritative, editorial-grade monitoring experience. We are moving away from the "clunky dashboard" trope toward **"The Orchestrator"** - a visual metaphor for a high-end command center that feels both surgically precise and aesthetically sophisticated.
 
 The system rejects the rigid, "boxed-in" look of traditional enterprise software. Instead, it utilizes **Tonal Layering** and **Intentional Asymmetry** to guide the eye. By leveraging high-contrast typography scales (Manrope for headlines, Inter for data) and soft, glass-like depth, we create a tool that feels less like a spreadsheet and more like a professional instrument.
 
@@ -71,7 +71,7 @@ In this system, elevation is a color property, not a shadow property.
 
 ### Do:
 *   **Do** use `spacing-8` (1.75rem) between major functional groups to prevent visual fatigue.
-*   **Do** use `tertiary` (Cyan) for "Secondary Success" metrics—it feels more "Cyber" and professional than a standard green.
+*   **Do** use `tertiary` (Cyan) for "Secondary Success" metrics - it feels more "Cyber" and professional than a standard green.
 *   **Do** lean into `manrope` for large numeric values to emphasize the "Monitoring" aspect of the console.
 
 ### Don’t:

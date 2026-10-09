@@ -10,7 +10,7 @@ public sealed class ProcessCollector(ILogger<ProcessCollector> logger)
         var list = new List<ProcessInfo>();
         var cpuByPid = GetCpuPercentByPid();
         // Win32_PerfFormattedData_PerfProc_Process.PercentProcessorTime can exceed 100% on multi-core
-        // systems (max is roughly 100 × logical processor count). Normalize to 0–100% of total CPU.
+        // systems (max is roughly 100 × logical processor count). Normalize to 0-100% of total CPU.
         var processors = Math.Max(1, Environment.ProcessorCount);
 
         try

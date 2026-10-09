@@ -8,7 +8,7 @@ internal static class CopyFeedback
 
     internal static bool TryCopy(string? text)
     {
-        if (string.IsNullOrWhiteSpace(text) || text == "—")
+        if (string.IsNullOrWhiteSpace(text) || text == "-")
             return false;
 
         try

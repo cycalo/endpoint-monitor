@@ -146,7 +146,7 @@ List<NetworkProcessGroup> buildNetworkProcessGroups(
       } else if (isLocalBindConnection(n)) {
         binds.add(n);
       } else if (hasBlockableRemoteEndpoint(n.remoteAddress)) {
-        // Non-established TCP with a remote (SYN_SENT, etc.) — roll up as remote.
+        // Non-established TCP with a remote (SYN_SENT, etc.) - roll up as remote.
         final rk =
             '${n.protocol.toUpperCase()}|${normalizeIpForBlockList(n.remoteAddress)}|${n.remotePort}';
         remoteMap.putIfAbsent(rk, () => []).add(n);

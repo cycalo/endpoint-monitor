@@ -73,7 +73,7 @@ class NetworkConnectionDetailScreen extends StatelessWidget {
                             children: [
                               _kvRow(
                                 'PID',
-                                current.pid > 0 ? '${current.pid}' : '—',
+                                current.pid > 0 ? '${current.pid}' : '-',
                               ),
                               _kvRow(
                                 'Remote endpoint',

@@ -1,18 +1,18 @@
-# Secure Coding — Standing Instructions
+# Secure Coding - Standing Instructions
 
 Drop this into whichever rules file your tool reads: `CLAUDE.md` (project root,
 or `~/.claude/CLAUDE.md` for every project), `AGENTS.md`, `.cursorrules` /
 `.cursor/rules/`, `.github/copilot-instructions.md`, or paste into a Claude.ai
 Project's custom instructions. Keep the Core section everywhere. Include only
-the stack addenda relevant to that repo — don't paste sections that don't
+the stack addenda relevant to that repo - don't paste sections that don't
 apply; irrelevant rules dilute the ones that matter.
 
 ---
 
 ## Core (always include)
 
-1. Treat all external input — user input, API responses, file contents, query
-   params, query results — as untrusted. Validate type, length, and format
+1. Treat all external input - user input, API responses, file contents, query
+   params, query results - as untrusted. Validate type, length, and format
    before use. Never build a query or command by string concatenation; use
    parameterized queries / prepared statements for any database access.
 
@@ -21,7 +21,7 @@ apply; irrelevant rules dilute the ones that matter.
 
 3. Enforce authorization at every layer that touches data, not just the UI.
    If a feature restricts what a user can see or do, that restriction must be
-   re-checked server-side or in the database (e.g. row-level security) —
+   re-checked server-side or in the database (e.g. row-level security) -
    never assume a client-side check is sufficient, and never assume a user
    will only request data that's "theirs."
 
@@ -39,7 +39,7 @@ apply; irrelevant rules dilute the ones that matter.
    rejections, no hangs.
 
 7. User-facing error messages stay generic. Full detail (stack traces,
-   internal paths, query text) goes to server-side logs only — and logs must
+   internal paths, query text) goes to server-side logs only - and logs must
    never contain secrets, passwords, or full PII.
 
 8. Use current, non-deprecated crypto and hashing (bcrypt/argon2 for
@@ -53,7 +53,7 @@ apply; irrelevant rules dilute the ones that matter.
    rather than "latest."
 
 10. Mark any placeholder, stub, or code you're not fully confident is secure
-    with an explicit comment — don't let it pass as finished.
+    with an explicit comment - don't let it pass as finished.
 
 11. **Before presenting code that touches auth, payments, user data, or
     file/network/process operations, stop and re-read your own output.**
@@ -70,14 +70,14 @@ apply; irrelevant rules dilute the ones that matter.
 - Every table holding user data needs Row Level Security enabled, with a
   policy restricting reads/writes to the owning user or appropriate role.
   Never rely on the client only requesting "its own" data.
-- Don't disable RLS "temporarily" to debug — debug locally with a
+- Don't disable RLS "temporarily" to debug - debug locally with a
   service-role key instead.
 - The anon/public key is public by design; the service-role key gets the
   same handling as a root password.
 
 ### Flutter / Dart
 - Tokens and credentials go in `flutter_secure_storage` or the platform
-  Keychain/Keystore — never `SharedPreferences` or plain files.
+  Keychain/Keystore - never `SharedPreferences` or plain files.
 - Validate and sanitize anything arriving via deep links, intents, or
   platform channels before acting on it.
 
@@ -87,7 +87,7 @@ apply; irrelevant rules dilute the ones that matter.
   `shell=True` string built from input.
 
 ### Web / JS / TS
-- Parameterized queries or ORM parameter binding for all DB access — same
+- Parameterized queries or ORM parameter binding for all DB access - same
   rule as everywhere else, called out because raw template strings are easy
   to reach for here.
 - Session cookies: `HttpOnly`, `Secure`, `SameSite`.
@@ -102,7 +102,7 @@ apply; irrelevant rules dilute the ones that matter.
 ---
 
 ## Pre-ship checklist
-Ask this of any feature before it ships — of the AI, and separately, of
+Ask this of any feature before it ships - of the AI, and separately, of
 yourself:
 
 1. Has anyone tried to access this data or endpoint directly, not through
@@ -116,14 +116,14 @@ yourself:
 
 ## Notes
 - This is a floor, not a substitute for tooling. Pair it with a SAST scanner
-  (Semgrep, Snyk), a secrets scanner (gitleaks) in pre-commit/CI, and — since
-  you're already on Supabase — periodically run the project's security
+  (Semgrep, Snyk), a secrets scanner (gitleaks) in pre-commit/CI, and - since
+  you're already on Supabase - periodically run the project's security
   advisors to catch RLS and config drift a prompt alone won't catch.
 - Research on prompting technique specifically found that telling the model
   to "act as a security expert" tends to perform *worse*, not better, than
-  direct instructions like the ones above — so this file deliberately skips
+  direct instructions like the ones above - so this file deliberately skips
   persona framing.
 - Keep this file short. Past a certain instruction count, models don't
-  selectively ignore the newest rules — they start ignoring all of them
+  selectively ignore the newest rules - they start ignoring all of them
   somewhat uniformly. Prune anything the model already does correctly
   without being told.

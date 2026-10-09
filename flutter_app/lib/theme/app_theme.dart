@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'em_design_system.dart';
 
-/// Cyber Slate — tokens from [flutter_design] HTML + DESIGN.md (Deep Slate + Cyber Blue).
+/// Cyber Slate - tokens from [flutter_design] HTML + DESIGN.md (Deep Slate + Cyber Blue).
 const ColorScheme _orchestratorDarkScheme = ColorScheme(
   brightness: Brightness.dark,
   primary: Color(0xFF98CBFF),

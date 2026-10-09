@@ -12,7 +12,7 @@ bool isValidSoftwareName(String name) {
 
 /// Formats registry EstimatedSize (KB) for display.
 String formatInstallSizeKb(int kb) {
-  if (kb <= 0) return '—';
+  if (kb <= 0) return '-';
   const mb = 1024;
   const gb = mb * 1024;
   if (kb >= gb) {
@@ -28,11 +28,11 @@ String formatInstallSizeKb(int kb) {
 String formatSoftwareDateAndSizeLine(String normalizedDate, int installSizeKb) {
   final size = formatInstallSizeKb(installSizeKb);
   final parts = <String>[];
-  if (normalizedDate.isNotEmpty && normalizedDate != '—') {
+  if (normalizedDate.isNotEmpty && normalizedDate != '-') {
     parts.add(normalizedDate);
   }
-  if (size != '—') parts.add(size);
-  if (parts.isEmpty) return '—';
+  if (size != '-') parts.add(size);
+  if (parts.isEmpty) return '-';
   return parts.join(' · ');
 }
 
@@ -42,7 +42,7 @@ String truncateVersion(String v, {int maxLen = 20}) {
   return '${t.substring(0, maxLen)}…';
 }
 
-/// Card list row: vendor · version (version truncated). Date is shown separately — never here.
+/// Card list row: vendor · version (version truncated). Date is shown separately - never here.
 String buildSoftwareCardVendorVersionLine(InstalledSoftwareItem s, {int versionMaxLen = 12}) {
   final parts = <String>[];
   final vendor = s.vendor.trim();
@@ -97,7 +97,7 @@ String normalizeInstallDateDisplay(String raw) {
   final d = tryParseInstallDate(raw);
   if (d == null) {
     final t = raw.trim();
-    return t.isEmpty ? '—' : t;
+    return t.isEmpty ? '-' : t;
   }
   return DateFormat('dd-MMM-yyyy', 'en_US').format(d);
 }

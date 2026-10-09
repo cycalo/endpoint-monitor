@@ -126,9 +126,9 @@ const kConnectScanQrTitle = 'Scan QR code';
 
 String connectScanQrSubtitle(ConnectPath path) => switch (path) {
       ConnectPath.wifi =>
-        'Uses the This Wi-Fi address from Pair — not Tailscale, even if both are in the QR.',
+        'Uses the This Wi-Fi address from Pair - not Tailscale, even if both are in the QR.',
       ConnectPath.tailscale =>
-        'Uses the Away from home (Tailscale) address from Pair — even if you are on the same Wi-Fi.',
+        'Uses the Away from home (Tailscale) address from Pair - even if you are on the same Wi-Fi.',
     };
 
 String connectQrScanSubtitle(ConnectPath path) => switch (path) {

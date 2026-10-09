@@ -12,7 +12,7 @@ import '../theme/em_design_system.dart';
 import '../widgets/em_brand_app_bar.dart';
 import '../widgets/em_loading_states.dart';
 
-/// Sysmon event types we filter on — matches [SysmonEvent.type] from the agent.
+/// Sysmon event types we filter on - matches [SysmonEvent.type] from the agent.
 const _kTypeTerminate = 'ProcessTerminate';
 const _kTypeNetwork = 'NetworkConnect';
 const _kTypeProcess = 'ProcessCreate';

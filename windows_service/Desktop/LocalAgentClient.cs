@@ -118,6 +118,13 @@ public sealed class LocalStatusDto
     public bool InteractiveSession { get; set; }
     public string[] LanIpv4 { get; set; } = [];
     public NetworkEndpointDto[] Endpoints { get; set; } = [];
+    public LiveClientDto[] LiveClients { get; set; } = [];
+}
+
+public sealed class LiveClientDto
+{
+    public string DeviceId { get; set; } = "";
+    public string RemoteIp { get; set; } = "";
 }
 
 public sealed class NetworkEndpointDto
@@ -167,6 +174,26 @@ public static class LocalStatusMapper
             LanIpv4 = endpoints.Select(e => e.Ip).ToArray(),
             Endpoints = ToDtos(endpoints),
         };
+    }
+
+    public static void ApplyLiveClients(LocalStatusDto dto, IEnumerable<LiveWebSocketClient> live)
+    {
+        dto.LiveClients = live
+            .Where(c => !string.IsNullOrWhiteSpace(c.DeviceId) && c.DeviceId.Length <= 64)
+            .Select(c => new LiveClientDto
+            {
+                DeviceId = c.DeviceId,
+                RemoteIp = SanitizeIp(c.RemoteIp),
+            })
+            .ToArray();
+    }
+
+    private static string SanitizeIp(string? ip)
+    {
+        if (string.IsNullOrWhiteSpace(ip))
+            return "";
+        var clean = new string(ip.Where(c => !char.IsControl(c)).ToArray()).Trim();
+        return clean.Length <= 64 ? clean : clean[..64];
     }
 
     public static NetworkEndpointDto[] ToDtos(IReadOnlyList<NetworkEndpoint> endpoints) =>

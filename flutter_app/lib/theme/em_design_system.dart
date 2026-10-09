@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-/// Tokens aligned with [flutter_design/cyber_slate_console/DESIGN.md] — tonal layering, ghost edges.
+/// Tokens aligned with [flutter_design/cyber_slate_console/DESIGN.md] - tonal layering, ghost edges.
 abstract final class EmDesign {
-  /// Spacing rhythm (DESIGN.md §6 — generous section gaps).
+  /// Spacing rhythm (DESIGN.md §6 - generous section gaps).
   static const double spaceXs = 6;
   static const double spaceSm = 10;
   static const double spaceMd = 16;
@@ -33,11 +33,11 @@ abstract final class EmDesign {
   static Color controlAudio(ColorScheme scheme) =>
       Color.lerp(scheme.primary, scheme.tertiary, 0.35)!;
 
-  /// "Ghost border" — outline_variant @ ~15% (DESIGN.md §2 / §4).
+  /// "Ghost border" - outline_variant @ ~15% (DESIGN.md §2 / §4).
   static Color ghostLine(ColorScheme scheme) =>
       scheme.outlineVariant.withValues(alpha: 0.15);
 
-  /// Explicit 1px sides — avoids hairline `width: 0` assertions with [BorderRadius].
+  /// Explicit 1px sides - avoids hairline `width: 0` assertions with [BorderRadius].
   static Border ghostBorder(ColorScheme scheme) => Border.all(
         color: ghostLine(scheme),
         width: 1,
@@ -56,7 +56,7 @@ abstract final class EmDesign {
     );
   }
 
-  /// Layered ambient shadows for the dashboard connection hero — soft glow, not harsh drop-shadow.
+  /// Layered ambient shadows for the dashboard connection hero - soft glow, not harsh drop-shadow.
   static List<BoxShadow> heroElevationShadows(
     ColorScheme scheme, {
     Color? accentGlow,

@@ -8,7 +8,7 @@ public readonly record struct HomeNextStep(
     bool ShowPair,
     bool ShowDevices);
 
-/// <summary>Copy and status for the Home tab — health at a glance, not pairing.</summary>
+/// <summary>Copy and status for the Home tab - health at a glance, not pairing.</summary>
 public static class HomeDashboard
 {
     public static bool WifiReady(IReadOnlyList<NetworkEndpoint> endpoints) =>

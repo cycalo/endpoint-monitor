@@ -54,7 +54,7 @@ public sealed class FirewallIsolationServiceTests
         var service = CreateService(netsh, webSockets, TimeSpan.FromMilliseconds(50));
 
         // Simulate connected client without opening a real socket: not possible with public API.
-        // ClientCount is 0 unless Add is called with a socket — skip unisolate delete verification
+        // ClientCount is 0 unless Add is called with a socket - skip unisolate delete verification
         // by ensuring no delete calls occur when we cancel watchdog immediately.
         service.ArmWatchdog();
         service.CancelWatchdog();

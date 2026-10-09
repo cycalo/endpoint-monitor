@@ -7,7 +7,7 @@ import '../bloc/connection_bloc.dart';
 
 /// Normalized host for status display (strips scheme/path/port).
 String emDisplayConnectionHost(String? raw) {
-  if (raw == null || raw.isEmpty) return '—';
+  if (raw == null || raw.isEmpty) return '-';
   var h = raw
       .replaceFirst(RegExp(r'^wss?://'), '')
       .replaceFirst(RegExp(r'^https?://'), '');
@@ -15,7 +15,7 @@ String emDisplayConnectionHost(String? raw) {
   if (slash >= 0) h = h.substring(0, slash);
   final colon = h.indexOf(':');
   if (colon >= 0) h = h.substring(0, colon);
-  return h.isEmpty ? '—' : h;
+  return h.isEmpty ? '-' : h;
 }
 
 class _EmConnectionStatus extends StatelessWidget {

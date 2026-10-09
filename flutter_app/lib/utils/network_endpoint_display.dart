@@ -4,7 +4,7 @@ library;
 import '../models/ws_models.dart';
 import 'network_tcp_state.dart';
 
-/// Listening sockets and “no remote peer” rows — there is no specific remote IP to block.
+/// Listening sockets and “no remote peer” rows - there is no specific remote IP to block.
 bool isListeningStyleSocket(NetworkConnection n) {
   final r = n.remoteAddress.trim();
   if (r.isEmpty || r == '*' || r == '::' || r == '0.0.0.0') return true;
@@ -32,7 +32,7 @@ bool isIpv6Address(String raw) {
 String formatNetworkEndpoint(String address, int port) {
   final a = address.trim();
   if (a.isEmpty) {
-    return '—';
+    return '-';
   }
   if (a == '::1') {
     return port > 0 ? 'localhost:$port' : 'localhost';

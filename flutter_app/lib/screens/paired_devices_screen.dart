@@ -142,7 +142,7 @@ class _PairedDevicesScreenState extends State<PairedDevicesScreen> {
   }
 
   String _formatWhen(String? iso) {
-    if (iso == null || iso.isEmpty) return '—';
+    if (iso == null || iso.isEmpty) return '-';
     final dt = DateTime.tryParse(iso);
     if (dt == null) return iso;
     return DateFormat.yMMMd().add_jm().format(dt.toLocal());

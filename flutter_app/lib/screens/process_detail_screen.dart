@@ -194,7 +194,7 @@ DateTime? _killedAtForPid(ProcessState s, int pid) {
 
 String _formatSysmonLocalTime(String iso) {
   final parsed = DateTime.tryParse(iso);
-  if (parsed == null) return iso.isEmpty ? '—' : iso;
+  if (parsed == null) return iso.isEmpty ? '-' : iso;
   return DateFormat('EEE, MMM d, y · HH:mm:ss').format(parsed.toLocal());
 }
 
@@ -485,7 +485,7 @@ class _OverviewTabState extends State<_OverviewTab> {
                 title: isKilledGhost ? 'Entry removed' : 'Process ended',
                 message: isKilledGhost
                     ? 'This killed-process entry was dismissed or the list refreshed.'
-                    : 'This process is not in the current snapshot — it may have exited.',
+                    : 'This process is not in the current snapshot - it may have exited.',
                 action: FilledButton(
                   onPressed: () => context.pop(),
                   child: const Text('Back to processes'),
@@ -930,7 +930,7 @@ class ExplainResult {
 
 String _plainTextAiReport(ExplainResult res, ProcessInfo process) {
   final buf = StringBuffer();
-  buf.writeln('Process AI report — ${process.name} (PID ${process.pid})');
+  buf.writeln('Process AI report - ${process.name} (PID ${process.pid})');
   buf.writeln('Generated: ${res.timestamp.toIso8601String()}');
   buf.writeln();
   if (res.isError || res.explanation == null) {
@@ -1087,7 +1087,7 @@ class _ExplainProcessSectionState extends State<_ExplainProcessSection> {
 
     final prompt =
         '''You are a Windows endpoint security analyst. When given details about a
-running Windows process, respond with a JSON object only — no markdown,
+running Windows process, respond with a JSON object only - no markdown,
 no explanation outside the JSON, no code fences. Use exactly this structure:
 
 {
@@ -1095,13 +1095,13 @@ no explanation outside the JSON, no code fences. Use exactly this structure:
   "verdictReason": "One sentence summary of why this verdict was reached.",
   "who": "Who created this process and what application it belongs to.",
   "what": "What this process does and what it is currently doing.",
-  "where": "Describe only whether the install/runtime location looks normal for this app (e.g. standard Program Files vs temp, user profile, or suspicious path). Do NOT repeat the full path here — the path field carries the exact path.",
+  "where": "Describe only whether the install/runtime location looks normal for this app (e.g. standard Program Files vs temp, user profile, or suspicious path). Do NOT repeat the full path here - the path field carries the exact path.",
   "allowed": "Whether this behaviour is expected and normal for this process type. Note anything unusual.",
   "path": "The full executable path exactly as provided. CRITICAL: You must escape all Windows backslashes (e.g. use C:\\\\Windows\\\\System32 instead of C:\\Windows\\System32)",
   "behaviour": "Two to five words summarising current behaviour. Example: Normal, low CPU usage"
 }
 
-Keep each field concise — one to two sentences maximum per field except
+Keep each field concise - one to two sentences maximum per field except
 verdictReason which must be one sentence only. Write plainly so a
 non-technical person can understand. Do not use markdown inside any field value.
 CRITICAL: Ensure the output is valid JSON. All backslashes in paths must be double-escaped.''';
@@ -1148,7 +1148,7 @@ $connText
         } else {
           _explainCache[widget.pid] = ExplainResult(
             rawError:
-                'Analysis format error — showing raw response\n\n$content',
+                'Analysis format error - showing raw response\n\n$content',
             timestamp: DateTime.now(),
             isError: true,
           );
@@ -1161,12 +1161,12 @@ $connText
       String errStr = 'Request failed: ${e.message}';
       if (e.type == DioExceptionType.connectionTimeout ||
           e.type == DioExceptionType.receiveTimeout) {
-        errStr = 'Request timed out — check your internet connection';
+        errStr = 'Request timed out - check your internet connection';
       } else if (e.response != null) {
         if (e.response!.statusCode == 401) {
-          errStr = 'Invalid Z.AI API key — check the key saved in Settings';
+          errStr = 'Invalid Z.AI API key - check the key saved in Settings';
         } else if (e.response!.statusCode == 429) {
-          errStr = 'Rate limit reached — try again in a moment';
+          errStr = 'Rate limit reached - try again in a moment';
           Future.delayed(const Duration(seconds: 8), () {
             if (mounted) _explain();
           });
@@ -1224,7 +1224,7 @@ $connText
     final text = _plainTextAiReport(res, widget.process);
     await Share.share(
       text,
-      subject: 'Process AI report — ${widget.process.name} (PID ${widget.pid})',
+      subject: 'Process AI report - ${widget.process.name} (PID ${widget.pid})',
     );
   }
 

@@ -76,10 +76,21 @@ public partial class MainWindow : Window
     private void ShowPage(UserControl page)
     {
         PageHost.Content = page;
+        FitPage();
         if (page is PairPage pair)
             _ = pair.RefreshAsync();
-        else
-            _ = PollCurrentPageAsync();
+        _ = PollCurrentPageAsync();
+    }
+
+    private void PageScroll_SizeChanged(object sender, SizeChangedEventArgs e) => FitPage();
+
+    private void FitPage()
+    {
+        if (PageHost.Content is not FrameworkElement page)
+            return;
+
+        var pad = PageScroll.Padding.Top + PageScroll.Padding.Bottom;
+        page.MinHeight = Math.Max(0, PageScroll.ViewportHeight - pad);
     }
 
     private static void EnsureThemeResources()
@@ -108,21 +119,44 @@ public partial class MainWindow : Window
         if (_isHidden || !IsVisible)
             return;
 
+        var status = await _data.GetStatusAsync().ConfigureAwait(true);
+        UpdateSidebar(status);
+
         switch (PageHost.Content)
         {
             case HomePage home:
-                await home.RefreshAsync().ConfigureAwait(true);
+                await home.RefreshAsync(status).ConfigureAwait(true);
                 break;
-            case PairPage pair:
-                // Only refresh pair page when navigated to, not on every poll
+            case PairPage:
+                // Pairing codes refresh only when the page is opened.
                 break;
             case DevicesPage devices:
-                await devices.RefreshAsync().ConfigureAwait(true);
+                await devices.RefreshAsync(status).ConfigureAwait(true);
                 break;
             case DiagnosticsPage diag:
-                await diag.RefreshAsync().ConfigureAwait(true);
+                await diag.RefreshAsync(status).ConfigureAwait(true);
                 break;
         }
+    }
+
+    private void UpdateSidebar(LocalStatusDto? status)
+    {
+        var uptime = TimeSpan.FromMilliseconds(Math.Max(0, Environment.TickCount64));
+        UptimeText.Text = "Up " + ConsoleFormat.FormatHostUptime(uptime);
+
+        if (status == null)
+        {
+            ServiceDot.Fill = (Brush)FindResource("CsErrorBrush");
+            ServiceLabel.Text = "Service offline";
+            ServiceLabel.Foreground = (Brush)FindResource("CsErrorBrush");
+            VersionText.Text = ConsoleFormat.FormatAgentVersion(null);
+            return;
+        }
+
+        ServiceDot.Fill = (Brush)FindResource("CsSuccessBrush");
+        ServiceLabel.Text = "Service active";
+        ServiceLabel.Foreground = (Brush)FindResource("CsSuccessBrush");
+        VersionText.Text = ConsoleFormat.FormatAgentVersion(status.Version);
     }
 
     private void OnWindowStateChanged()

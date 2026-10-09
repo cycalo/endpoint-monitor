@@ -72,7 +72,7 @@ abstract final class AlertNotificationService {
         }
         allow = true;
       } else {
-        // e.g. encoded PowerShell — not tied to the executable watchlist.
+        // e.g. encoded PowerShell - not tied to the executable watchlist.
         if (sev == 'high' && high) allow = true;
       }
     } else {

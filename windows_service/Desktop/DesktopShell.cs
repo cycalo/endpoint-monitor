@@ -123,7 +123,7 @@ public sealed class DesktopShell : IDisposable
         _notifyIcon = new NotifyIcon
         {
             Icon = SystemIcons.Shield,
-            Text = "Endpoint Monitor — right-click for menu",
+            Text = "Endpoint Monitor - right-click for menu",
             Visible = true,
             ContextMenuStrip = menu,
         };

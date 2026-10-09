@@ -189,13 +189,13 @@ class _EndpointIdentityStrip extends StatelessWidget {
 
   static String _orDash(String? s) {
     final t = s?.trim() ?? '';
-    return t.isEmpty ? '—' : t;
+    return t.isEmpty ? '-' : t;
   }
 
   String _osLine(SystemInfo i) {
     final base = i.osDisplayLine.trim();
     final arch = i.osArchitecture.trim();
-    if (base.isEmpty && arch.isEmpty) return '—';
+    if (base.isEmpty && arch.isEmpty) return '-';
     if (base.isEmpty) return arch;
     if (arch.isEmpty) return base;
     return '$base ($arch)';
@@ -204,9 +204,9 @@ class _EndpointIdentityStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final i = info;
-    final host = i != null ? _orDash(i.systemName) : '—';
-    final ip = i != null ? _orDash(i.primaryNetworkIpv4) : '—';
-    final os = i != null ? _osLine(i) : '—';
+    final host = i != null ? _orDash(i.systemName) : '-';
+    final ip = i != null ? _orDash(i.primaryNetworkIpv4) : '-';
+    final os = i != null ? _osLine(i) : '-';
 
     return Container(
       width: double.infinity,

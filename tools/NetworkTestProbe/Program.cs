@@ -3,13 +3,13 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 
-// NetworkTestProbe — manual testing helper (network UI, Sysmon, firewall rules).
+// NetworkTestProbe - manual testing helper (network UI, Sysmon, firewall rules).
 
 var argsList = args.ToList();
 
 var useHttpPooling = TakeFlag(argsList, "--http-pooling");
 
-/// One process, one outbound TCP target per cycle — no HTTPS/DNS/listener noise.
+/// One process, one outbound TCP target per cycle - no HTTPS/DNS/listener noise.
 /// Requires --tcp-host and --tcp-port. Use a literal IPv4/IPv6 so the firewall rule matches exactly.
 var simpleBlockTest = TakeFlag(argsList, "--simple-block-test");
 
@@ -57,11 +57,11 @@ if (simpleBlockTest)
 {
     var literal = IPAddress.TryParse(tcpHost!, out _);
     Console.WriteLine("══════════════════════════════════════════════════════════════");
-    Console.WriteLine("  SIMPLE BLOCK TEST  —  one process, one TCP target");
+    Console.WriteLine("  SIMPLE BLOCK TEST  -  one process, one TCP target");
     Console.WriteLine("══════════════════════════════════════════════════════════════");
     Console.WriteLine($"  Each cycle: new TCP connect to {tcpHost}:{tcpPort} (no HTTPS/DNS, no local listener).");
     Console.WriteLine($"  In Endpoint Monitor → Network: find this PID, open the row with remote {tcpHost}:{tcpPort},");
-    Console.WriteLine("  Block IP — that rule must use the same remote IP.");
+    Console.WriteLine("  Block IP - that rule must use the same remote IP.");
     if (!literal)
         Console.WriteLine("  Note: --tcp-host is not a literal IP; use IPv4/IPv6 text for a 1:1 match with the rule.");
     Console.WriteLine("══════════════════════════════════════════════════════════════");
@@ -78,8 +78,8 @@ else
     Console.WriteLine();
     Console.WriteLine(
         useHttpPooling
-            ? "  HTTPS: connection pooling ON (--http-pooling) — can mask outbound IP blocks"
-            : "  HTTPS: connection pooling OFF (default) — each cycle uses a new connection (accurate block tests)");
+            ? "  HTTPS: connection pooling ON (--http-pooling) - can mask outbound IP blocks"
+            : "  HTTPS: connection pooling OFF (default) - each cycle uses a new connection (accurate block tests)");
     Console.WriteLine();
     Console.WriteLine("Interpreting results from this process only:");
     Console.WriteLine("  • OK = outbound reached the remote for that probe.");
@@ -244,7 +244,7 @@ static async Task<ProbeOutcome> ProbeDnsAsync(string host, CancellationToken ct)
 static string ClassifyRemoteFailure(Exception ex, TimeSpan connectTimeout)
 {
     if (ex is TaskCanceledException)
-        return $"timed out (>{connectTimeout.TotalSeconds}s) — common when a rule drops packets";
+        return $"timed out (>{connectTimeout.TotalSeconds}s) - common when a rule drops packets";
 
     for (var e = ex; e != null; e = e.InnerException)
     {
@@ -253,11 +253,11 @@ static string ClassifyRemoteFailure(Exception ex, TimeSpan connectTimeout)
             return se.SocketErrorCode switch
             {
                 SocketError.TimedOut =>
-                    $"socket {se.SocketErrorCode} — timed out (often block/filter on path)",
+                    $"socket {se.SocketErrorCode} - timed out (often block/filter on path)",
                 SocketError.ConnectionRefused =>
-                    $"socket {se.SocketErrorCode} — refused (port closed or explicit RST, not typical silent block)",
+                    $"socket {se.SocketErrorCode} - refused (port closed or explicit RST, not typical silent block)",
                 SocketError.HostUnreachable or SocketError.NetworkUnreachable =>
-                    $"socket {se.SocketErrorCode} — no route / host unreachable",
+                    $"socket {se.SocketErrorCode} - no route / host unreachable",
                 _ => $"socket {se.SocketErrorCode}: {se.Message}",
             };
         }

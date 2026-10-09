@@ -113,7 +113,7 @@ class _SoftwareDetailScreenState extends State<SoftwareDetailScreen> {
     final item = widget.item;
 
     Widget row(String label, String value, {bool mono = false}) {
-      final v = value.trim().isEmpty ? '—' : value.trim();
+      final v = value.trim().isEmpty ? '-' : value.trim();
       return Padding(
         padding: const EdgeInsets.only(bottom: 16),
         child: Column(
@@ -150,7 +150,7 @@ class _SoftwareDetailScreenState extends State<SoftwareDetailScreen> {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         children: [
           Text(
-            item.name.trim().isEmpty ? '—' : item.name.trim(),
+            item.name.trim().isEmpty ? '-' : item.name.trim(),
             style: GoogleFonts.manrope(
               fontSize: 22,
               fontWeight: FontWeight.w800,

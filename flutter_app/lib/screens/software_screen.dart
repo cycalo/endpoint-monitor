@@ -399,7 +399,7 @@ class _SoftwareCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = item.name.trim().isEmpty ? '—' : item.name.trim();
+    final name = item.name.trim().isEmpty ? '-' : item.name.trim();
     final vendorVersion = buildSoftwareCardVendorVersionLine(item);
     final dateAndSizeLine = formatSoftwareDateAndSizeLine(
       normalizeInstallDateDisplay(item.installDate),

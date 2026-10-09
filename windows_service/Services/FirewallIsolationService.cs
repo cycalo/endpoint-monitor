@@ -203,7 +203,7 @@ public sealed class FirewallIsolationService(
         }
 
         logger.LogWarning(
-            "Isolation watchdog: no authenticated WebSocket clients after {Seconds}s — auto-unisolating",
+            "Isolation watchdog: no authenticated WebSocket clients after {Seconds}s - auto-unisolating",
             _watchdogDelay.TotalSeconds);
         await UnisolateAsync(null, "watchdog", CancellationToken.None).ConfigureAwait(false);
     }

@@ -39,7 +39,7 @@ Trimming can remove code ASP.NET Core discovers only at runtime. For a reliable 
 | Launch | What runs |
 |--------|-----------|
 | **Service at boot** (`sc create` + `start= auto`) | Headless agent only (Kestrel, collectors). No window. |
-| **Double-click exe** (service already running) | Desktop console only — talks to `http://127.0.0.1:<port>/local/*`. Does not start a second agent. |
+| **Double-click exe** (service already running) | Desktop console only - talks to `http://127.0.0.1:<port>/local/*`. Does not start a second agent. |
 | **Double-click exe** (service not running) | In-process agent **and** desktop console (`dotnet run` dev path). |
 
 The console can **minimize to the system tray** (Settings). Tray **Exit** closes the UI only; the Windows Service keeps running.

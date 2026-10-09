@@ -20,7 +20,10 @@ internal static class LocalConsoleApi
 
             var diag = await BuildDiagnosticsAsync(ctx).ConfigureAwait(false);
             var endpoints = LocalNetworkHelper.GetNetworkEndpoints();
-            return Results.Json(LocalStatusMapper.FromDiagnostics(diag, endpoints));
+            var dto = LocalStatusMapper.FromDiagnostics(diag, endpoints);
+            var ws = ctx.RequestServices.GetRequiredService<WebSocketConnectionManager>();
+            LocalStatusMapper.ApplyLiveClients(dto, ws.LiveClients);
+            return Results.Json(dto);
         });
 
         app.MapGet("/local/pairing", (HttpContext ctx, PairingAuthService pairing) =>
